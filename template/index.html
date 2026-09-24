@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dashboard · Nurullah POS</title>
+  <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600&family=Inter:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;600;700&text=%E0%A7%B3&display=swap">
+  <link rel="stylesheet" href="assets/css/app.css">
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.3"></script>
+</head>
+<body data-page="dashboard" class="bg-[#f5f7fb] text-slate-800 antialiased">
+  <div id="sidebar-root"></div>
+
+  <div class="lg:pl-60">
+    <div id="topbar-root"></div>
+
+    <main class="mx-auto w-full max-w-[1720px] px-4 py-6 sm:px-6 xl:px-8">
+      <!-- ============ Greeting ============ -->
+      <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+        <div>
+          <h1 id="greeting" class="text-3xl font-bold tracking-tight text-slate-900">Good morning!</h1>
+          <p class="mt-1 text-slate-500">Here's your overview for today. Small steps make a big life.</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-3 sm:gap-5">
+          <div class="flex items-center gap-1.5">
+            <span id="view-date" class="mr-2 text-sm font-semibold text-slate-700">Mon, Sep 21, 2026</span>
+            <button type="button" id="date-prev" class="btn btn-ghost btn-sm btn-icon" aria-label="Previous day"><i data-lucide="chevron-left" class="size-4"></i></button>
+            <button type="button" id="date-today" class="btn btn-secondary btn-sm">Today</button>
+            <button type="button" id="date-next" class="btn btn-ghost btn-sm btn-icon" aria-label="Next day"><i data-lucide="chevron-right" class="size-4"></i></button>
+          </div>
+          <figure class="flex items-center gap-3 rounded-2xl bg-emerald-50 px-5 py-3 ring-1 ring-emerald-100">
+            <i data-lucide="sprout" class="size-7 shrink-0 text-emerald-600"></i>
+            <div>
+              <blockquote class="text-sm font-medium text-slate-800">Progress, not perfection.</blockquote>
+              <figcaption class="text-xs text-slate-500">— Unknown</figcaption>
+            </div>
+          </figure>
+        </div>
+      </div>
+
+      <!-- ============ Stat cards (numbers are calculated by dashboard.js) ============ -->
+      <div class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <article class="flex items-center gap-4 rounded-2xl bg-[#eef3ff] p-5 ring-1 ring-blue-100">
+          <span class="grid size-12 shrink-0 place-items-center rounded-full bg-blue-500 text-white shadow-md shadow-blue-500/25">
+            <i data-lucide="check" class="size-6" stroke-width="3"></i>
+          </span>
+          <div class="min-w-0 flex-1">
+            <p class="text-sm font-medium text-slate-600">Tasks Completed</p>
+            <p id="stat-tasks" class="mt-0.5 text-2xl font-bold text-slate-900">2 / 6</p>
+            <div class="mt-2.5 flex items-center gap-3">
+              <div class="progress flex-1 bg-blue-100"><span id="stat-tasks-bar" class="bg-blue-500" style="width: 33%"></span></div>
+              <span id="stat-tasks-pct" class="w-9 text-right text-xs font-semibold text-slate-600">33%</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="flex items-center gap-4 rounded-2xl bg-[#ecfaf2] p-5 ring-1 ring-emerald-100" title="Goals you marked as on track">
+          <span class="grid size-12 shrink-0 place-items-center text-emerald-600"><i data-lucide="target" class="size-11" stroke-width="2.25"></i></span>
+          <div class="min-w-0 flex-1">
+            <p class="text-sm font-medium text-slate-600">Goals on Track</p>
+            <p id="stat-goals" class="mt-0.5 text-2xl font-bold text-slate-900">3 / 5</p>
+            <div class="mt-2.5 flex items-center gap-3">
+              <div class="progress flex-1 bg-emerald-100"><span id="stat-goals-bar" class="bg-emerald-500" style="width: 60%"></span></div>
+              <span id="stat-goals-pct" class="w-9 text-right text-xs font-semibold text-slate-600">60%</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="flex items-center gap-4 rounded-2xl bg-[#fff6e8] p-5 ring-1 ring-amber-100">
+          <span class="grid size-12 shrink-0 place-items-center"><i data-lucide="flame" class="size-11 fill-orange-300 text-orange-500"></i></span>
+          <div class="min-w-0 flex-1">
+            <p class="text-sm font-medium text-slate-600">Best Habit Streak</p>
+            <p id="stat-streak" class="mt-0.5 text-2xl font-bold text-slate-900">21 days</p>
+            <p class="mt-1.5 truncate text-sm text-slate-600"><span id="stat-streak-habit" class="font-medium text-slate-700">Drink Water</span> · keep going!</p>
+          </div>
+        </article>
+
+        <article class="flex items-center gap-4 rounded-2xl bg-[#fdf0f4] p-5 ring-1 ring-pink-100" title="Your own rating from today's health check-in">
+          <span class="grid size-12 shrink-0 place-items-center"><i data-lucide="heart" class="size-11 fill-pink-400 text-pink-500"></i></span>
+          <div class="min-w-0 flex-1">
+            <p class="text-sm font-medium text-slate-600">Wellness Score</p>
+            <p class="mt-0.5 text-2xl font-bold text-slate-900">8 / 10</p>
+            <div class="mt-2.5 flex items-center gap-3">
+              <div class="progress flex-1 bg-pink-100"><span class="bg-pink-500" style="width: 80%"></span></div>
+              <span class="w-9 text-right text-xs font-semibold text-slate-600">80%</span>
+            </div>
+          </div>
+        </article>
+      </div>
+
+      <!-- ============ Widgets ============ -->
+      <div class="mt-6 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,22.5rem)_minmax(0,1fr)]">
+
+        <!-- Today's schedule (tall column on wide screens) -->
+        <section class="card flex flex-col p-5 xl:row-span-2" aria-labelledby="schedule-title">
+          <header class="flex items-start justify-between gap-3">
+            <div class="flex items-start gap-3">
+              <span class="icon-tile bg-blue-50 text-blue-600"><i data-lucide="calendar-days" class="size-5"></i></span>
+              <div>
+                <h2 id="schedule-title" class="card-title whitespace-nowrap">Today's Schedule</h2>
+                <p id="schedule-date" class="text-xs text-slate-500">Mon, Sep 21, 2026</p>
+              </div>
+            </div>
+            <a href="calendar.html" class="link-more mt-1">View Calendar <i data-lucide="arrow-right" class="size-3.5"></i></a>
+          </header>
+
+          <ol id="schedule" class="mt-4 space-y-0.5">
+            <li class="grid grid-cols-[4.25rem_auto_1fr] items-start gap-3 rounded-xl px-2 py-2" data-start="07:00" data-end="08:30">
+              <time class="pt-0.5 text-xs font-medium text-slate-500">7:00 AM</time>
+              <span class="mt-0.5 h-9 w-1 rounded-full bg-amber-400"></span>
+              <div class="min-w-0"><p class="text-sm font-semibold text-slate-800">Morning Routine</p><p class="truncate text-xs text-slate-500">Exercise • Shower • Breakfast</p></div>
+            </li>
+            <li class="grid grid-cols-[4.25rem_auto_1fr] items-start gap-3 rounded-xl px-2 py-2" data-start="09:00" data-end="12:00">
+              <time class="pt-0.5 text-xs font-medium text-slate-500">9:00 AM</time>
+              <span class="mt-0.5 h-9 w-1 rounded-full bg-emerald-500"></span>
+              <div class="min-w-0"><p class="text-sm font-semibold text-slate-800">Deep Work</p><p class="truncate text-xs text-slate-500">Work on project proposal</p></div>
+            </li>
+            <li class="grid grid-cols-[4.25rem_auto_1fr] items-start gap-3 rounded-xl px-2 py-2" data-start="12:00" data-end="13:00">
+              <time class="pt-0.5 text-xs font-medium text-slate-500">12:00 PM</time>
+              <span class="mt-0.5 h-9 w-1 rounded-full bg-cyan-400"></span>
+              <div class="min-w-0"><p class="text-sm font-semibold text-slate-800">Lunch Break</p><p class="truncate text-xs text-slate-500">Healthy meal &amp; short walk</p></div>
+            </li>
+            <li class="grid grid-cols-[4.25rem_auto_1fr] items-start gap-3 rounded-xl px-2 py-2" data-start="13:00" data-end="13:30">
+              <time class="pt-0.5 text-xs font-medium text-slate-500">1:00 PM</time>
+              <span class="mt-0.5 h-9 w-1 rounded-full bg-rose-400"></span>
+              <div class="min-w-0"><p class="text-sm font-semibold text-slate-800">Team Sync</p><p class="truncate text-xs text-slate-500">Zoom meeting</p></div>
+            </li>
+            <li class="grid grid-cols-[4.25rem_auto_1fr] items-start gap-3 rounded-xl px-2 py-2" data-start="15:00" data-end="16:00">
+              <time class="pt-0.5 text-xs font-medium text-slate-500">3:00 PM</time>
+              <span class="mt-0.5 h-9 w-1 rounded-full bg-blue-500"></span>
+              <div class="min-w-0"><p class="text-sm font-semibold text-slate-800">Personal Finance</p><p class="truncate text-xs text-slate-500">Review expenses</p></div>
+            </li>
+            <li class="grid grid-cols-[4.25rem_auto_1fr] items-start gap-3 rounded-xl px-2 py-2" data-start="18:00" data-end="19:00">
+              <time class="pt-0.5 text-xs font-medium text-slate-500">6:00 PM</time>
+              <span class="mt-0.5 h-9 w-1 rounded-full bg-slate-700"></span>
+              <div class="min-w-0"><p class="text-sm font-semibold text-slate-800">Gym</p><p class="truncate text-xs text-slate-500">Strength training</p></div>
+            </li>
+            <li class="grid grid-cols-[4.25rem_auto_1fr] items-start gap-3 rounded-xl px-2 py-2" data-start="20:00" data-end="20:30">
+              <time class="pt-0.5 text-xs font-medium text-slate-500">8:00 PM</time>
+              <span class="mt-0.5 h-9 w-1 rounded-full bg-yellow-400"></span>
+              <div class="min-w-0"><p class="text-sm font-semibold text-slate-800">Read</p><p class="truncate text-xs text-slate-500">30 minutes</p></div>
+            </li>
+            <li class="grid grid-cols-[4.25rem_auto_1fr] items-start gap-3 rounded-xl px-2 py-2" data-start="21:30" data-end="22:00">
+              <time class="pt-0.5 text-xs font-medium text-slate-500">9:30 PM</time>
+              <span class="mt-0.5 h-9 w-1 rounded-full bg-violet-500"></span>
+              <div class="min-w-0"><p class="text-sm font-semibold text-slate-800">Wind Down</p><p class="truncate text-xs text-slate-500">Journaling • Plan tomorrow</p></div>
+            </li>
+          </ol>
+
+          <div class="mt-auto pt-4">
+            <div class="flex items-center gap-3 rounded-xl bg-slate-50 p-3 ring-1 ring-slate-100">
+              <span class="icon-tile size-8 bg-white text-blue-600 ring-1 ring-slate-200"><i data-lucide="clock" class="size-4"></i></span>
+              <p id="next-up" class="text-sm text-slate-600">Next: <b class="font-semibold text-slate-800">Team Sync</b> at 1:00 PM</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- Row 1: Tasks · Habits · Goals -->
+        <div class="grid grid-cols-1 gap-5 md:grid-cols-2 min-[100rem]:grid-cols-3">
+
+          <!-- Tasks -->
+          <section class="card flex flex-col p-5" aria-labelledby="tasks-title">
+            <header class="flex items-center justify-between gap-3">
+              <h2 id="tasks-title" class="card-title flex items-center gap-2.5"><span class="icon-tile size-8 bg-blue-50 text-blue-600"><i data-lucide="square-check" class="size-4.5"></i></span>Tasks</h2>
+              <a href="tasks.html" class="link-more">View All <i data-lucide="arrow-right" class="size-3.5"></i></a>
+            </header>
+            <div id="task-tabs" class="segmented mt-4 self-start" role="tablist" data-tabs>
+              <button type="button" role="tab" aria-selected="true" data-tab="today">Today</button>
+              <button type="button" role="tab" aria-selected="false" data-tab="week">This Week</button>
+              <button type="button" role="tab" aria-selected="false" data-tab="overdue">Overdue <span id="overdue-count" class="text-rose-500">(1)</span></button>
+            </div>
+            <ul id="dash-tasks" class="mt-2 divide-y divide-slate-100">
+              <li data-when="today" class="flex items-center gap-3 py-2.5">
+                <input id="dt-1" type="checkbox" class="checkbox peer" checked>
+                <label for="dt-1" class="min-w-0 flex-1 truncate text-sm text-slate-700 peer-checked:text-slate-400 peer-checked:line-through">Finish project proposal</label>
+                <span class="badge bg-blue-50 text-blue-700">Work</span>
+              </li>
+              <li data-when="today" class="flex items-center gap-3 py-2.5">
+                <input id="dt-2" type="checkbox" class="checkbox peer" checked>
+                <label for="dt-2" class="min-w-0 flex-1 truncate text-sm text-slate-700 peer-checked:text-slate-400 peer-checked:line-through">Review monthly expenses</label>
+                <span class="badge bg-amber-50 text-amber-700">Finance</span>
+              </li>
+              <li data-when="today" class="flex items-center gap-3 py-2.5">
+                <input id="dt-3" type="checkbox" class="checkbox peer">
+                <label for="dt-3" class="min-w-0 flex-1 truncate text-sm text-slate-700 peer-checked:text-slate-400 peer-checked:line-through">Go to the gym</label>
+                <span class="badge bg-emerald-50 text-emerald-700">Health</span>
+              </li>
+              <li data-when="today" class="flex items-center gap-3 py-2.5">
+                <input id="dt-4" type="checkbox" class="checkbox peer">
+                <label for="dt-4" class="min-w-0 flex-1 truncate text-sm text-slate-700 peer-checked:text-slate-400 peer-checked:line-through">Read 30 minutes</label>
+                <span class="badge bg-violet-50 text-violet-700">Personal</span>
+              </li>
+              <li data-when="today" class="flex items-center gap-3 py-2.5">
+                <input id="dt-5" type="checkbox" class="checkbox peer">
+                <label for="dt-5" class="min-w-0 flex-1 truncate text-sm text-slate-700 peer-checked:text-slate-400 peer-checked:line-through">Plan weekend trip</label>
+                <span class="badge bg-violet-50 text-violet-700">Personal</span>
+              </li>
+              <li data-when="today" class="flex items-center gap-3 py-2.5">
+                <input id="dt-6" type="checkbox" class="checkbox peer">
+                <label for="dt-6" class="min-w-0 flex-1 truncate text-sm text-slate-700 peer-checked:text-slate-400 peer-checked:line-through">Clean workspace</label>
+                <span class="badge bg-orange-50 text-orange-700">Home</span>
+              </li>
+              <li data-when="week" class="flex items-center gap-3 py-2.5" hidden>
+                <input id="dt-7" type="checkbox" class="checkbox peer">
+                <label for="dt-7" class="min-w-0 flex-1 truncate text-sm text-slate-700 peer-checked:text-slate-400 peer-checked:line-through">Complete IQA Unit 1.3 notes</label>
+                <span class="text-xs text-slate-400" data-date-offset="1" data-date-format="weekday"></span>
+                <span class="badge bg-teal-50 text-teal-700">Learning</span>
+              </li>
+              <li data-when="week" class="flex items-center gap-3 py-2.5" hidden>
+                <input id="dt-8" type="checkbox" class="checkbox peer">
+                <label for="dt-8" class="min-w-0 flex-1 truncate text-sm text-slate-700 peer-checked:text-slate-400 peer-checked:line-through">Book dentist appointment</label>
+                <span class="text-xs text-slate-400" data-date-offset="1" data-date-format="weekday"></span>
+                <span class="badge bg-emerald-50 text-emerald-700">Health</span>
+              </li>
+              <li data-when="week" class="flex items-center gap-3 py-2.5" hidden>
+                <input id="dt-9" type="checkbox" class="checkbox peer">
+                <label for="dt-9" class="min-w-0 flex-1 truncate text-sm text-slate-700 peer-checked:text-slate-400 peer-checked:line-through">Prepare retrospective slides</label>
+                <span class="text-xs text-slate-400" data-date-offset="3" data-date-format="weekday"></span>
+                <span class="badge bg-blue-50 text-blue-700">Work</span>
+              </li>
+              <li data-when="week" class="flex items-center gap-3 py-2.5" hidden>
+                <input id="dt-10" type="checkbox" class="checkbox peer">
+                <label for="dt-10" class="min-w-0 flex-1 truncate text-sm text-slate-700 peer-checked:text-slate-400 peer-checked:line-through">Buy groceries for the week</label>
+                <span class="text-xs text-slate-400" data-date-offset="4" data-date-format="weekday"></span>
+                <span class="badge bg-orange-50 text-orange-700">Home</span>
+              </li>
+              <li data-when="overdue" class="flex items-center gap-3 py-2.5" hidden>
+                <input id="dt-11" type="checkbox" class="checkbox peer">
+                <label for="dt-11" class="min-w-0 flex-1 truncate text-sm text-slate-700 peer-checked:text-slate-400 peer-checked:line-through">Pay electricity bill</label>
+                <span class="text-xs font-medium text-rose-500">Yesterday</span>
+                <span class="badge bg-amber-50 text-amber-700">Finance</span>
+              </li>
+            </ul>
+            <p id="dash-tasks-empty" class="py-8 text-center text-sm text-slate-500" hidden>Nothing here. Nice work!</p>
+          </section>
+
+          <!-- Habit tracker -->
+          <section class="card flex flex-col p-5" aria-labelledby="habits-title">
+            <header class="flex items-center justify-between gap-3">
+              <h2 id="habits-title" class="card-title flex items-center gap-2.5"><span class="icon-tile size-8 bg-indigo-50 text-indigo-600"><i data-lucide="chart-column" class="size-4.5"></i></span>Habit Tracker</h2>
+              <a href="habits.html" class="link-more">View All <i data-lucide="arrow-right" class="size-3.5"></i></a>
+            </header>
+            <div class="mt-4 flex items-center gap-2.5 text-[11px] font-medium text-slate-400">
+              <span class="flex-1"><span id="habits-today">2 of 6</span> done today</span>
+              <div id="habit-day-labels" class="flex gap-1"></div>
+              <span class="w-7"></span>
+            </div>
+            <!-- Each row: last 5 days (the last dot is today). data-prior = streak days before these 5. -->
+            <ul id="dash-habits" class="mt-2 space-y-3">
+              <li class="flex items-center gap-2.5" data-prior="8">
+                <i data-lucide="dumbbell" class="size-4 shrink-0 text-slate-500"></i>
+                <span class="min-w-0 flex-1 truncate text-[13px] text-slate-700">Exercise</span>
+                <div class="flex gap-1"><button type="button" class="habit-dot habit-dot-sm" aria-pressed="true"></button><button type="button" class="habit-dot habit-dot-sm" aria-pressed="true"></button><button type="button" class="habit-dot habit-dot-sm" aria-pressed="true"></button><button type="button" class="habit-dot habit-dot-sm" aria-pressed="true"></button><button type="button" class="habit-dot habit-dot-sm" aria-pressed="false"></button></div>
+                <span class="w-7 text-right text-xs font-semibold text-slate-500" data-streak>12d</span>
+              </li>
+              <li class="flex items-center gap-2.5" data-prior="3">
+                <i data-lucide="book-open" class="size-4 shrink-0 text-slate-500"></i>
+                <span class="min-w-0 flex-1 truncate text-[13px] text-slate-700">Read</span>
+                <div class="flex gap-1"><button type="button" class="habit-dot habit-dot-sm" aria-pressed="true"></button><button type="button" class="habit-dot habit-dot-sm" aria-pressed="true"></button><button type="button" class="habit-dot habit-dot-sm" aria-pressed="true"></button><button type="button" class="habit-dot habit-dot-sm" aria-pressed="true"></button><button type="button" class="habit-dot habit-dot-sm" aria-pressed="true"></button></div>
+                <span class="w-7 text-right text-xs font-semibold text-slate-500" data-streak>8d</span>
+              </li>
+              <li class="flex items-center gap-2.5" data-prior="2">
+                <i data-lucide="brain" class="size-4 shrink-0 text-slate-500"></i>
+                <span class="min-w-0 flex-1 truncate text-[13px] text-slate-700">Meditate</span>
+                <div class="flex gap-1"><button type="button" class="habit-dot habit-dot-sm" aria-pressed="false"></button><button type="button" class="habit-dot habit-dot-sm" aria-pressed="true"></button><button type="button" class="habit-dot habit-dot-sm" aria-pressed="true"></button><button type="button" class="habit-dot habit-dot-sm" aria-pressed="true"></button><button type="button" class="habit-dot habit-dot-sm" aria-pressed="false"></button></div>
+                <span class="w-7 text-right text-xs font-semibold text-slate-500" data-streak>3d</span>
+              </li>
+              <li class="flex items-center gap-2.5" data-prior="16">
+                <i data-lucide="glass-water" class="size-4 shrink-0 text-slate-500"></i>
+                <span class="min-w-0 flex-1 truncate text-[13px] text-slate-700">Drink Water</span>
+                <div class="flex gap-1"><button type="button" class="habit-dot habit-dot-sm" aria-pressed="true"></button><button type="button" class="habit-dot habit-dot-sm" aria-pressed="true"></button><button type="button" class="habit-dot habit-dot-sm" aria-pressed="true"></button><button type="button" class="habit-dot habit-dot-sm" aria-pressed="true"></button><button type="button" class="habit-dot habit-dot-sm" aria-pressed="true"></button></div>
+                <span class="w-7 text-right text-xs font-semibold text-slate-500" data-streak>21d</span>
+              </li>
+              <li class="flex items-center gap-2.5" data-prior="10">
+                <i data-lucide="salad" class="size-4 shrink-0 text-slate-500"></i>
+                <span class="min-w-0 flex-1 truncate text-[13px] text-slate-700">Eat Healthy</span>
+                <div class="flex gap-1"><button type="button" class="habit-dot habit-dot-sm" aria-pressed="true"></button><button type="button" class="habit-dot habit-dot-sm" aria-pressed="true"></button><button type="button" class="habit-dot habit-dot-sm" aria-pressed="true"></button><button type="button" class="habit-dot habit-dot-sm" aria-pressed="true"></button><button type="button" class="habit-dot habit-dot-sm" aria-pressed="false"></button></div>
+                <span class="w-7 text-right text-xs font-semibold text-slate-500" data-streak>14d</span>
+              </li>
+              <li class="flex items-center gap-2.5" data-prior="2">
+                <i data-lucide="moon" class="size-4 shrink-0 text-slate-500"></i>
+                <span class="min-w-0 flex-1 truncate text-[13px] text-slate-700">Sleep Before 11</span>
+                <div class="flex gap-1"><button type="button" class="habit-dot habit-dot-sm" aria-pressed="false"></button><button type="button" class="habit-dot habit-dot-sm" aria-pressed="false"></button><button type="button" class="habit-dot habit-dot-sm" aria-pressed="true"></button><button type="button" class="habit-dot habit-dot-sm" aria-pressed="true"></button><button type="button" class="habit-dot habit-dot-sm" aria-pressed="false"></button></div>
+                <span class="w-7 text-right text-xs font-semibold text-slate-500" data-streak>2d</span>
+              </li>
+            </ul>
+          </section>
+
+          <!-- Goals -->
+          <section class="card flex flex-col p-5 md:col-span-2 min-[100rem]:col-span-1" aria-labelledby="goals-title">
+            <header class="flex items-center justify-between gap-3">
+              <h2 id="goals-title" class="card-title flex items-center gap-2.5"><span class="icon-tile size-8 bg-emerald-50 text-emerald-600"><i data-lucide="target" class="size-4.5"></i></span>Goals</h2>
+              <a href="goals.html" class="link-more">View All <i data-lucide="arrow-right" class="size-3.5"></i></a>
+            </header>
+            <!-- data-status is set by you on the Goals page (on-track / behind) -->
+            <ul id="dash-goals" class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-x-8 min-[100rem]:grid-cols-1">
+              <li class="flex items-center gap-3" data-status="on-track">
+                <span class="icon-tile bg-emerald-50 text-emerald-600"><i data-lucide="piggy-bank" class="size-5"></i></span>
+                <div class="min-w-0 flex-1">
+                  <p class="truncate text-sm font-medium text-slate-800">Build Emergency Fund</p>
+                  <div class="mt-1.5 flex items-center gap-3"><div class="progress h-1.5 flex-1"><span class="bg-emerald-500" style="width: 70%"></span></div><span class="w-8 text-right text-xs font-semibold text-slate-600">70%</span></div>
+                </div>
+              </li>
+              <li class="flex items-center gap-3" data-status="behind">
+                <span class="icon-tile bg-blue-50 text-blue-600"><i data-lucide="footprints" class="size-5"></i></span>
+                <div class="min-w-0 flex-1">
+                  <p class="flex items-center gap-1.5 truncate text-sm font-medium text-slate-800">Run a 10K <span class="size-1.5 rounded-full bg-amber-400" title="Behind schedule"></span></p>
+                  <div class="mt-1.5 flex items-center gap-3"><div class="progress h-1.5 flex-1"><span class="bg-blue-500" style="width: 40%"></span></div><span class="w-8 text-right text-xs font-semibold text-slate-600">40%</span></div>
+                </div>
+              </li>
+              <li class="flex items-center gap-3" data-status="on-track">
+                <span class="icon-tile bg-violet-50 text-violet-600"><i data-lucide="graduation-cap" class="size-5"></i></span>
+                <div class="min-w-0 flex-1">
+                  <p class="truncate text-sm font-medium text-slate-800">Learn a New Skill</p>
+                  <div class="mt-1.5 flex items-center gap-3"><div class="progress h-1.5 flex-1"><span class="bg-violet-500" style="width: 60%"></span></div><span class="w-8 text-right text-xs font-semibold text-slate-600">60%</span></div>
+                </div>
+              </li>
+              <li class="flex items-center gap-3" data-status="behind">
+                <span class="icon-tile bg-pink-50 text-pink-600"><i data-lucide="plane" class="size-5"></i></span>
+                <div class="min-w-0 flex-1">
+                  <p class="flex items-center gap-1.5 truncate text-sm font-medium text-slate-800">Travel to Japan <span class="size-1.5 rounded-full bg-amber-400" title="Behind schedule"></span></p>
+                  <div class="mt-1.5 flex items-center gap-3"><div class="progress h-1.5 flex-1"><span class="bg-pink-500" style="width: 25%"></span></div><span class="w-8 text-right text-xs font-semibold text-slate-600">25%</span></div>
+                </div>
+              </li>
+              <li class="flex items-center gap-3" data-status="on-track">
+                <span class="icon-tile bg-amber-50 text-amber-600"><i data-lucide="book-open" class="size-5"></i></span>
+                <div class="min-w-0 flex-1">
+                  <p class="truncate text-sm font-medium text-slate-800">Read 24 Books This Year</p>
+                  <div class="mt-1.5 flex items-center gap-3"><div class="progress h-1.5 flex-1"><span class="bg-amber-400" style="width: 50%"></span></div><span class="w-8 text-right text-xs font-semibold text-slate-600">50%</span></div>
+                </div>
+              </li>
+            </ul>
+          </section>
+        </div>
+
+        <!-- Row 2: Budget · Health · Notes · Productivity -->
+        <div class="grid grid-cols-1 gap-5 md:grid-cols-2 min-[112.5rem]:grid-cols-4">
+
+          <!-- Monthly budget -->
+          <section class="card flex flex-col p-5" aria-labelledby="budget-title">
+            <header class="flex items-center justify-between gap-3">
+              <h2 id="budget-title" class="card-title flex items-center gap-2.5"><span class="icon-tile size-8 bg-blue-50 text-blue-600"><i data-lucide="wallet" class="size-4.5"></i></span>Monthly Budget</h2>
+              <select id="budget-month" class="select" aria-label="Month"></select>
+            </header>
+            <div class="mt-4 flex items-center gap-4">
+              <div class="relative size-32 shrink-0">
+                <div id="budget-donut" class="absolute inset-0"></div>
+                <div class="absolute inset-0 grid place-content-center text-center">
+                  <p id="budget-spent" class="text-[15px] font-bold text-slate-900">৳45,000</p>
+                  <p class="text-[11px] text-slate-500">of <span id="budget-total">৳60,000</span></p>
+                </div>
+              </div>
+              <!-- Spent this month per category. Percentages and the ring are calculated from these amounts. -->
+              <ul id="budget-legend" class="min-w-0 flex-1 space-y-2 text-xs" data-budget="60000">
+                <li class="flex items-center gap-2" data-amount="15750" data-color="#60a5fa"><span class="size-2.5 shrink-0 rounded-full bg-[#60a5fa]"></span><span class="flex-1 truncate text-slate-600">Housing</span><b class="font-semibold text-slate-800" data-pct>35%</b></li>
+                <li class="flex items-center gap-2" data-amount="8100" data-color="#a78bfa"><span class="size-2.5 shrink-0 rounded-full bg-[#a78bfa]"></span><span class="flex-1 truncate text-slate-600">Food</span><b class="font-semibold text-slate-800" data-pct>18%</b></li>
+                <li class="flex items-center gap-2" data-amount="5400" data-color="#fb923c"><span class="size-2.5 shrink-0 rounded-full bg-[#fb923c]"></span><span class="flex-1 truncate text-slate-600">Transport</span><b class="font-semibold text-slate-800" data-pct>12%</b></li>
+                <li class="flex items-center gap-2" data-amount="6750" data-color="#facc15"><span class="size-2.5 shrink-0 rounded-full bg-[#facc15]"></span><span class="flex-1 truncate text-slate-600">Lifestyle</span><b class="font-semibold text-slate-800" data-pct>15%</b></li>
+                <li class="flex items-center gap-2" data-amount="9000" data-color="#34d399"><span class="size-2.5 shrink-0 rounded-full bg-[#34d399]"></span><span class="flex-1 truncate text-slate-600">Savings</span><b class="font-semibold text-slate-800" data-pct>20%</b></li>
+              </ul>
+            </div>
+            <div class="mt-auto pt-4">
+              <div class="flex items-center gap-3 rounded-xl bg-emerald-50 p-3">
+                <i data-lucide="trending-up" class="size-5 shrink-0 text-emerald-600"></i>
+                <div>
+                  <p id="budget-left" class="text-sm font-semibold text-emerald-800">৳15,000 left this month</p>
+                  <p class="text-xs text-emerald-700/80">Great job managing your finances.</p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Health -->
+          <section class="card flex flex-col p-5" aria-labelledby="health-title">
+            <header class="flex items-center justify-between gap-3">
+              <h2 id="health-title" class="card-title flex items-center gap-2.5"><span class="icon-tile size-8 bg-pink-50 text-pink-500"><i data-lucide="heart" class="size-4.5 fill-pink-200"></i></span>Health &amp; Wellness</h2>
+              <a href="health.html" class="link-more">View Details <i data-lucide="arrow-right" class="size-3.5"></i></a>
+            </header>
+            <div class="mt-4 grid grid-cols-3 gap-2">
+              <div class="rounded-xl bg-emerald-50/70 p-2.5">
+                <i data-lucide="footprints" class="size-5 text-emerald-600"></i>
+                <p class="mt-2 text-[11px] text-slate-500">Steps</p>
+                <p class="text-base font-bold leading-tight text-slate-900">8,432</p>
+                <p class="text-[11px] text-slate-500">/ 10,000</p>
+                <div class="progress mt-2 h-1.5 bg-emerald-100"><span class="bg-emerald-500" style="width: 84%"></span></div>
+              </div>
+              <div class="rounded-xl bg-violet-50/70 p-2.5">
+                <i data-lucide="moon" class="size-5 fill-violet-200 text-violet-600"></i>
+                <p class="mt-2 text-[11px] text-slate-500">Sleep</p>
+                <p class="text-base font-bold leading-tight text-slate-900">7<small class="text-xs font-semibold">h</small> 20<small class="text-xs font-semibold">m</small></p>
+                <p class="text-[11px] text-slate-500">/ 8h</p>
+                <div class="progress mt-2 h-1.5 bg-violet-100"><span class="bg-violet-500" style="width: 92%"></span></div>
+              </div>
+              <div class="rounded-xl bg-pink-50/70 p-2.5">
+                <i data-lucide="heart-pulse" class="size-5 text-pink-500"></i>
+                <p class="mt-2 text-[11px] text-slate-500">Heart Rate</p>
+                <p class="text-base font-bold leading-tight text-slate-900">62 <small class="text-xs font-semibold">bpm</small></p>
+                <p class="text-[11px] text-slate-500">Resting</p>
+                <svg viewBox="0 0 60 12" class="mt-1.5 h-3 w-full text-pink-500" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M0 7h14l3-5 4 9 3-6 2 2h34"/></svg>
+              </div>
+            </div>
+            <div class="mt-auto pt-4">
+              <p class="flex items-center gap-2 rounded-xl bg-slate-50 p-3 text-xs italic text-slate-600"><i data-lucide="leaf" class="size-4 shrink-0 not-italic text-emerald-600"></i>“A healthy mind fuels a brighter tomorrow.”</p>
+            </div>
+          </section>
+
+          <!-- Notes & reminders -->
+          <section class="card flex flex-col p-5" aria-labelledby="notes-title">
+            <header class="flex items-center justify-between gap-3">
+              <h2 id="notes-title" class="card-title flex items-center gap-2.5"><span class="icon-tile size-8 bg-sky-50 text-sky-600"><i data-lucide="file-text" class="size-4.5"></i></span>Notes &amp; Reminders</h2>
+              <a href="notes.html" class="link-more">View All <i data-lucide="arrow-right" class="size-3.5"></i></a>
+            </header>
+            <ul id="dash-notes" class="mt-4 space-y-3">
+              <li class="flex items-start gap-2.5"><input id="dn-1" type="checkbox" class="checkbox peer mt-0.5"><label for="dn-1" class="text-sm text-slate-700 peer-checked:text-slate-400 peer-checked:line-through">Book dentist appointment</label></li>
+              <li class="flex items-start gap-2.5"><input id="dn-2" type="checkbox" class="checkbox peer mt-0.5"><label for="dn-2" class="text-sm text-slate-700 peer-checked:text-slate-400 peer-checked:line-through">Renew car insurance (due <span data-date-offset="14" data-date-format="short"></span>)</label></li>
+              <li class="flex items-start gap-2.5"><input id="dn-3" type="checkbox" class="checkbox peer mt-0.5"><label for="dn-3" class="text-sm text-slate-700 peer-checked:text-slate-400 peer-checked:line-through">Plan birthday gift for Sarah</label></li>
+              <li class="flex items-start gap-2.5"><input id="dn-4" type="checkbox" class="checkbox peer mt-0.5"><label for="dn-4" class="text-sm text-slate-700 peer-checked:text-slate-400 peer-checked:line-through">Research weekend getaway spots</label></li>
+              <li class="flex items-start gap-2.5"><input id="dn-5" type="checkbox" class="checkbox peer mt-0.5"><label for="dn-5" class="text-sm text-slate-700 peer-checked:text-slate-400 peer-checked:line-through">Declutter wardrobe this month</label></li>
+            </ul>
+            <form id="dash-note-form" class="mt-auto pt-4">
+              <label class="flex items-center gap-2 rounded-xl border border-dashed border-slate-300 px-3 py-2.5 transition focus-within:border-blue-300 focus-within:bg-blue-50/40">
+                <i data-lucide="plus" class="size-4 shrink-0 text-slate-400"></i>
+                <input name="note" type="text" autocomplete="off" placeholder="Add a note…" class="min-w-0 flex-1 bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400">
+              </label>
+            </form>
+          </section>
+
+          <!-- Productivity -->
+          <section class="card flex flex-col p-5" aria-labelledby="prod-title">
+            <header class="flex items-center justify-between gap-3">
+              <h2 id="prod-title" class="card-title flex items-center gap-2.5"><span class="icon-tile size-8 bg-blue-50 text-blue-600"><i data-lucide="chart-no-axes-column" class="size-4.5"></i></span>Productivity</h2>
+              <span class="badge bg-slate-100 text-slate-600">Last 7 days</span>
+            </header>
+            <!-- Focused hours per day, oldest first (the last bar is today). -->
+            <div class="mt-5 flex h-40 gap-2">
+              <div class="flex flex-col justify-between pb-5 text-right text-[10px] text-slate-400"><span>8h</span><span>6h</span><span>4h</span><span>2h</span><span>0</span></div>
+              <div class="relative flex-1">
+                <div class="pointer-events-none absolute inset-x-0 bottom-5 top-1.5 flex flex-col justify-between">
+                  <span class="border-t border-dashed border-slate-200"></span><span class="border-t border-dashed border-slate-200"></span><span class="border-t border-dashed border-slate-200"></span><span class="border-t border-dashed border-slate-200"></span><span class="border-t border-slate-200"></span>
+                </div>
+                <div id="prod-bars" class="relative grid h-full grid-cols-7 gap-1.5" data-max="8" data-last-week="26.7">
+                  <div class="flex flex-col items-center gap-1" data-hours="4.5"><div class="flex w-full flex-1 items-end justify-center pt-1.5"><span class="w-full max-w-5 rounded-t-md bg-blue-400"></span></div><span class="text-[10px] text-slate-500">–</span></div>
+                  <div class="flex flex-col items-center gap-1" data-hours="5"><div class="flex w-full flex-1 items-end justify-center pt-1.5"><span class="w-full max-w-5 rounded-t-md bg-blue-400"></span></div><span class="text-[10px] text-slate-500">–</span></div>
+                  <div class="flex flex-col items-center gap-1" data-hours="6"><div class="flex w-full flex-1 items-end justify-center pt-1.5"><span class="w-full max-w-5 rounded-t-md bg-blue-400"></span></div><span class="text-[10px] text-slate-500">–</span></div>
+                  <div class="flex flex-col items-center gap-1" data-hours="3"><div class="flex w-full flex-1 items-end justify-center pt-1.5"><span class="w-full max-w-5 rounded-t-md bg-blue-400"></span></div><span class="text-[10px] text-slate-500">–</span></div>
+                  <div class="flex flex-col items-center gap-1" data-hours="4"><div class="flex w-full flex-1 items-end justify-center pt-1.5"><span class="w-full max-w-5 rounded-t-md bg-blue-400"></span></div><span class="text-[10px] text-slate-500">–</span></div>
+                  <div class="flex flex-col items-center gap-1" data-hours="5.5"><div class="flex w-full flex-1 items-end justify-center pt-1.5"><span class="w-full max-w-5 rounded-t-md bg-blue-400"></span></div><span class="text-[10px] text-slate-500">–</span></div>
+                  <div class="flex flex-col items-center gap-1" data-hours="3.5"><div class="flex w-full flex-1 items-end justify-center pt-1.5"><span class="w-full max-w-5 rounded-t-md bg-blue-400"></span></div><span class="text-[10px] text-slate-500">–</span></div>
+                </div>
+              </div>
+            </div>
+            <div class="mt-auto pt-4">
+              <div class="flex items-center gap-3 rounded-xl bg-emerald-50 p-3">
+                <i data-lucide="sun" class="size-5 shrink-0 text-amber-500"></i>
+                <p id="prod-compare" class="text-sm font-medium text-emerald-800">You're 18% more productive than last week!</p>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/lucide@1.47.0/dist/umd/lucide.min.js"></script>
+  <script src="assets/js/app.js"></script>
+  <script src="assets/js/dashboard.js"></script>
+</body>
+</html>

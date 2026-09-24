@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Health · Nurullah POS</title>
+  <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600&family=Inter:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;600;700&text=%E0%A7%B3&display=swap">
+  <link rel="stylesheet" href="assets/css/app.css">
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.3"></script>
+</head>
+<body data-page="health" class="bg-[#f5f7fb] text-slate-800 antialiased">
+  <div id="sidebar-root"></div>
+
+  <div class="lg:pl-60">
+    <div id="topbar-root"></div>
+
+    <main class="mx-auto w-full max-w-[1720px] px-4 py-6 sm:px-6 xl:px-8">
+      <!-- Page header -->
+      <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 class="text-3xl font-bold tracking-tight text-slate-900">Health</h1>
+          <p class="mt-1 text-slate-500">Small healthy choices, every day.</p>
+        </div>
+        <button type="button" class="btn btn-primary self-start sm:self-auto" data-modal-open="log-modal"><i data-lucide="heart-pulse" class="size-4"></i>Log Today</button>
+      </div>
+
+      <!-- ============ Today ============ -->
+      <div class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-6 min-[100rem]:grid-cols-5">
+        <section class="card p-5 xl:col-span-2 min-[100rem]:col-span-1" aria-label="Steps today">
+          <div class="flex items-center justify-between gap-2">
+            <p class="flex items-center gap-2 font-semibold text-slate-800"><span class="icon-tile size-8 bg-emerald-50 text-emerald-600"><i data-lucide="footprints" class="size-4"></i></span>Steps</p>
+            <span class="text-xs text-slate-500">Goal 10,000</span>
+          </div>
+          <div class="mt-4 flex items-center gap-4">
+            <div class="relative size-22 shrink-0"><div id="steps-ring" class="absolute inset-0"></div><p id="steps-pct" class="absolute inset-0 grid place-content-center text-sm font-bold text-slate-800">84%</p></div>
+            <div><p id="steps-today" class="text-3xl font-bold text-slate-900">8,432</p><p class="text-sm text-slate-500" id="steps-left">1,568 to go</p></div>
+          </div>
+        </section>
+
+        <section class="card p-5 xl:col-span-2 min-[100rem]:col-span-1" aria-label="Sleep last night">
+          <div class="flex items-center justify-between gap-2">
+            <p class="flex items-center gap-2 font-semibold text-slate-800"><span class="icon-tile size-8 bg-violet-50 text-violet-600"><i data-lucide="moon" class="size-4 fill-violet-200"></i></span>Sleep</p>
+            <span class="text-xs text-slate-500">Goal 8h</span>
+          </div>
+          <div class="mt-4 flex items-center gap-4">
+            <div class="relative size-22 shrink-0"><div id="sleep-ring" class="absolute inset-0"></div><p id="sleep-pct" class="absolute inset-0 grid place-content-center text-sm font-bold text-slate-800">92%</p></div>
+            <div><p id="sleep-today" class="text-3xl font-bold text-slate-900">7h 20m</p><p class="text-sm text-slate-500">last night</p></div>
+          </div>
+        </section>
+
+        <section class="card p-5 xl:col-span-2 min-[100rem]:col-span-1" aria-label="Resting heart rate">
+          <div class="flex items-center justify-between gap-2">
+            <p class="flex items-center gap-2 font-semibold text-slate-800"><span class="icon-tile size-8 bg-pink-50 text-pink-500"><i data-lucide="heart-pulse" class="size-4"></i></span>Heart rate</p>
+            <span class="text-xs text-slate-500">Resting</span>
+          </div>
+          <p class="mt-4 text-3xl font-bold text-slate-900"><span id="hr-today">62</span> <span class="text-lg font-semibold text-slate-500">bpm</span></p>
+          <p class="text-sm text-emerald-600">In the healthy range (60–100)</p>
+          <svg id="hr-spark" viewBox="0 0 120 28" class="mt-3 h-7 w-full text-pink-500" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg>
+        </section>
+
+        <section class="card p-5 xl:col-span-3 min-[100rem]:col-span-1" aria-label="Water today">
+          <div class="flex items-center justify-between gap-2">
+            <p class="flex items-center gap-2 font-semibold text-slate-800"><span class="icon-tile size-8 bg-sky-50 text-sky-600"><i data-lucide="glass-water" class="size-4"></i></span>Water</p>
+            <span class="text-xs text-slate-500">Goal 8 glasses</span>
+          </div>
+          <p class="mt-4 text-3xl font-bold text-slate-900"><span id="water-count">6</span> <span class="text-lg font-semibold text-slate-400">/ 8</span></p>
+          <div id="water-glasses" class="mt-2 flex flex-wrap gap-1" aria-hidden="true"></div>
+          <div class="mt-3 flex gap-2">
+            <button type="button" id="water-minus" class="btn btn-secondary btn-sm btn-icon" aria-label="Remove a glass"><i data-lucide="minus" class="size-4"></i></button>
+            <button type="button" id="water-plus" class="btn btn-primary btn-sm flex-1"><i data-lucide="plus" class="size-4"></i>Add a glass</button>
+          </div>
+        </section>
+
+        <section class="card p-5 sm:col-span-2 xl:col-span-3 min-[100rem]:col-span-1" aria-label="Weight">
+          <div class="flex items-center justify-between gap-2">
+            <p class="flex items-center gap-2 font-semibold text-slate-800"><span class="icon-tile size-8 bg-amber-50 text-amber-600"><i data-lucide="scale" class="size-4"></i></span>Weight</p>
+            <span class="text-xs text-slate-500">Last 30 days</span>
+          </div>
+          <p class="mt-4 text-3xl font-bold text-slate-900"><span id="weight-today">72.4</span> <span class="text-lg font-semibold text-slate-500">kg</span></p>
+          <p id="weight-change" class="flex items-center gap-1 text-sm text-emerald-600"><i data-lucide="trending-down" class="size-4"></i>0.6 kg down this month</p>
+          <svg id="weight-spark" data-values="73,72.9,72.9,72.8,72.9,72.7,72.6,72.6,72.5,72.4" viewBox="0 0 120 28" class="mt-3 h-7 w-full text-amber-500" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg>
+        </section>
+      </div>
+
+      <!-- ============ Last 7 days ============ -->
+      <!-- data-values = oldest day first, today last. -->
+      <div class="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-2">
+        <section class="card p-5" aria-labelledby="steps-title">
+          <header class="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 id="steps-title" class="card-title">Steps</h2>
+              <p class="text-xs text-slate-500">Last 7 days · average <b id="steps-avg" class="text-slate-700">8,783</b></p>
+            </div>
+            <span class="badge bg-emerald-50 text-emerald-700"><span id="steps-hit">2</span> days hit the goal</span>
+          </header>
+          <div id="steps-chart" class="mt-6" data-values="7200,10450,9100,6300,11200,8800,8432" data-goal="10000" data-max="12000"></div>
+        </section>
+
+        <section class="card p-5" aria-labelledby="sleep-title">
+          <header class="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 id="sleep-title" class="card-title">Sleep</h2>
+              <p class="text-xs text-slate-500">Last 7 nights · average <b id="sleep-avg" class="text-slate-700">7h 22m</b></p>
+            </div>
+            <span class="badge bg-violet-50 text-violet-700"><span id="sleep-hit">2</span> nights of 8h+</span>
+          </header>
+          <div id="sleep-chart" class="mt-6" data-values="6.5,7.25,8,6.75,7.5,8.25,7.33" data-goal="8" data-max="10"></div>
+        </section>
+      </div>
+
+      <div class="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_26rem]">
+        <section class="card p-5" aria-labelledby="hr-title">
+          <header class="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 id="hr-title" class="card-title">Resting heart rate</h2>
+              <p class="text-xs text-slate-500">Last 14 days · lower is usually better</p>
+            </div>
+            <span class="badge bg-pink-50 text-pink-700">Average <span id="hr-avg">63</span> bpm</span>
+          </header>
+          <!-- Filled by health.js -->
+          <div id="hr-chart" class="mt-5" data-values="64,63,65,62,63,61,62,64,63,62,61,62,63,62"></div>
+        </section>
+
+        <section class="card p-5" aria-labelledby="mood-title">
+          <h2 id="mood-title" class="card-title">How do you feel today?</h2>
+          <p class="text-xs text-slate-500">Your wellness score shows on the dashboard.</p>
+          <div class="mt-5 flex items-center gap-4">
+            <span id="mood-face" class="grid size-16 shrink-0 place-items-center rounded-2xl bg-pink-50 text-pink-500"><i data-lucide="smile" class="size-9"></i></span>
+            <div>
+              <p class="text-3xl font-bold text-slate-900"><span id="mood-score">8</span> <span class="text-lg font-semibold text-slate-400">/ 10</span></p>
+              <p id="mood-label" class="text-sm font-medium text-pink-600">Feeling great</p>
+            </div>
+          </div>
+          <div id="mood-picker" class="mt-5 grid grid-cols-10 gap-1.5" role="group" aria-label="Wellness score from 1 to 10"></div>
+          <p class="mt-5 rounded-xl bg-slate-50 p-3 text-xs text-slate-500">You enter health numbers by hand for now. Syncing from your phone can come later.</p>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <!-- ============ Log today window ============ -->
+  <dialog id="log-modal" data-new-modal aria-labelledby="log-title" class="w-[calc(100%-2rem)] max-w-md rounded-2xl bg-white p-0 shadow-2xl">
+    <form id="log-form" class="p-6">
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <h2 id="log-title" class="text-lg font-semibold text-slate-900">Log today</h2>
+          <p class="text-sm text-slate-500">Fill in what you know. Leave the rest.</p>
+        </div>
+        <button type="button" class="btn btn-ghost btn-sm btn-icon -mr-2 -mt-1" data-modal-close aria-label="Close"><i data-lucide="x" class="size-5"></i></button>
+      </div>
+      <div class="mt-5 grid grid-cols-2 gap-4">
+        <div>
+          <label class="label" for="log-steps">Steps</label>
+          <input id="log-steps" name="steps" type="number" min="0" step="1" class="input" placeholder="e.g. 9500">
+        </div>
+        <div>
+          <label class="label" for="log-hr">Resting heart rate</label>
+          <input id="log-hr" name="hr" type="number" min="30" max="200" step="1" class="input" placeholder="bpm">
+        </div>
+        <div>
+          <label class="label" for="log-sleep-h">Sleep (hours)</label>
+          <input id="log-sleep-h" name="sleepH" type="number" min="0" max="16" step="1" class="input" placeholder="e.g. 7">
+        </div>
+        <div>
+          <label class="label" for="log-sleep-m">Sleep (minutes)</label>
+          <input id="log-sleep-m" name="sleepM" type="number" min="0" max="59" step="5" class="input" placeholder="e.g. 30">
+        </div>
+        <div class="col-span-2">
+          <label class="label" for="log-weight">Weight (kg)</label>
+          <input id="log-weight" name="weight" type="number" min="20" max="250" step="0.1" class="input" placeholder="e.g. 72.2">
+        </div>
+      </div>
+      <div class="mt-6 flex justify-end gap-2">
+        <button type="button" class="btn btn-secondary" data-modal-close>Cancel</button>
+        <button type="submit" class="btn btn-primary">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="https://cdn.jsdelivr.net/npm/lucide@1.47.0/dist/umd/lucide.min.js"></script>
+  <script src="assets/js/app.js"></script>
+  <script src="assets/js/health.js"></script>
+</body>
+</html>

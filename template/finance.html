@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Finance · Nurullah POS</title>
+  <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600&family=Inter:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;600;700&text=%E0%A7%B3&display=swap">
+  <link rel="stylesheet" href="assets/css/app.css">
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.3"></script>
+</head>
+<body data-page="finance" class="bg-[#f5f7fb] text-slate-800 antialiased">
+  <div id="sidebar-root"></div>
+
+  <div class="lg:pl-60">
+    <div id="topbar-root"></div>
+
+    <main class="mx-auto w-full max-w-[1720px] px-4 py-6 sm:px-6 xl:px-8">
+      <!-- Page header -->
+      <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 class="text-3xl font-bold tracking-tight text-slate-900">Finance</h1>
+          <p class="mt-1 text-slate-500">Know where every taka goes.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <select id="month" class="select select-lg w-auto" aria-label="Month"></select>
+          <button type="button" class="btn btn-primary" data-modal-open="tx-modal"><i data-lucide="plus" class="size-4"></i>Add Transaction</button>
+        </div>
+      </div>
+
+      <!-- Summary (calculated by finance.js from the transactions below) -->
+      <div class="mt-6 grid grid-cols-2 gap-4 xl:grid-cols-4">
+        <div class="card p-4 sm:p-5">
+          <div class="flex items-center justify-between"><p class="text-sm text-slate-500">Income</p><span class="icon-tile size-9 bg-emerald-50 text-emerald-600"><i data-lucide="arrow-down-left" class="size-4.5"></i></span></div>
+          <p id="sum-income" class="mt-2 text-2xl font-bold text-slate-900">৳85,000</p>
+          <p class="text-xs text-slate-500">this month</p>
+        </div>
+        <div class="card p-4 sm:p-5">
+          <div class="flex items-center justify-between"><p class="text-sm text-slate-500">Spent</p><span class="icon-tile size-9 bg-rose-50 text-rose-600"><i data-lucide="arrow-up-right" class="size-4.5"></i></span></div>
+          <p id="sum-spent" class="mt-2 text-2xl font-bold text-slate-900">৳36,000</p>
+          <p class="text-xs text-slate-500">not counting savings</p>
+        </div>
+        <div class="card p-4 sm:p-5">
+          <div class="flex items-center justify-between"><p class="text-sm text-slate-500">Saved</p><span class="icon-tile size-9 bg-blue-50 text-blue-600"><i data-lucide="piggy-bank" class="size-4.5"></i></span></div>
+          <p id="sum-saved" class="mt-2 text-2xl font-bold text-slate-900">৳9,000</p>
+          <p class="text-xs text-slate-500"><span id="sum-rate">11%</span> of income</p>
+        </div>
+        <div class="card p-4 sm:p-5">
+          <div class="flex items-center justify-between"><p class="text-sm text-slate-500">Budget left</p><span class="icon-tile size-9 bg-amber-50 text-amber-600"><i data-lucide="wallet" class="size-4.5"></i></span></div>
+          <p id="sum-left" class="mt-2 text-2xl font-bold text-slate-900">৳15,000</p>
+          <p class="text-xs text-slate-500">of <span id="sum-budget">৳60,000</span></p>
+        </div>
+      </div>
+
+      <div class="mt-6 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_24rem]">
+        <!-- ============ Transactions ============ -->
+        <section class="card overflow-hidden" aria-labelledby="tx-title">
+          <div class="flex flex-wrap items-center justify-between gap-3 p-4 sm:p-5">
+            <h2 id="tx-title" class="card-title">Transactions</h2>
+            <div class="flex flex-wrap items-center gap-2">
+              <div id="tx-filter" class="segmented" role="tablist" data-tabs>
+                <button type="button" role="tab" aria-selected="true" data-tab="all">All</button>
+                <button type="button" role="tab" aria-selected="false" data-tab="expense">Expenses</button>
+                <button type="button" role="tab" aria-selected="false" data-tab="income">Income</button>
+              </div>
+              <label class="relative">
+                <span class="sr-only">Search transactions</span>
+                <i data-lucide="search" class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400"></i>
+                <input id="tx-search" type="search" placeholder="Search" class="input h-9 w-44 pl-9">
+              </label>
+            </div>
+          </div>
+          <div class="overflow-x-auto">
+            <!-- One row per transaction: data-type, data-category, data-amount (taka) and data-offset (days from today). -->
+            <table class="w-full min-w-[680px] text-sm">
+              <thead class="border-y border-slate-100 bg-slate-50/70 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <tr><th class="px-5 py-2.5">Description</th><th class="px-4 py-2.5">Date</th><th class="px-4 py-2.5">Category</th><th class="px-4 py-2.5">Paid with</th><th class="px-5 py-2.5 text-right">Amount</th></tr>
+              </thead>
+              <tbody id="tx-body" class="divide-y divide-slate-100">
+                <tr data-type="expense" data-category="Food" data-amount="2350" data-offset="-1"><td class="px-5 py-3"><p class="font-medium text-slate-800">Groceries</p><p class="text-xs text-slate-500">Shwapno</p></td><td class="px-4 py-3 text-slate-600" data-date></td><td class="px-4 py-3" data-badge></td><td class="px-4 py-3 text-slate-600" data-method>bKash</td><td class="px-5 py-3 text-right font-semibold" data-amount-cell></td></tr>
+                <tr data-type="expense" data-category="Transport" data-amount="420" data-offset="-2"><td class="px-5 py-3"><p class="font-medium text-slate-800">Pathao ride</p><p class="text-xs text-slate-500">Office to home</p></td><td class="px-4 py-3 text-slate-600" data-date></td><td class="px-4 py-3" data-badge></td><td class="px-4 py-3 text-slate-600" data-method>bKash</td><td class="px-5 py-3 text-right font-semibold" data-amount-cell></td></tr>
+                <tr data-type="expense" data-category="Food" data-amount="870" data-offset="-3"><td class="px-5 py-3"><p class="font-medium text-slate-800">Dinner delivery</p><p class="text-xs text-slate-500">Foodpanda</p></td><td class="px-4 py-3 text-slate-600" data-date></td><td class="px-4 py-3" data-badge></td><td class="px-4 py-3 text-slate-600" data-method>Card</td><td class="px-5 py-3 text-right font-semibold" data-amount-cell></td></tr>
+                <tr data-type="expense" data-category="Lifestyle" data-amount="1200" data-offset="-3"><td class="px-5 py-3"><p class="font-medium text-slate-800">Movie tickets</p><p class="text-xs text-slate-500">Family movie night</p></td><td class="px-4 py-3 text-slate-600" data-date></td><td class="px-4 py-3" data-badge></td><td class="px-4 py-3 text-slate-600" data-method>Card</td><td class="px-5 py-3 text-right font-semibold" data-amount-cell></td></tr>
+                <tr data-type="expense" data-category="Food" data-amount="1250" data-offset="-5"><td class="px-5 py-3"><p class="font-medium text-slate-800">Team lunch</p><p class="text-xs text-slate-500">Gulshan</p></td><td class="px-4 py-3 text-slate-600" data-date></td><td class="px-4 py-3" data-badge></td><td class="px-4 py-3 text-slate-600" data-method>Cash</td><td class="px-5 py-3 text-right font-semibold" data-amount-cell></td></tr>
+                <tr data-type="income" data-category="Income" data-amount="10000" data-offset="-6"><td class="px-5 py-3"><p class="font-medium text-slate-800">Freelance project</p><p class="text-xs text-slate-500">Website design</p></td><td class="px-4 py-3 text-slate-600" data-date></td><td class="px-4 py-3" data-badge></td><td class="px-4 py-3 text-slate-600" data-method>Bank</td><td class="px-5 py-3 text-right font-semibold" data-amount-cell></td></tr>
+                <tr data-type="expense" data-category="Transport" data-amount="680" data-offset="-6"><td class="px-5 py-3"><p class="font-medium text-slate-800">Uber ride</p><p class="text-xs text-slate-500">Dhanmondi</p></td><td class="px-4 py-3 text-slate-600" data-date></td><td class="px-4 py-3" data-badge></td><td class="px-4 py-3 text-slate-600" data-method>Card</td><td class="px-5 py-3 text-right font-semibold" data-amount-cell></td></tr>
+                <tr data-type="expense" data-category="Food" data-amount="1980" data-offset="-8"><td class="px-5 py-3"><p class="font-medium text-slate-800">Groceries</p><p class="text-xs text-slate-500">Meena Bazar</p></td><td class="px-4 py-3 text-slate-600" data-date></td><td class="px-4 py-3" data-badge></td><td class="px-4 py-3 text-slate-600" data-method>Card</td><td class="px-5 py-3 text-right font-semibold" data-amount-cell></td></tr>
+                <tr data-type="expense" data-category="Lifestyle" data-amount="2300" data-offset="-9"><td class="px-5 py-3"><p class="font-medium text-slate-800">New shirt</p><p class="text-xs text-slate-500">Aarong</p></td><td class="px-4 py-3 text-slate-600" data-date></td><td class="px-4 py-3" data-badge></td><td class="px-4 py-3 text-slate-600" data-method>Card</td><td class="px-5 py-3 text-right font-semibold" data-amount-cell></td></tr>
+                <tr data-type="expense" data-category="Transport" data-amount="2500" data-offset="-10"><td class="px-5 py-3"><p class="font-medium text-slate-800">Fuel</p><p class="text-xs text-slate-500">Octane, full tank</p></td><td class="px-4 py-3 text-slate-600" data-date></td><td class="px-4 py-3" data-badge></td><td class="px-4 py-3 text-slate-600" data-method>Cash</td><td class="px-5 py-3 text-right font-semibold" data-amount-cell></td></tr>
+                <tr data-type="expense" data-category="Savings" data-amount="9000" data-offset="-11"><td class="px-5 py-3"><p class="font-medium text-slate-800">Emergency fund</p><p class="text-xs text-slate-500">Monthly transfer</p></td><td class="px-4 py-3 text-slate-600" data-date></td><td class="px-4 py-3" data-badge></td><td class="px-4 py-3 text-slate-600" data-method>Bank</td><td class="px-5 py-3 text-right font-semibold" data-amount-cell></td></tr>
+                <tr data-type="expense" data-category="Food" data-amount="650" data-offset="-12"><td class="px-5 py-3"><p class="font-medium text-slate-800">Fruits and vegetables</p><p class="text-xs text-slate-500">Local market</p></td><td class="px-4 py-3 text-slate-600" data-date></td><td class="px-4 py-3" data-badge></td><td class="px-4 py-3 text-slate-600" data-method>Cash</td><td class="px-5 py-3 text-right font-semibold" data-amount-cell></td></tr>
+                <tr data-type="expense" data-category="Transport" data-amount="1000" data-offset="-13"><td class="px-5 py-3"><p class="font-medium text-slate-800">Metro rail card top-up</p><p class="text-xs text-slate-500">MRT pass</p></td><td class="px-4 py-3 text-slate-600" data-date></td><td class="px-4 py-3" data-badge></td><td class="px-4 py-3 text-slate-600" data-method>Cash</td><td class="px-5 py-3 text-right font-semibold" data-amount-cell></td></tr>
+                <tr data-type="expense" data-category="Food" data-amount="1000" data-offset="-15"><td class="px-5 py-3"><p class="font-medium text-slate-800">Groceries</p><p class="text-xs text-slate-500">Shwapno</p></td><td class="px-4 py-3 text-slate-600" data-date></td><td class="px-4 py-3" data-badge></td><td class="px-4 py-3 text-slate-600" data-method>bKash</td><td class="px-5 py-3 text-right font-semibold" data-amount-cell></td></tr>
+                <tr data-type="expense" data-category="Housing" data-amount="950" data-offset="-16"><td class="px-5 py-3"><p class="font-medium text-slate-800">Gas bill</p><p class="text-xs text-slate-500">Titas Gas</p></td><td class="px-4 py-3 text-slate-600" data-date></td><td class="px-4 py-3" data-badge></td><td class="px-4 py-3 text-slate-600" data-method>bKash</td><td class="px-5 py-3 text-right font-semibold" data-amount-cell></td></tr>
+                <tr data-type="expense" data-category="Housing" data-amount="900" data-offset="-16"><td class="px-5 py-3"><p class="font-medium text-slate-800">Water bill</p><p class="text-xs text-slate-500">Dhaka WASA</p></td><td class="px-4 py-3 text-slate-600" data-date></td><td class="px-4 py-3" data-badge></td><td class="px-4 py-3 text-slate-600" data-method>bKash</td><td class="px-5 py-3 text-right font-semibold" data-amount-cell></td></tr>
+                <tr data-type="expense" data-category="Transport" data-amount="800" data-offset="-18"><td class="px-5 py-3"><p class="font-medium text-slate-800">Pathao rides</p><p class="text-xs text-slate-500">Weekend trips</p></td><td class="px-4 py-3 text-slate-600" data-date></td><td class="px-4 py-3" data-badge></td><td class="px-4 py-3 text-slate-600" data-method>Nagad</td><td class="px-5 py-3 text-right font-semibold" data-amount-cell></td></tr>
+                <tr data-type="expense" data-category="Lifestyle" data-amount="750" data-offset="-19"><td class="px-5 py-3"><p class="font-medium text-slate-800">Streaming subscriptions</p><p class="text-xs text-slate-500">Music and video</p></td><td class="px-4 py-3 text-slate-600" data-date></td><td class="px-4 py-3" data-badge></td><td class="px-4 py-3 text-slate-600" data-method>Card</td><td class="px-5 py-3 text-right font-semibold" data-amount-cell></td></tr>
+                <tr data-type="expense" data-category="Lifestyle" data-amount="2500" data-offset="-20"><td class="px-5 py-3"><p class="font-medium text-slate-800">Gym membership</p><p class="text-xs text-slate-500">Monthly fee</p></td><td class="px-4 py-3 text-slate-600" data-date></td><td class="px-4 py-3" data-badge></td><td class="px-4 py-3 text-slate-600" data-method>Card</td><td class="px-5 py-3 text-right font-semibold" data-amount-cell></td></tr>
+                <tr data-type="expense" data-category="Housing" data-amount="13900" data-offset="-20"><td class="px-5 py-3"><p class="font-medium text-slate-800">House rent</p><p class="text-xs text-slate-500">Mohammadpur flat</p></td><td class="px-4 py-3 text-slate-600" data-date></td><td class="px-4 py-3" data-badge></td><td class="px-4 py-3 text-slate-600" data-method>Bank</td><td class="px-5 py-3 text-right font-semibold" data-amount-cell></td></tr>
+                <tr data-type="income" data-category="Income" data-amount="75000" data-offset="-20"><td class="px-5 py-3"><p class="font-medium text-slate-800">Salary</p><p class="text-xs text-slate-500">Monthly pay</p></td><td class="px-4 py-3 text-slate-600" data-date></td><td class="px-4 py-3" data-badge></td><td class="px-4 py-3 text-slate-600" data-method>Bank</td><td class="px-5 py-3 text-right font-semibold" data-amount-cell></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p id="tx-empty" class="py-12 text-center text-sm text-slate-500" hidden>No transactions match.</p>
+        </section>
+
+        <!-- ============ Budget + bills ============ -->
+        <aside class="space-y-5">
+          <section class="card p-5" aria-labelledby="budget-title">
+            <h2 id="budget-title" class="card-title">Budget by category</h2>
+            <p class="text-xs text-slate-500">Spent this month against the limit you set</p>
+            <div class="mt-4 flex items-center gap-5">
+              <div class="relative size-32 shrink-0">
+                <div id="budget-donut" class="absolute inset-0"></div>
+                <div class="absolute inset-0 grid place-content-center text-center"><p id="donut-used" class="text-lg font-bold text-slate-900">75%</p><p class="text-[11px] text-slate-500">used</p></div>
+              </div>
+              <p class="text-sm text-slate-600"><b id="donut-spent" class="text-slate-900">৳45,000</b> of <span id="donut-budget">৳60,000</span> budget used, savings included.</p>
+            </div>
+            <!-- data-budget = your monthly limit for each category. Spent amounts come from the transactions. -->
+            <ul id="budget-list" class="mt-5 space-y-4">
+              <li data-category="Housing" data-budget="18000"></li>
+              <li data-category="Food" data-budget="12000"></li>
+              <li data-category="Transport" data-budget="7000"></li>
+              <li data-category="Lifestyle" data-budget="8000"></li>
+              <li data-category="Savings" data-budget="15000"></li>
+            </ul>
+          </section>
+
+          <section class="card p-5" aria-labelledby="bills-title">
+            <h2 id="bills-title" class="card-title">Upcoming bills</h2>
+            <p class="text-xs text-slate-500">“Pay” adds the bill to your transactions</p>
+            <ul id="bills" class="mt-3 divide-y divide-slate-100 text-sm">
+              <li class="flex items-center gap-3 py-2.5" data-name="Electricity bill" data-note="DESCO" data-category="Housing" data-amount="1850"><span class="icon-tile size-9 bg-rose-50 text-rose-600"><i data-lucide="zap" class="size-4"></i></span><div class="min-w-0 flex-1"><p class="font-medium text-slate-800">Electricity bill</p><p class="text-xs text-rose-500">Overdue since <span data-date-offset="-1" data-date-format="short"></span></p></div><span class="font-semibold text-slate-900">৳1,850</span><button type="button" class="btn btn-secondary btn-sm" data-pay>Pay</button></li>
+              <li class="flex items-center gap-3 py-2.5" data-name="Internet" data-note="Home broadband" data-category="Housing" data-amount="1200"><span class="icon-tile size-9 bg-sky-50 text-sky-600"><i data-lucide="wifi" class="size-4"></i></span><div class="min-w-0 flex-1"><p class="font-medium text-slate-800">Internet</p><p class="text-xs text-slate-500">Due <span data-date-offset="3" data-date-format="relative"></span></p></div><span class="font-semibold text-slate-900">৳1,200</span><button type="button" class="btn btn-secondary btn-sm" data-pay>Pay</button></li>
+              <li class="flex items-center gap-3 py-2.5" data-name="Phone bill" data-note="Postpaid" data-category="Housing" data-amount="600"><span class="icon-tile size-9 bg-violet-50 text-violet-600"><i data-lucide="smartphone" class="size-4"></i></span><div class="min-w-0 flex-1"><p class="font-medium text-slate-800">Phone bill</p><p class="text-xs text-slate-500">Due <span data-date-offset="9" data-date-format="short"></span></p></div><span class="font-semibold text-slate-900">৳600</span><button type="button" class="btn btn-secondary btn-sm" data-pay>Pay</button></li>
+              <li class="flex items-center gap-3 py-2.5" data-name="Car insurance" data-note="Yearly renewal" data-category="Transport" data-amount="18500"><span class="icon-tile size-9 bg-amber-50 text-amber-600"><i data-lucide="car" class="size-4"></i></span><div class="min-w-0 flex-1"><p class="font-medium text-slate-800">Car insurance</p><p class="text-xs text-slate-500">Due <span data-date-offset="14" data-date-format="short"></span></p></div><span class="font-semibold text-slate-900">৳18,500</span><button type="button" class="btn btn-secondary btn-sm" data-pay>Pay</button></li>
+            </ul>
+            <p id="bills-empty" class="py-6 text-center text-sm text-slate-500" hidden>All bills paid. Nice!</p>
+          </section>
+        </aside>
+      </div>
+    </main>
+  </div>
+
+  <!-- ============ Add transaction window ============ -->
+  <dialog id="tx-modal" data-new-modal aria-labelledby="tx-modal-title" class="w-[calc(100%-2rem)] max-w-lg rounded-2xl bg-white p-0 shadow-2xl">
+    <form id="tx-form" class="p-6">
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <h2 id="tx-modal-title" class="text-lg font-semibold text-slate-900">Add a transaction</h2>
+          <p class="text-sm text-slate-500">Money in or money out.</p>
+        </div>
+        <button type="button" class="btn btn-ghost btn-sm btn-icon -mr-2 -mt-1" data-modal-close aria-label="Close"><i data-lucide="x" class="size-5"></i></button>
+      </div>
+      <div class="mt-5 space-y-4">
+        <div class="grid grid-cols-2 gap-2">
+          <label><input type="radio" name="type" value="expense" class="peer sr-only" checked><span class="flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 transition peer-checked:border-rose-300 peer-checked:bg-rose-50 peer-checked:text-rose-700"><i data-lucide="arrow-up-right" class="size-4"></i>Expense</span></label>
+          <label><input type="radio" name="type" value="income" class="peer sr-only"><span class="flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 transition peer-checked:border-emerald-300 peer-checked:bg-emerald-50 peer-checked:text-emerald-700"><i data-lucide="arrow-down-left" class="size-4"></i>Income</span></label>
+        </div>
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label class="label" for="tx-desc">Description</label>
+            <input id="tx-desc" name="desc" class="input" required placeholder="e.g. Groceries" autocomplete="off">
+          </div>
+          <div>
+            <label class="label" for="tx-amount">Amount (৳)</label>
+            <input id="tx-amount" name="amount" type="number" min="1" step="1" class="input" required placeholder="e.g. 1500">
+          </div>
+        </div>
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div>
+            <label class="label" for="tx-cat">Category</label>
+            <select id="tx-cat" name="category" class="select select-lg">
+              <option>Housing</option><option selected>Food</option><option>Transport</option><option>Lifestyle</option><option>Savings</option>
+            </select>
+          </div>
+          <div>
+            <label class="label" for="tx-method">Paid with</label>
+            <select id="tx-method" name="method" class="select select-lg">
+              <option>bKash</option><option>Nagad</option><option>Card</option><option>Cash</option><option>Bank</option>
+            </select>
+          </div>
+          <div>
+            <label class="label" for="tx-date">Date</label>
+            <input id="tx-date" name="date" type="date" class="input" required>
+          </div>
+        </div>
+      </div>
+      <div class="mt-6 flex justify-end gap-2">
+        <button type="button" class="btn btn-secondary" data-modal-close>Cancel</button>
+        <button type="submit" class="btn btn-primary">Add transaction</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="https://cdn.jsdelivr.net/npm/lucide@1.47.0/dist/umd/lucide.min.js"></script>
+  <script src="assets/js/app.js"></script>
+  <script src="assets/js/finance.js"></script>
+</body>
+</html>

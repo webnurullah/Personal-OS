@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Settings · Nurullah POS</title>
+  <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600&family=Inter:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;600;700&text=%E0%A7%B3&display=swap">
+  <link rel="stylesheet" href="assets/css/app.css">
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.3"></script>
+</head>
+<body data-page="settings" class="bg-[#f5f7fb] text-slate-800 antialiased">
+  <div id="sidebar-root"></div>
+
+  <div class="lg:pl-60">
+    <div id="topbar-root"></div>
+
+    <main class="mx-auto w-full max-w-[1280px] px-4 py-6 sm:px-6 xl:px-8">
+      <div>
+        <h1 class="text-3xl font-bold tracking-tight text-slate-900">Settings</h1>
+        <p class="mt-1 text-slate-500">Make the app work the way you do.</p>
+      </div>
+
+      <div class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[14rem_minmax(0,1fr)]">
+        <!-- Section tabs (panels below switch with them) -->
+        <div id="settings-tabs" role="tablist" aria-orientation="vertical" data-tabs="settings-panels"
+          class="flex gap-1 overflow-x-auto pb-1 lg:flex-col lg:self-start lg:pb-0">
+          <button type="button" class="side-tab" role="tab" aria-selected="true" data-tab="profile"><i data-lucide="user" class="size-4.5"></i>Profile</button>
+          <button type="button" class="side-tab" role="tab" aria-selected="false" data-tab="preferences"><i data-lucide="sliders-horizontal" class="size-4.5"></i>Preferences</button>
+          <button type="button" class="side-tab" role="tab" aria-selected="false" data-tab="categories"><i data-lucide="tag" class="size-4.5"></i>Categories</button>
+          <button type="button" class="side-tab" role="tab" aria-selected="false" data-tab="notifications"><i data-lucide="bell" class="size-4.5"></i>Notifications</button>
+          <button type="button" class="side-tab" role="tab" aria-selected="false" data-tab="data"><i data-lucide="shield-check" class="size-4.5"></i>Data &amp; privacy</button>
+        </div>
+
+        <div id="settings-panels">
+          <!-- ============ Profile ============ -->
+          <section data-tab-panel="profile" class="card p-5 sm:p-6" aria-labelledby="profile-title">
+            <h2 id="profile-title" class="text-lg font-semibold text-slate-900">Profile</h2>
+            <p class="text-sm text-slate-500">How you appear in the app.</p>
+            <form class="settings-form mt-6 space-y-5">
+              <div class="flex items-center gap-4">
+                <span class="block size-18 shrink-0 overflow-hidden rounded-full shadow ring-4 ring-white">
+                  <svg viewBox="0 0 40 40" class="block size-full" aria-hidden="true"><rect width="40" height="40" fill="#cfe3fb"/><circle cx="28" cy="13" r="5" fill="#fde68a"/><path d="M0 29 L11 18 L18 25 L26 16 L40 28 V40 H0Z" fill="#9fd9b0"/><path d="M0 33 C8 29 16 31 22 33 S34 30 40 32 V40 H0Z" fill="#5fbf7f"/></svg>
+                </span>
+                <div class="flex flex-wrap gap-2">
+                  <button type="button" class="btn btn-secondary btn-sm" data-soon><i data-lucide="upload" class="size-4"></i>Change photo</button>
+                  <button type="button" class="btn btn-ghost btn-sm" data-soon>Remove</button>
+                </div>
+              </div>
+              <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div><label class="label" for="p-name">Name</label><input id="p-name" class="input" value="Nurullah" autocomplete="name"></div>
+                <div><label class="label" for="p-email">Email</label><input id="p-email" type="email" class="input" placeholder="you@example.com" autocomplete="email"></div>
+                <div><label class="label" for="p-tagline">Tagline</label><input id="p-tagline" class="input" value="A better you, every day"></div>
+                <div><label class="label" for="p-city">City</label><input id="p-city" class="input" value="Dhaka, Bangladesh"></div>
+              </div>
+              <div class="flex justify-end border-t border-slate-100 pt-5"><button type="submit" class="btn btn-primary">Save changes</button></div>
+            </form>
+          </section>
+
+          <!-- ============ Preferences ============ -->
+          <section data-tab-panel="preferences" class="card p-5 sm:p-6" aria-labelledby="prefs-title" hidden>
+            <h2 id="prefs-title" class="text-lg font-semibold text-slate-900">Preferences</h2>
+            <p class="text-sm text-slate-500">Language, time and money.</p>
+            <form class="settings-form mt-6 space-y-5">
+              <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div><label class="label" for="s-lang">Language</label><select id="s-lang" class="select select-lg"><option>English</option><option>বাংলা (Bangla)</option></select></div>
+                <div><label class="label" for="s-tz">Time zone</label><select id="s-tz" class="select select-lg"><option>Asia/Dhaka (GMT+6)</option><option>UTC</option></select></div>
+                <div><label class="label" for="s-currency">Currency</label><select id="s-currency" class="select select-lg"><option>Bangladeshi Taka (৳ BDT)</option><option>US Dollar ($ USD)</option></select></div>
+                <div><label class="label" for="s-week">Week starts on</label><select id="s-week" class="select select-lg"><option>Saturday</option><option>Sunday</option><option selected>Monday</option></select></div>
+                <div><label class="label" for="s-date">Date format</label><select id="s-date" class="select select-lg"><option>21 Sep 2026</option><option selected>Sep 21, 2026</option><option>21/09/2026</option></select></div>
+                <div><label class="label" for="s-time">Time format</label><select id="s-time" class="select select-lg"><option selected>12-hour (1:30 PM)</option><option>24-hour (13:30)</option></select></div>
+              </div>
+              <div class="flex items-center justify-between gap-4 rounded-xl bg-slate-50 p-4">
+                <div><p class="text-sm font-medium text-slate-800">Hide money amounts</p><p class="text-xs text-slate-500">Useful when someone is looking at your screen.</p></div>
+                <button type="button" role="switch" aria-checked="false" class="switch" aria-label="Hide money amounts"></button>
+              </div>
+              <div class="flex justify-end border-t border-slate-100 pt-5"><button type="submit" class="btn btn-primary">Save changes</button></div>
+            </form>
+          </section>
+
+          <!-- ============ Categories ============ -->
+          <section data-tab-panel="categories" class="card p-5 sm:p-6" aria-labelledby="cats-title" hidden>
+            <h2 id="cats-title" class="text-lg font-semibold text-slate-900">Categories</h2>
+            <p class="text-sm text-slate-500">Used by tasks, events and goals.</p>
+            <ul id="category-chips" class="mt-6 flex flex-wrap gap-2">
+              <li class="flex items-center gap-2 rounded-full border border-slate-200 bg-white py-1.5 pl-3 pr-1.5 text-sm font-medium text-slate-700"><span class="size-2.5 rounded-full bg-blue-500"></span>Work<button type="button" class="grid size-6 place-items-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700" data-remove aria-label="Remove Work"><i data-lucide="x" class="size-3.5"></i></button></li>
+              <li class="flex items-center gap-2 rounded-full border border-slate-200 bg-white py-1.5 pl-3 pr-1.5 text-sm font-medium text-slate-700"><span class="size-2.5 rounded-full bg-amber-500"></span>Finance<button type="button" class="grid size-6 place-items-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700" data-remove aria-label="Remove Finance"><i data-lucide="x" class="size-3.5"></i></button></li>
+              <li class="flex items-center gap-2 rounded-full border border-slate-200 bg-white py-1.5 pl-3 pr-1.5 text-sm font-medium text-slate-700"><span class="size-2.5 rounded-full bg-emerald-500"></span>Health<button type="button" class="grid size-6 place-items-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700" data-remove aria-label="Remove Health"><i data-lucide="x" class="size-3.5"></i></button></li>
+              <li class="flex items-center gap-2 rounded-full border border-slate-200 bg-white py-1.5 pl-3 pr-1.5 text-sm font-medium text-slate-700"><span class="size-2.5 rounded-full bg-violet-500"></span>Personal<button type="button" class="grid size-6 place-items-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700" data-remove aria-label="Remove Personal"><i data-lucide="x" class="size-3.5"></i></button></li>
+              <li class="flex items-center gap-2 rounded-full border border-slate-200 bg-white py-1.5 pl-3 pr-1.5 text-sm font-medium text-slate-700"><span class="size-2.5 rounded-full bg-orange-500"></span>Home<button type="button" class="grid size-6 place-items-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700" data-remove aria-label="Remove Home"><i data-lucide="x" class="size-3.5"></i></button></li>
+              <li class="flex items-center gap-2 rounded-full border border-slate-200 bg-white py-1.5 pl-3 pr-1.5 text-sm font-medium text-slate-700"><span class="size-2.5 rounded-full bg-teal-500"></span>Learning<button type="button" class="grid size-6 place-items-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700" data-remove aria-label="Remove Learning"><i data-lucide="x" class="size-3.5"></i></button></li>
+            </ul>
+            <form id="category-form" class="mt-6 flex flex-wrap items-end gap-3 border-t border-slate-100 pt-5">
+              <div class="min-w-48 flex-1"><label class="label" for="c-name">New category</label><input id="c-name" name="name" class="input" required placeholder="e.g. Family" autocomplete="off"></div>
+              <div><label class="label" for="c-color">Colour</label><select id="c-color" name="color" class="select select-lg w-36"><option value="bg-rose-500">Pink</option><option value="bg-sky-500">Sky</option><option value="bg-lime-500">Lime</option><option value="bg-slate-500">Grey</option></select></div>
+              <button type="submit" class="btn btn-primary"><i data-lucide="plus" class="size-4"></i>Add</button>
+            </form>
+          </section>
+
+          <!-- ============ Notifications ============ -->
+          <section data-tab-panel="notifications" class="card p-5 sm:p-6" aria-labelledby="notif-title" hidden>
+            <h2 id="notif-title" class="text-lg font-semibold text-slate-900">Notifications</h2>
+            <p class="text-sm text-slate-500">Choose what reminds you, and when.</p>
+            <ul class="mt-4 divide-y divide-slate-100">
+              <li class="flex items-center justify-between gap-4 py-4"><div><p class="text-sm font-medium text-slate-800">Morning plan</p><p class="text-xs text-slate-500">Today's tasks and schedule at 7:00 AM</p></div><button type="button" role="switch" aria-checked="true" class="switch" aria-label="Morning plan"></button></li>
+              <li class="flex items-center justify-between gap-4 py-4"><div><p class="text-sm font-medium text-slate-800">Habit reminder</p><p class="text-xs text-slate-500">A nudge at 8:00 PM for habits not ticked yet</p></div><button type="button" role="switch" aria-checked="true" class="switch" aria-label="Habit reminder"></button></li>
+              <li class="flex items-center justify-between gap-4 py-4"><div><p class="text-sm font-medium text-slate-800">Bills due</p><p class="text-xs text-slate-500">Three days before each bill is due</p></div><button type="button" role="switch" aria-checked="true" class="switch" aria-label="Bills due"></button></li>
+              <li class="flex items-center justify-between gap-4 py-4"><div><p class="text-sm font-medium text-slate-800">Study sessions</p><p class="text-xs text-slate-500">30 minutes before a planned learning block</p></div><button type="button" role="switch" aria-checked="true" class="switch" aria-label="Study sessions"></button></li>
+              <li class="flex items-center justify-between gap-4 py-4"><div><p class="text-sm font-medium text-slate-800">Weekly review</p><p class="text-xs text-slate-500">Sunday at 6:00 PM</p></div><button type="button" role="switch" aria-checked="false" class="switch" aria-label="Weekly review"></button></li>
+            </ul>
+          </section>
+
+          <!-- ============ Data & privacy ============ -->
+          <section data-tab-panel="data" class="space-y-5" aria-labelledby="data-title" hidden>
+            <div class="card p-5 sm:p-6">
+              <h2 id="data-title" class="text-lg font-semibold text-slate-900">Your data</h2>
+              <p class="text-sm text-slate-500">It is yours. Take a copy any time.</p>
+              <div class="mt-5 flex flex-wrap gap-2">
+                <button type="button" class="btn btn-secondary" data-soon><i data-lucide="download" class="size-4"></i>Export as JSON</button>
+                <button type="button" class="btn btn-secondary" data-soon><i data-lucide="download" class="size-4"></i>Export as CSV</button>
+              </div>
+              <p class="mt-4 rounded-xl bg-blue-50 p-3 text-sm text-blue-800"><b>This is a template.</b> Nothing is saved yet: every change lasts until you reload the page. Saving starts when the app gets a database.</p>
+            </div>
+            <div class="card border-rose-200 p-5 sm:p-6">
+              <h2 class="text-lg font-semibold text-rose-600">Danger zone</h2>
+              <p class="text-sm text-slate-500">Deleting your data cannot be undone.</p>
+              <button type="button" class="btn btn-danger mt-5" disabled title="Available once there is saved data"><i data-lucide="trash-2" class="size-4"></i>Delete all my data</button>
+            </div>
+          </section>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/lucide@1.47.0/dist/umd/lucide.min.js"></script>
+  <script src="assets/js/app.js"></script>
+  <script src="assets/js/settings.js"></script>
+</body>
+</html>

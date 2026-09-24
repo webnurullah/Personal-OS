@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>IQA Course Tracker · Nurullah POS</title>
+  <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600&family=Inter:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;600;700&text=%E0%A7%B3&display=swap">
+  <link rel="stylesheet" href="assets/css/app.css">
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.3"></script>
+</head>
+<body data-page="learning" class="bg-[#f5f7fb] text-slate-800 antialiased">
+  <div id="sidebar-root"></div>
+
+  <div class="lg:pl-60">
+    <div id="topbar-root"></div>
+
+    <main class="mx-auto w-full max-w-[1720px] px-4 py-6 sm:px-6 xl:px-8">
+      <nav aria-label="Breadcrumb" class="flex items-center gap-2 text-sm text-slate-500">
+        <a href="learning.html" class="flex items-center gap-1 hover:text-blue-600"><i data-lucide="chevron-left" class="size-4"></i>Learning</a>
+        <span>/</span><span class="text-slate-700">IQA course tracker</span>
+      </nav>
+
+      <!-- ============ Title + key numbers (calculated by course.js) ============ -->
+      <div class="mt-4 grid grid-cols-1 gap-5 2xl:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] 2xl:items-center">
+        <div class="flex gap-4">
+          <span class="grid size-16 shrink-0 place-items-center rounded-2xl bg-[#12305a] text-white shadow-lg shadow-blue-900/20"><i data-lucide="graduation-cap" class="size-9"></i></span>
+          <div class="min-w-0">
+            <h1 class="text-2xl font-bold leading-tight tracking-tight text-[#12305a] sm:text-[1.65rem]">Level 4 Award in the Internal Quality Assurance of Assessment Processes and Practice (RQF)</h1>
+            <p class="mt-1 text-lg text-slate-700">Personal Learning Progress Tracker</p>
+            <p class="font-hand text-2xl text-slate-600">“Plan your learning. Track your progress. Achieve your goal.”</p>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <div class="rounded-2xl bg-blue-50 p-4 text-center ring-1 ring-blue-100">
+            <p class="flex items-center justify-center gap-2 text-[13px] font-semibold leading-tight text-slate-700"><i data-lucide="target" class="size-5 text-blue-600"></i>Total Learning Time</p>
+            <p class="mt-2 whitespace-nowrap font-bold text-[#12305a]"><span id="t-total" class="text-3xl">51</span> <span class="text-lg">hours</span></p>
+            <p class="text-sm text-slate-500">(Estimated)</p>
+          </div>
+          <div class="rounded-2xl bg-emerald-50 p-4 text-center ring-1 ring-emerald-100">
+            <p class="flex items-center justify-center gap-2 text-[13px] font-semibold leading-tight text-slate-700"><i data-lucide="clock" class="size-5 text-emerald-600"></i>Time Completed</p>
+            <p class="mt-2 whitespace-nowrap font-bold text-emerald-800"><span id="t-done" class="text-3xl">7.5</span> <span class="text-lg">hours</span></p>
+            <p class="text-sm text-slate-500">(<span id="t-done-pct">15%</span>)</p>
+          </div>
+          <div class="rounded-2xl bg-amber-50 p-4 text-center ring-1 ring-amber-100">
+            <p class="flex items-center justify-center gap-2 text-[13px] font-semibold leading-tight text-slate-700"><i data-lucide="hourglass" class="size-5 text-amber-600"></i>Time Remaining</p>
+            <p class="mt-2 whitespace-nowrap font-bold text-[#12305a]"><span id="t-left" class="text-3xl">43.5</span> <span class="text-lg">hours</span></p>
+            <p class="text-sm text-slate-500">(<span id="t-left-pct">85%</span>)</p>
+          </div>
+          <div class="rounded-2xl bg-violet-50 p-4 text-center ring-1 ring-violet-100">
+            <p class="flex items-center justify-center gap-2 text-[13px] font-semibold leading-tight text-slate-700"><i data-lucide="calendar-check" class="size-5 text-violet-600"></i>Target Date</p>
+            <p id="t-target" class="mt-2 whitespace-nowrap text-2xl font-bold leading-9 text-[#12305a]">31 Dec 2026</p>
+            <p class="text-sm text-slate-500">(<span id="t-weeks">15 weeks left</span>)</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ Overview row ============ -->
+      <div class="mt-5 grid grid-cols-1 gap-5 md:grid-cols-2 2xl:grid-cols-[1fr_1.15fr_1.3fr_0.85fr]">
+        <section class="card flex items-center justify-center gap-6 p-5" aria-label="Course progress">
+          <div class="relative size-32 shrink-0 sm:size-36 2xl:size-32 min-[112.5rem]:size-36">
+            <div id="course-donut" class="absolute inset-0"></div>
+            <p id="donut-pct" class="absolute inset-0 grid place-content-center text-3xl font-bold text-[#12305a]">15%</p>
+          </div>
+          <ul class="space-y-2.5 whitespace-nowrap text-sm text-slate-700">
+            <li class="flex items-center gap-2"><span class="size-3 rounded-full bg-emerald-600"></span>Completed</li>
+            <li class="flex items-center gap-2"><span class="size-3 rounded-full bg-blue-500"></span>In Progress</li>
+            <li class="flex items-center gap-2"><span class="size-3 rounded-full bg-slate-300"></span>Not Started</li>
+          </ul>
+        </section>
+
+        <section class="card p-5" aria-labelledby="module-title">
+          <h2 id="module-title" class="text-lg font-bold text-[#12305a]">Module Progress</h2>
+          <ul id="module-list" class="mt-4 space-y-3.5 text-sm"></ul>
+        </section>
+
+        <section class="card p-5" aria-labelledby="week-title">
+          <div class="flex items-center gap-3">
+            <span class="icon-tile size-10 bg-[#12305a] text-white"><i data-lucide="calendar-days" class="size-5"></i></span>
+            <div>
+              <h2 id="week-title" class="text-lg font-bold leading-tight text-[#12305a]">This Week's Plan</h2>
+              <p id="week-label" class="text-sm font-semibold text-slate-500">(Week 2)</p>
+            </div>
+          </div>
+          <!-- Topics planned for this week are added by course.js; the two extra items are yours to tick. -->
+          <ul id="week-plan" class="mt-4 space-y-2.5 text-sm">
+            <li class="flex items-center gap-2.5" data-extra><input id="wx-1" type="checkbox" class="checkbox checkbox-green peer"><label for="wx-1" class="text-slate-700 peer-checked:text-slate-400 peer-checked:line-through">Revise notes and complete activities</label></li>
+            <li class="flex items-center gap-2.5" data-extra><input id="wx-2" type="checkbox" class="checkbox checkbox-green peer"><label for="wx-2" class="text-slate-700 peer-checked:text-slate-400 peer-checked:line-through">Prepare for next week</label></li>
+          </ul>
+        </section>
+
+        <section class="flex flex-col justify-center rounded-[1.25rem] bg-pink-50 p-6 text-center ring-1 ring-pink-100">
+          <p class="font-hand text-3xl leading-tight text-slate-800">“Small steps every week make big progress.”</p>
+          <svg viewBox="0 0 80 8" class="mx-auto mt-3 w-20 text-slate-700" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M2 5c20-3 50-4 76-2"/></svg>
+        </section>
+      </div>
+
+      <!-- ============ Topics table ============ -->
+      <!--
+        Facts per topic: data-est (estimated hours), data-week (planned week), the status and the actual hours.
+        Everything else (remaining time, unit hours, totals, the charts above) is calculated by course.js.
+      -->
+      <section class="card mt-5 overflow-hidden" aria-label="Topics">
+        <div class="overflow-x-auto">
+          <table id="topics" class="w-full min-w-[1180px] border-collapse text-sm">
+            <thead class="bg-[#e8f1fc] text-xs font-semibold text-slate-700">
+              <tr>
+                <th class="w-28 px-4 py-3 text-center">Unit</th>
+                <th class="w-12 px-2 py-3"></th>
+                <th class="px-3 py-3 text-left">Topic / Learning Outcome</th>
+                <th class="px-3 py-3 text-left">What I Will Learn</th>
+                <th class="w-20 px-2 py-3 text-center">Estimated<br>Time (Hours)</th>
+                <th class="w-16 px-2 py-3 text-center">Week<br>Plan</th>
+                <th class="w-36 px-2 py-3 text-center">Status</th>
+                <th class="w-24 px-2 py-3 text-center">Actual Time<br>Spent (Hours)</th>
+                <th class="w-24 px-2 py-3 text-center">Remaining<br>Time (Hours)</th>
+                <th class="px-3 py-3 text-left">Notes / Resources</th>
+              </tr>
+            </thead>
+
+            <tbody data-unit="1" class="border-t-4 border-white">
+              <tr class="border-t border-slate-100" data-est="3" data-week="1" data-short="Purpose &amp; principles of IQA">
+                <th scope="rowgroup" rowspan="5" class="border-r border-white bg-blue-50 px-3 text-center align-middle"><span class="block text-lg font-bold text-[#12305a]">Unit 1</span><span class="text-sm text-slate-600" data-unit-hours>(14 hours)</span></th>
+                <td class="px-2 py-2 text-center text-slate-500" data-code>1.1</td>
+                <td class="px-3 py-2 text-slate-800">The purpose and principles of internal quality assurance</td>
+                <td class="px-3 py-2 text-slate-600">Understand the purpose, principles and benefits of IQA</td>
+                <td class="px-2 py-2 text-center">3</td>
+                <td class="px-2 py-2 text-center text-slate-600">W1</td>
+                <td class="px-2 py-2 text-center"><select class="select status-select h-7 text-xs" data-status-select aria-label="Status of topic 1.1"><option value="not-started">Not Started</option><option value="in-progress">In Progress</option><option value="done" selected>Completed</option></select></td>
+                <td class="px-2 py-2 text-center"><input type="number" min="0" step="0.5" value="3" placeholder="–" class="cell-input" data-actual aria-label="Actual hours for topic 1.1"></td>
+                <td class="px-2 py-2 text-center font-medium text-slate-700" data-remaining>0</td>
+                <td class="px-3 py-2 text-slate-600">Read textbook, make notes</td>
+              </tr>
+              <tr class="border-t border-slate-100" data-est="3" data-week="1" data-short="The IQA process">
+                <td class="px-2 py-2 text-center text-slate-500" data-code>1.2</td>
+                <td class="px-3 py-2 text-slate-800">The internal quality assurance process</td>
+                <td class="px-3 py-2 text-slate-600">Learn the IQA process and key stages</td>
+                <td class="px-2 py-2 text-center">3</td>
+                <td class="px-2 py-2 text-center text-slate-600">W1</td>
+                <td class="px-2 py-2 text-center"><select class="select status-select h-7 text-xs" data-status-select aria-label="Status of topic 1.2"><option value="not-started">Not Started</option><option value="in-progress">In Progress</option><option value="done" selected>Completed</option></select></td>
+                <td class="px-2 py-2 text-center"><input type="number" min="0" step="0.5" value="3" placeholder="–" class="cell-input" data-actual aria-label="Actual hours for topic 1.2"></td>
+                <td class="px-2 py-2 text-center font-medium text-slate-700" data-remaining>0</td>
+                <td class="px-3 py-2 text-slate-600">Watched video, summary notes</td>
+              </tr>
+              <tr class="border-t border-slate-100" data-est="3" data-week="2" data-short="Responsibilities of IQA">
+                <td class="px-2 py-2 text-center text-slate-500" data-code>1.3</td>
+                <td class="px-3 py-2 text-slate-800">Responsibilities of the internal quality assurer</td>
+                <td class="px-3 py-2 text-slate-600">Understand roles and responsibilities</td>
+                <td class="px-2 py-2 text-center">3</td>
+                <td class="px-2 py-2 text-center text-slate-600">W2</td>
+                <td class="px-2 py-2 text-center"><select class="select status-select h-7 text-xs" data-status-select aria-label="Status of topic 1.3"><option value="not-started">Not Started</option><option value="in-progress" selected>In Progress</option><option value="done">Completed</option></select></td>
+                <td class="px-2 py-2 text-center"><input type="number" min="0" step="0.5" value="1.5" placeholder="–" class="cell-input" data-actual aria-label="Actual hours for topic 1.3"></td>
+                <td class="px-2 py-2 text-center font-medium text-slate-700" data-remaining>1.5</td>
+                <td class="px-3 py-2 text-slate-600">Continue reading and examples</td>
+              </tr>
+              <tr class="border-t border-slate-100" data-est="3" data-week="2" data-short="Legal &amp; regulatory requirements">
+                <td class="px-2 py-2 text-center text-slate-500" data-code>1.4</td>
+                <td class="px-3 py-2 text-slate-800">Legal and regulatory requirements</td>
+                <td class="px-3 py-2 text-slate-600">Learn relevant legislation, regulations and guidance</td>
+                <td class="px-2 py-2 text-center">3</td>
+                <td class="px-2 py-2 text-center text-slate-600">W2</td>
+                <td class="px-2 py-2 text-center"><select class="select status-select h-7 text-xs" data-status-select aria-label="Status of topic 1.4"><option value="not-started" selected>Not Started</option><option value="in-progress">In Progress</option><option value="done">Completed</option></select></td>
+                <td class="px-2 py-2 text-center"><input type="number" min="0" step="0.5" placeholder="–" class="cell-input" data-actual aria-label="Actual hours for topic 1.4"></td>
+                <td class="px-2 py-2 text-center font-medium text-slate-700" data-remaining>3</td>
+                <td class="px-3 py-2 text-slate-600">Use official guidelines</td>
+              </tr>
+              <tr class="border-t border-slate-100" data-est="2" data-week="3" data-short="IQA documentation">
+                <td class="px-2 py-2 text-center text-slate-500" data-code>1.5</td>
+                <td class="px-3 py-2 text-slate-800">Internal quality assurance documentation</td>
+                <td class="px-3 py-2 text-slate-600">Explore key documents and records</td>
+                <td class="px-2 py-2 text-center">2</td>
+                <td class="px-2 py-2 text-center text-slate-600">W3</td>
+                <td class="px-2 py-2 text-center"><select class="select status-select h-7 text-xs" data-status-select aria-label="Status of topic 1.5"><option value="not-started" selected>Not Started</option><option value="in-progress">In Progress</option><option value="done">Completed</option></select></td>
+                <td class="px-2 py-2 text-center"><input type="number" min="0" step="0.5" placeholder="–" class="cell-input" data-actual aria-label="Actual hours for topic 1.5"></td>
+                <td class="px-2 py-2 text-center font-medium text-slate-700" data-remaining>2</td>
+                <td class="px-3 py-2 text-slate-600">Review templates</td>
+              </tr>
+            </tbody>
+
+            <tbody data-unit="2" class="border-t-4 border-white">
+              <tr class="border-t border-slate-100" data-est="4" data-week="4" data-short="Planning IQA">
+                <th scope="rowgroup" rowspan="5" class="border-r border-white bg-emerald-50 px-3 text-center align-middle"><span class="block text-lg font-bold text-[#12305a]">Unit 2</span><span class="text-sm text-slate-600" data-unit-hours>(17 hours)</span></th>
+                <td class="px-2 py-2 text-center text-slate-500" data-code>2.1</td>
+                <td class="px-3 py-2 text-slate-800">Planning internal quality assurance</td>
+                <td class="px-3 py-2 text-slate-600">Learn how to plan IQA activities</td>
+                <td class="px-2 py-2 text-center">4</td>
+                <td class="px-2 py-2 text-center text-slate-600">W4</td>
+                <td class="px-2 py-2 text-center"><select class="select status-select h-7 text-xs" data-status-select aria-label="Status of topic 2.1"><option value="not-started" selected>Not Started</option><option value="in-progress">In Progress</option><option value="done">Completed</option></select></td>
+                <td class="px-2 py-2 text-center"><input type="number" min="0" step="0.5" placeholder="–" class="cell-input" data-actual aria-label="Actual hours for topic 2.1"></td>
+                <td class="px-2 py-2 text-center font-medium text-slate-700" data-remaining>4</td>
+                <td class="px-3 py-2 text-slate-600">Plan own IQA schedule</td>
+              </tr>
+              <tr class="border-t border-slate-100" data-est="3" data-week="4" data-short="Sampling for IQA">
+                <td class="px-2 py-2 text-center text-slate-500" data-code>2.2</td>
+                <td class="px-3 py-2 text-slate-800">Sampling for internal quality assurance</td>
+                <td class="px-3 py-2 text-slate-600">Understand sampling methods and rationale</td>
+                <td class="px-2 py-2 text-center">3</td>
+                <td class="px-2 py-2 text-center text-slate-600">W4</td>
+                <td class="px-2 py-2 text-center"><select class="select status-select h-7 text-xs" data-status-select aria-label="Status of topic 2.2"><option value="not-started" selected>Not Started</option><option value="in-progress">In Progress</option><option value="done">Completed</option></select></td>
+                <td class="px-2 py-2 text-center"><input type="number" min="0" step="0.5" placeholder="–" class="cell-input" data-actual aria-label="Actual hours for topic 2.2"></td>
+                <td class="px-2 py-2 text-center font-medium text-slate-700" data-remaining>3</td>
+                <td class="px-3 py-2 text-slate-600">Case studies</td>
+              </tr>
+              <tr class="border-t border-slate-100" data-est="4" data-week="5" data-short="Conducting IQA">
+                <td class="px-2 py-2 text-center text-slate-500" data-code>2.3</td>
+                <td class="px-3 py-2 text-slate-800">Conducting internal quality assurance</td>
+                <td class="px-3 py-2 text-slate-600">Learn how to carry out IQA activities</td>
+                <td class="px-2 py-2 text-center">4</td>
+                <td class="px-2 py-2 text-center text-slate-600">W5</td>
+                <td class="px-2 py-2 text-center"><select class="select status-select h-7 text-xs" data-status-select aria-label="Status of topic 2.3"><option value="not-started" selected>Not Started</option><option value="in-progress">In Progress</option><option value="done">Completed</option></select></td>
+                <td class="px-2 py-2 text-center"><input type="number" min="0" step="0.5" placeholder="–" class="cell-input" data-actual aria-label="Actual hours for topic 2.3"></td>
+                <td class="px-2 py-2 text-center font-medium text-slate-700" data-remaining>4</td>
+                <td class="px-3 py-2 text-slate-600">Practical examples</td>
+              </tr>
+              <tr class="border-t border-slate-100" data-est="3" data-week="5" data-short="Constructive feedback">
+                <td class="px-2 py-2 text-center text-slate-500" data-code>2.4</td>
+                <td class="px-3 py-2 text-slate-800">Providing constructive feedback</td>
+                <td class="px-3 py-2 text-slate-600">Learn how to give effective feedback</td>
+                <td class="px-2 py-2 text-center">3</td>
+                <td class="px-2 py-2 text-center text-slate-600">W5</td>
+                <td class="px-2 py-2 text-center"><select class="select status-select h-7 text-xs" data-status-select aria-label="Status of topic 2.4"><option value="not-started" selected>Not Started</option><option value="in-progress">In Progress</option><option value="done">Completed</option></select></td>
+                <td class="px-2 py-2 text-center"><input type="number" min="0" step="0.5" placeholder="–" class="cell-input" data-actual aria-label="Actual hours for topic 2.4"></td>
+                <td class="px-2 py-2 text-center font-medium text-slate-700" data-remaining>3</td>
+                <td class="px-3 py-2 text-slate-600">Communication techniques</td>
+              </tr>
+              <tr class="border-t border-slate-100" data-est="3" data-week="6" data-short="Recording IQA outcomes">
+                <td class="px-2 py-2 text-center text-slate-500" data-code>2.5</td>
+                <td class="px-3 py-2 text-slate-800">Recording outcomes of internal quality assurance</td>
+                <td class="px-3 py-2 text-slate-600">Understand how to record and report IQA findings</td>
+                <td class="px-2 py-2 text-center">3</td>
+                <td class="px-2 py-2 text-center text-slate-600">W6</td>
+                <td class="px-2 py-2 text-center"><select class="select status-select h-7 text-xs" data-status-select aria-label="Status of topic 2.5"><option value="not-started" selected>Not Started</option><option value="in-progress">In Progress</option><option value="done">Completed</option></select></td>
+                <td class="px-2 py-2 text-center"><input type="number" min="0" step="0.5" placeholder="–" class="cell-input" data-actual aria-label="Actual hours for topic 2.5"></td>
+                <td class="px-2 py-2 text-center font-medium text-slate-700" data-remaining>3</td>
+                <td class="px-3 py-2 text-slate-600">Use template forms</td>
+              </tr>
+            </tbody>
+
+            <tbody data-unit="3" class="border-t-4 border-white">
+              <tr class="border-t border-slate-100" data-est="3" data-week="7" data-short="Monitoring IQA actions">
+                <th scope="rowgroup" rowspan="3" class="border-r border-white bg-orange-50 px-3 text-center align-middle"><span class="block text-lg font-bold text-[#12305a]">Unit 3</span><span class="text-sm text-slate-600" data-unit-hours>(9 hours)</span></th>
+                <td class="px-2 py-2 text-center text-slate-500" data-code>3.1</td>
+                <td class="px-3 py-2 text-slate-800">Monitoring the actions from IQA</td>
+                <td class="px-3 py-2 text-slate-600">Learn how to monitor and follow up actions</td>
+                <td class="px-2 py-2 text-center">3</td>
+                <td class="px-2 py-2 text-center text-slate-600">W7</td>
+                <td class="px-2 py-2 text-center"><select class="select status-select h-7 text-xs" data-status-select aria-label="Status of topic 3.1"><option value="not-started" selected>Not Started</option><option value="in-progress">In Progress</option><option value="done">Completed</option></select></td>
+                <td class="px-2 py-2 text-center"><input type="number" min="0" step="0.5" placeholder="–" class="cell-input" data-actual aria-label="Actual hours for topic 3.1"></td>
+                <td class="px-2 py-2 text-center font-medium text-slate-700" data-remaining>3</td>
+                <td class="px-3 py-2 text-slate-600">Review action plans</td>
+              </tr>
+              <tr class="border-t border-slate-100" data-est="3" data-week="8" data-short="Developing assessment practice">
+                <td class="px-2 py-2 text-center text-slate-500" data-code>3.2</td>
+                <td class="px-3 py-2 text-slate-800">Contributing to the development of assessment practice</td>
+                <td class="px-3 py-2 text-slate-600">Understand how IQA supports improvement</td>
+                <td class="px-2 py-2 text-center">3</td>
+                <td class="px-2 py-2 text-center text-slate-600">W8</td>
+                <td class="px-2 py-2 text-center"><select class="select status-select h-7 text-xs" data-status-select aria-label="Status of topic 3.2"><option value="not-started" selected>Not Started</option><option value="in-progress">In Progress</option><option value="done">Completed</option></select></td>
+                <td class="px-2 py-2 text-center"><input type="number" min="0" step="0.5" placeholder="–" class="cell-input" data-actual aria-label="Actual hours for topic 3.2"></td>
+                <td class="px-2 py-2 text-center font-medium text-slate-700" data-remaining>3</td>
+                <td class="px-3 py-2 text-slate-600">Reflect on own practice</td>
+              </tr>
+              <tr class="border-t border-slate-100" data-est="3" data-week="8" data-short="Working with others">
+                <td class="px-2 py-2 text-center text-slate-500" data-code>3.3</td>
+                <td class="px-3 py-2 text-slate-800">Working with others in the quality assurance process</td>
+                <td class="px-3 py-2 text-slate-600">Learn how to collaborate with assessors and others</td>
+                <td class="px-2 py-2 text-center">3</td>
+                <td class="px-2 py-2 text-center text-slate-600">W8</td>
+                <td class="px-2 py-2 text-center"><select class="select status-select h-7 text-xs" data-status-select aria-label="Status of topic 3.3"><option value="not-started" selected>Not Started</option><option value="in-progress">In Progress</option><option value="done">Completed</option></select></td>
+                <td class="px-2 py-2 text-center"><input type="number" min="0" step="0.5" placeholder="–" class="cell-input" data-actual aria-label="Actual hours for topic 3.3"></td>
+                <td class="px-2 py-2 text-center font-medium text-slate-700" data-remaining>3</td>
+                <td class="px-3 py-2 text-slate-600">Team work examples</td>
+              </tr>
+            </tbody>
+
+            <tbody data-unit="4" class="border-t-4 border-white">
+              <tr class="border-t border-slate-100" data-est="4" data-week="9" data-short="Reviewing IQA effectiveness">
+                <th scope="rowgroup" rowspan="3" class="border-r border-white bg-violet-50 px-3 text-center align-middle"><span class="block text-lg font-bold text-[#12305a]">Unit 4</span><span class="text-sm text-slate-600" data-unit-hours>(11 hours)</span></th>
+                <td class="px-2 py-2 text-center text-slate-500" data-code>4.1</td>
+                <td class="px-3 py-2 text-slate-800">Reviewing the effectiveness of internal quality assurance</td>
+                <td class="px-3 py-2 text-slate-600">Learn how to evaluate IQA effectiveness</td>
+                <td class="px-2 py-2 text-center">4</td>
+                <td class="px-2 py-2 text-center text-slate-600">W9</td>
+                <td class="px-2 py-2 text-center"><select class="select status-select h-7 text-xs" data-status-select aria-label="Status of topic 4.1"><option value="not-started" selected>Not Started</option><option value="in-progress">In Progress</option><option value="done">Completed</option></select></td>
+                <td class="px-2 py-2 text-center"><input type="number" min="0" step="0.5" placeholder="–" class="cell-input" data-actual aria-label="Actual hours for topic 4.1"></td>
+                <td class="px-2 py-2 text-center font-medium text-slate-700" data-remaining>4</td>
+                <td class="px-3 py-2 text-slate-600">Self-reflection</td>
+              </tr>
+              <tr class="border-t border-slate-100" data-est="4" data-week="10" data-short="Continuous improvement">
+                <td class="px-2 py-2 text-center text-slate-500" data-code>4.2</td>
+                <td class="px-3 py-2 text-slate-800">Planning for continuous improvement</td>
+                <td class="px-3 py-2 text-slate-600">Learn how to support ongoing improvement</td>
+                <td class="px-2 py-2 text-center">4</td>
+                <td class="px-2 py-2 text-center text-slate-600">W10</td>
+                <td class="px-2 py-2 text-center"><select class="select status-select h-7 text-xs" data-status-select aria-label="Status of topic 4.2"><option value="not-started" selected>Not Started</option><option value="in-progress">In Progress</option><option value="done">Completed</option></select></td>
+                <td class="px-2 py-2 text-center"><input type="number" min="0" step="0.5" placeholder="–" class="cell-input" data-actual aria-label="Actual hours for topic 4.2"></td>
+                <td class="px-2 py-2 text-center font-medium text-slate-700" data-remaining>4</td>
+                <td class="px-3 py-2 text-slate-600">Set future goals</td>
+              </tr>
+              <tr class="border-t border-slate-100" data-est="3" data-week="10" data-short="Professional development">
+                <td class="px-2 py-2 text-center text-slate-500" data-code>4.3</td>
+                <td class="px-3 py-2 text-slate-800">Professional development</td>
+                <td class="px-3 py-2 text-slate-600">Identify own CPD needs as an IQA</td>
+                <td class="px-2 py-2 text-center">3</td>
+                <td class="px-2 py-2 text-center text-slate-600">W10</td>
+                <td class="px-2 py-2 text-center"><select class="select status-select h-7 text-xs" data-status-select aria-label="Status of topic 4.3"><option value="not-started" selected>Not Started</option><option value="in-progress">In Progress</option><option value="done">Completed</option></select></td>
+                <td class="px-2 py-2 text-center"><input type="number" min="0" step="0.5" placeholder="–" class="cell-input" data-actual aria-label="Actual hours for topic 4.3"></td>
+                <td class="px-2 py-2 text-center font-medium text-slate-700" data-remaining>3</td>
+                <td class="px-3 py-2 text-slate-600">Create CPD plan</td>
+              </tr>
+            </tbody>
+
+            <tfoot class="border-t-2 border-slate-200 bg-[#e8f1fc] text-sm font-bold text-slate-900">
+              <tr>
+                <th class="px-4 py-3 text-center text-base">Total</th>
+                <td colspan="3"></td>
+                <td class="px-2 py-3 text-center" id="sum-est">51</td>
+                <td class="px-2 py-3 text-center">–</td>
+                <td class="px-2 py-3 text-center">–</td>
+                <td class="px-2 py-3 text-center" id="sum-actual">7.5</td>
+                <td class="px-2 py-3 text-center" id="sum-left">43.5</td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </section>
+
+      <!-- ============ Weekly plan + overall progress ============ -->
+      <div class="mt-5 grid grid-cols-1 gap-5 2xl:grid-cols-[minmax(0,1fr)_24rem]">
+        <section class="card p-5" aria-labelledby="plan-title">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <h2 id="plan-title" class="flex flex-wrap items-center gap-x-2.5 text-lg font-bold text-[#12305a]"><i data-lucide="calendar-days" class="size-5"></i>Weekly Learning Plan <span class="text-sm font-medium text-slate-500">(Set Your Own Schedule)</span></h2>
+            <p id="plan-note" class="text-sm text-slate-500">57h planned for 51h of topics.</p>
+          </div>
+          <!-- data-planned = hours you plan for weeks 1–16. Actual hours per week are added up from the topics table. -->
+          <div class="mt-4 overflow-x-auto">
+            <table id="weeks" class="w-full min-w-[960px] border-collapse text-center text-sm" data-planned="5,5,4,4,4,4,4,3,3,3,3,3,3,3,3,3">
+              <tbody>
+                <tr id="wk-head" class="bg-slate-50 text-xs font-semibold text-slate-600"><th class="w-32 border border-slate-100 px-3 py-2 text-left">Week</th></tr>
+                <tr id="wk-planned"><th class="border border-slate-100 px-3 py-1.5 text-left font-medium text-slate-700">Planned Hours</th></tr>
+                <tr id="wk-actual"><th class="border border-slate-100 px-3 py-2 text-left font-medium text-slate-700">Actual Hours</th></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="flex flex-col justify-center rounded-[1.25rem] bg-[#e8f1fc] p-6 ring-1 ring-blue-100" aria-labelledby="overall-title">
+          <h2 id="overall-title" class="text-lg font-bold text-[#12305a]">Overall Progress</h2>
+          <div class="mt-3 flex items-center gap-4">
+            <div class="progress h-4 flex-1 bg-white"><span id="overall-bar" class="bg-emerald-600" style="width: 15%"></span></div>
+            <span id="overall-pct" class="text-2xl font-bold text-[#12305a]">15%</span>
+          </div>
+          <p id="pace" class="mt-3 text-sm text-slate-600">About 3h a week gets you there by 31 Dec 2026.</p>
+          <p class="font-hand mt-2 text-2xl text-slate-700">“Consistent effort leads to success.”</p>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/lucide@1.47.0/dist/umd/lucide.min.js"></script>
+  <script src="assets/js/app.js"></script>
+  <script src="assets/js/course.js"></script>
+</body>
+</html>

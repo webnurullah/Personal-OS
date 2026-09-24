@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Goals · Nurullah POS</title>
+  <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600&family=Inter:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;600;700&text=%E0%A7%B3&display=swap">
+  <link rel="stylesheet" href="assets/css/app.css">
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.3"></script>
+</head>
+<body data-page="goals" class="bg-[#f5f7fb] text-slate-800 antialiased">
+  <div id="sidebar-root"></div>
+
+  <div class="lg:pl-60">
+    <div id="topbar-root"></div>
+
+    <main class="mx-auto w-full max-w-[1720px] px-4 py-6 sm:px-6 xl:px-8">
+      <!-- Page header -->
+      <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 class="text-3xl font-bold tracking-tight text-slate-900">Goals</h1>
+          <p class="mt-1 text-slate-500">Dream big, start small, keep going.</p>
+        </div>
+        <button type="button" class="btn btn-primary self-start sm:self-auto" data-modal-open="goal-modal"><i data-lucide="plus" class="size-4"></i>New Goal</button>
+      </div>
+
+      <!-- Summary (calculated by goals.js) -->
+      <div class="mt-6 grid grid-cols-2 gap-4 xl:grid-cols-4">
+        <div class="card flex items-center gap-4 p-4">
+          <span class="icon-tile size-11 bg-blue-50 text-blue-600"><i data-lucide="target" class="size-5"></i></span>
+          <div><p class="text-sm text-slate-500">Active goals</p><p id="sum-active" class="text-xl font-bold text-slate-900">5</p></div>
+        </div>
+        <div class="card flex items-center gap-4 p-4">
+          <span class="icon-tile size-11 bg-emerald-50 text-emerald-600"><i data-lucide="trending-up" class="size-5"></i></span>
+          <div><p class="text-sm text-slate-500">On track</p><p id="sum-track" class="text-xl font-bold text-slate-900">3</p></div>
+        </div>
+        <div class="card flex items-center gap-4 p-4">
+          <span class="icon-tile size-11 bg-amber-50 text-amber-600"><i data-lucide="hourglass" class="size-5"></i></span>
+          <div><p class="text-sm text-slate-500">Behind</p><p id="sum-behind" class="text-xl font-bold text-slate-900">2</p></div>
+        </div>
+        <div class="card flex items-center gap-4 p-4">
+          <span class="icon-tile size-11 bg-violet-50 text-violet-600"><i data-lucide="trophy" class="size-5"></i></span>
+          <div><p class="text-sm text-slate-500">Average progress</p><p id="sum-avg" class="text-xl font-bold text-slate-900">49%</p></div>
+        </div>
+      </div>
+
+      <div class="mt-6 flex flex-wrap items-center justify-between gap-3">
+        <div id="goal-filter" class="segmented" role="tablist" data-tabs>
+          <button type="button" role="tab" aria-selected="true" data-tab="active">Active</button>
+          <button type="button" role="tab" aria-selected="false" data-tab="on-track">On track</button>
+          <button type="button" role="tab" aria-selected="false" data-tab="behind">Behind</button>
+          <button type="button" role="tab" aria-selected="false" data-tab="completed">Completed</button>
+        </div>
+        <p class="text-sm text-slate-500">Progress is calculated from each goal's numbers or milestones.</p>
+      </div>
+
+      <!--
+        Each card keeps its facts in data attributes:
+          data-current / data-target / data-unit  → progress = current ÷ target
+          data-progress="milestones"               → progress = ticked milestones ÷ all milestones
+          data-status (on-track, behind, completed) and data-deadline (YYYY-MM-DD)
+      -->
+      <div id="goal-grid" class="mt-5 grid grid-cols-1 gap-5 md:grid-cols-2 2xl:grid-cols-3">
+
+        <article class="goal card flex flex-col p-5" data-status="on-track" data-current="140000" data-target="200000" data-unit="৳" data-deadline="2026-12-31">
+          <div class="flex items-start gap-3">
+            <span class="icon-tile size-11 bg-emerald-50 text-emerald-600"><i data-lucide="piggy-bank" class="size-5"></i></span>
+            <div class="min-w-0 flex-1">
+              <h3 class="font-semibold text-slate-900">Build Emergency Fund</h3>
+              <p class="text-xs text-slate-500">Finance · <span data-deadline-label></span></p>
+            </div>
+            <select class="select status-select h-7 text-xs" data-status-select aria-label="Status"><option value="on-track">On track</option><option value="behind">Behind</option><option value="completed">Completed</option></select>
+          </div>
+          <div class="mt-5 flex items-end justify-between gap-3">
+            <p class="text-3xl font-bold tracking-tight text-slate-900" data-pct>70%</p>
+            <p class="text-right text-sm text-slate-500" data-amount>৳1,40,000 of ৳2,00,000</p>
+          </div>
+          <div class="progress mt-2 h-2.5"><span class="bg-emerald-500" data-bar style="width: 70%"></span></div>
+          <ul class="mt-5 space-y-2.5 text-sm">
+            <li class="flex items-center gap-2.5"><input id="g1-1" data-at="50000" type="checkbox" class="checkbox checkbox-green peer" checked disabled><label for="g1-1" class="text-slate-600 peer-checked:text-slate-400 peer-checked:line-through">Save ৳50,000</label></li>
+            <li class="flex items-center gap-2.5"><input id="g1-2" data-at="100000" type="checkbox" class="checkbox checkbox-green peer" checked disabled><label for="g1-2" class="text-slate-600 peer-checked:text-slate-400 peer-checked:line-through">Save ৳1,00,000</label></li>
+            <li class="flex items-center gap-2.5"><input id="g1-3" data-at="150000" type="checkbox" class="checkbox checkbox-green peer" disabled><label for="g1-3" class="text-slate-600 peer-checked:text-slate-400 peer-checked:line-through">Save ৳1,50,000</label></li>
+            <li class="flex items-center gap-2.5"><input id="g1-4" data-at="200000" type="checkbox" class="checkbox checkbox-green peer" disabled><label for="g1-4" class="text-slate-600 peer-checked:text-slate-400 peer-checked:line-through">Six months of expenses: ৳2,00,000</label></li>
+          </ul>
+          <div class="mt-auto flex items-center justify-between gap-3 pt-5">
+            <p class="text-xs text-slate-500">Milestones tick themselves as the amount grows.</p>
+            <button type="button" class="btn btn-secondary btn-sm" data-update><i data-lucide="pencil" class="size-3.5"></i>Update</button>
+          </div>
+        </article>
+
+        <article class="goal card flex flex-col p-5" data-status="behind" data-current="4" data-target="10" data-unit="km" data-deadline="2026-12-12">
+          <div class="flex items-start gap-3">
+            <span class="icon-tile size-11 bg-blue-50 text-blue-600"><i data-lucide="footprints" class="size-5"></i></span>
+            <div class="min-w-0 flex-1">
+              <h3 class="font-semibold text-slate-900">Run a 10K</h3>
+              <p class="text-xs text-slate-500">Health · <span data-deadline-label></span></p>
+            </div>
+            <select class="select status-select h-7 text-xs" data-status-select aria-label="Status"><option value="on-track">On track</option><option value="behind">Behind</option><option value="completed">Completed</option></select>
+          </div>
+          <div class="mt-5 flex items-end justify-between gap-3">
+            <p class="text-3xl font-bold tracking-tight text-slate-900" data-pct>40%</p>
+            <p class="text-right text-sm text-slate-500" data-amount>4 km of 10 km</p>
+          </div>
+          <div class="progress mt-2 h-2.5"><span class="bg-blue-500" data-bar style="width: 40%"></span></div>
+          <ul class="mt-5 space-y-2.5 text-sm">
+            <li class="flex items-center gap-2.5"><input id="g2-1" data-at="2" type="checkbox" class="checkbox peer" checked disabled><label for="g2-1" class="text-slate-600 peer-checked:text-slate-400 peer-checked:line-through">Run 2 km without stopping</label></li>
+            <li class="flex items-center gap-2.5"><input id="g2-2" data-at="4" type="checkbox" class="checkbox peer" checked disabled><label for="g2-2" class="text-slate-600 peer-checked:text-slate-400 peer-checked:line-through">Run 4 km</label></li>
+            <li class="flex items-center gap-2.5"><input id="g2-3" data-at="6" type="checkbox" class="checkbox peer" disabled><label for="g2-3" class="text-slate-600 peer-checked:text-slate-400 peer-checked:line-through">Run 6 km</label></li>
+            <li class="flex items-center gap-2.5"><input id="g2-4" data-at="8" type="checkbox" class="checkbox peer" disabled><label for="g2-4" class="text-slate-600 peer-checked:text-slate-400 peer-checked:line-through">Run 8 km</label></li>
+            <li class="flex items-center gap-2.5"><input id="g2-5" data-at="10" type="checkbox" class="checkbox peer" disabled><label for="g2-5" class="text-slate-600 peer-checked:text-slate-400 peer-checked:line-through">Race day: 10 km</label></li>
+          </ul>
+          <div class="mt-auto flex items-center justify-between gap-3 pt-5">
+            <p class="text-xs text-amber-600">Two runs a week gets you back on track.</p>
+            <button type="button" class="btn btn-secondary btn-sm" data-update><i data-lucide="pencil" class="size-3.5"></i>Update</button>
+          </div>
+        </article>
+
+        <article class="goal card flex flex-col p-5" data-status="on-track" data-progress="milestones" data-deadline="2027-03-31">
+          <div class="flex items-start gap-3">
+            <span class="icon-tile size-11 bg-violet-50 text-violet-600"><i data-lucide="graduation-cap" class="size-5"></i></span>
+            <div class="min-w-0 flex-1">
+              <h3 class="font-semibold text-slate-900">Learn a New Skill: Data Analytics</h3>
+              <p class="text-xs text-slate-500">Learning · <span data-deadline-label></span></p>
+            </div>
+            <select class="select status-select h-7 text-xs" data-status-select aria-label="Status"><option value="on-track">On track</option><option value="behind">Behind</option><option value="completed">Completed</option></select>
+          </div>
+          <div class="mt-5 flex items-end justify-between gap-3">
+            <p class="text-3xl font-bold tracking-tight text-slate-900" data-pct>60%</p>
+            <p class="text-right text-sm text-slate-500" data-amount>3 of 5 milestones</p>
+          </div>
+          <div class="progress mt-2 h-2.5"><span class="bg-violet-500" data-bar style="width: 60%"></span></div>
+          <ul class="mt-5 space-y-2.5 text-sm">
+            <li class="flex items-center gap-2.5"><input id="g3-1" type="checkbox" class="checkbox peer" style="--check:#8b5cf6" checked><label for="g3-1" class="text-slate-600 peer-checked:text-slate-400 peer-checked:line-through">Excel basics</label></li>
+            <li class="flex items-center gap-2.5"><input id="g3-2" type="checkbox" class="checkbox peer" style="--check:#8b5cf6" checked><label for="g3-2" class="text-slate-600 peer-checked:text-slate-400 peer-checked:line-through">SQL fundamentals</label></li>
+            <li class="flex items-center gap-2.5"><input id="g3-3" type="checkbox" class="checkbox peer" style="--check:#8b5cf6" checked><label for="g3-3" class="text-slate-600 peer-checked:text-slate-400 peer-checked:line-through">Power BI dashboards</label></li>
+            <li class="flex items-center gap-2.5"><input id="g3-4" type="checkbox" class="checkbox peer" style="--check:#8b5cf6"><label for="g3-4" class="text-slate-600 peer-checked:text-slate-400 peer-checked:line-through">Python with pandas</label></li>
+            <li class="flex items-center gap-2.5"><input id="g3-5" type="checkbox" class="checkbox peer" style="--check:#8b5cf6"><label for="g3-5" class="text-slate-600 peer-checked:text-slate-400 peer-checked:line-through">Capstone project</label></li>
+          </ul>
+          <div class="mt-auto flex items-center justify-between gap-3 pt-5">
+            <p class="text-xs text-slate-500">Tick a milestone to update the progress.</p>
+            <a href="learning.html" class="btn btn-secondary btn-sm"><i data-lucide="book-open" class="size-3.5"></i>Learning</a>
+          </div>
+        </article>
+
+        <article class="goal card flex flex-col p-5" data-status="behind" data-current="75000" data-target="300000" data-unit="৳" data-deadline="2027-04-05">
+          <div class="flex items-start gap-3">
+            <span class="icon-tile size-11 bg-pink-50 text-pink-600"><i data-lucide="plane" class="size-5"></i></span>
+            <div class="min-w-0 flex-1">
+              <h3 class="font-semibold text-slate-900">Travel to Japan</h3>
+              <p class="text-xs text-slate-500">Personal · <span data-deadline-label></span></p>
+            </div>
+            <select class="select status-select h-7 text-xs" data-status-select aria-label="Status"><option value="on-track">On track</option><option value="behind">Behind</option><option value="completed">Completed</option></select>
+          </div>
+          <div class="mt-5 flex items-end justify-between gap-3">
+            <p class="text-3xl font-bold tracking-tight text-slate-900" data-pct>25%</p>
+            <p class="text-right text-sm text-slate-500" data-amount>৳75,000 of ৳3,00,000</p>
+          </div>
+          <div class="progress mt-2 h-2.5"><span class="bg-pink-500" data-bar style="width: 25%"></span></div>
+          <ul class="mt-5 space-y-2.5 text-sm">
+            <li class="flex items-center gap-2.5"><input id="g4-1" type="checkbox" class="checkbox peer" style="--check:#ec4899" checked><label for="g4-1" class="text-slate-600 peer-checked:text-slate-400 peer-checked:line-through">Renew passport</label></li>
+            <li class="flex items-center gap-2.5"><input id="g4-2" type="checkbox" class="checkbox peer" style="--check:#ec4899"><label for="g4-2" class="text-slate-600 peer-checked:text-slate-400 peer-checked:line-through">Plan the route: Tokyo, Kyoto, Osaka</label></li>
+            <li class="flex items-center gap-2.5"><input id="g4-3" type="checkbox" class="checkbox peer" style="--check:#ec4899"><label for="g4-3" class="text-slate-600 peer-checked:text-slate-400 peer-checked:line-through">Book flights</label></li>
+            <li class="flex items-center gap-2.5"><input id="g4-4" type="checkbox" class="checkbox peer" style="--check:#ec4899"><label for="g4-4" class="text-slate-600 peer-checked:text-slate-400 peer-checked:line-through">Apply for the visa</label></li>
+          </ul>
+          <div class="mt-auto flex items-center justify-between gap-3 pt-5">
+            <p class="text-xs text-amber-600">Save ৳15,000 a month to arrive on time.</p>
+            <button type="button" class="btn btn-secondary btn-sm" data-update><i data-lucide="pencil" class="size-3.5"></i>Update</button>
+          </div>
+        </article>
+
+        <article class="goal card flex flex-col p-5" data-status="on-track" data-current="12" data-target="24" data-unit="books" data-deadline="2026-12-31">
+          <div class="flex items-start gap-3">
+            <span class="icon-tile size-11 bg-amber-50 text-amber-600"><i data-lucide="book-open" class="size-5"></i></span>
+            <div class="min-w-0 flex-1">
+              <h3 class="font-semibold text-slate-900">Read 24 Books This Year</h3>
+              <p class="text-xs text-slate-500">Personal · <span data-deadline-label></span></p>
+            </div>
+            <select class="select status-select h-7 text-xs" data-status-select aria-label="Status"><option value="on-track">On track</option><option value="behind">Behind</option><option value="completed">Completed</option></select>
+          </div>
+          <div class="mt-5 flex items-end justify-between gap-3">
+            <p class="text-3xl font-bold tracking-tight text-slate-900" data-pct>50%</p>
+            <p class="text-right text-sm text-slate-500" data-amount>12 books of 24 books</p>
+          </div>
+          <div class="progress mt-2 h-2.5"><span class="bg-amber-400" data-bar style="width: 50%"></span></div>
+          <p class="mt-5 text-xs font-semibold uppercase tracking-wide text-slate-400">Recently finished</p>
+          <ul class="mt-2 space-y-2 text-sm text-slate-600">
+            <li class="flex items-center gap-2"><i data-lucide="book-marked" class="size-4 text-amber-500"></i>Atomic Habits</li>
+            <li class="flex items-center gap-2"><i data-lucide="book-marked" class="size-4 text-amber-500"></i>Deep Work</li>
+            <li class="flex items-center gap-2"><i data-lucide="book-marked" class="size-4 text-amber-500"></i>The Psychology of Money</li>
+          </ul>
+          <div class="mt-auto flex items-center justify-between gap-3 pt-5">
+            <p class="text-xs text-slate-500">Now reading: <b class="font-medium text-slate-700">Ikigai</b></p>
+            <button type="button" class="btn btn-secondary btn-sm" data-update><i data-lucide="pencil" class="size-3.5"></i>Update</button>
+          </div>
+        </article>
+
+        <article class="goal card flex flex-col p-5" data-status="completed" data-current="5" data-target="5" data-unit="km" data-deadline="2026-03-15">
+          <div class="flex items-start gap-3">
+            <span class="icon-tile size-11 bg-emerald-50 text-emerald-600"><i data-lucide="medal" class="size-5"></i></span>
+            <div class="min-w-0 flex-1">
+              <h3 class="font-semibold text-slate-900">Run a 5K</h3>
+              <p class="text-xs text-slate-500">Health · <span data-deadline-label></span></p>
+            </div>
+            <select class="select status-select h-7 text-xs" data-status-select aria-label="Status"><option value="on-track">On track</option><option value="behind">Behind</option><option value="completed">Completed</option></select>
+          </div>
+          <div class="mt-5 flex items-end justify-between gap-3">
+            <p class="text-3xl font-bold tracking-tight text-slate-900" data-pct>100%</p>
+            <p class="text-right text-sm text-slate-500" data-amount>5 km of 5 km</p>
+          </div>
+          <div class="progress mt-2 h-2.5"><span class="bg-emerald-500" data-bar style="width: 100%"></span></div>
+          <div class="mt-5 flex items-center gap-3 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">
+            <i data-lucide="party-popper" class="size-5 shrink-0"></i>
+            Done! Finished in 31 minutes. This led to the 10K goal.
+          </div>
+        </article>
+      </div>
+
+      <div id="goal-empty" class="card mt-5 py-14 text-center" hidden>
+        <span class="icon-tile mx-auto size-12 bg-slate-100 text-slate-400"><i data-lucide="target" class="size-6"></i></span>
+        <p class="mt-3 text-sm font-medium text-slate-700">No goals here</p>
+        <p class="text-sm text-slate-500">Try another filter, or set a new goal.</p>
+      </div>
+    </main>
+  </div>
+
+  <!-- ============ Update progress window ============ -->
+  <dialog id="update-modal" aria-labelledby="update-title" class="w-[calc(100%-2rem)] max-w-sm rounded-2xl bg-white p-0 shadow-2xl">
+    <form id="update-form" class="p-6">
+      <h2 id="update-title" class="text-lg font-semibold text-slate-900">Update progress</h2>
+      <p id="update-goal" class="text-sm text-slate-500">Goal name</p>
+      <div class="mt-5">
+        <label class="label" for="update-value">Where are you now?</label>
+        <div class="flex items-center gap-2">
+          <input id="update-value" name="value" type="number" min="0" step="any" class="input" required>
+          <span id="update-unit" class="w-24 shrink-0 text-sm text-slate-500">of 10 km</span>
+        </div>
+      </div>
+      <div class="mt-6 flex justify-end gap-2">
+        <button type="button" class="btn btn-secondary" data-modal-close>Cancel</button>
+        <button type="submit" class="btn btn-primary">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- ============ New goal window ============ -->
+  <dialog id="goal-modal" data-new-modal aria-labelledby="goal-modal-title" class="w-[calc(100%-2rem)] max-w-lg rounded-2xl bg-white p-0 shadow-2xl">
+    <form id="goal-form" class="p-6">
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <h2 id="goal-modal-title" class="text-lg font-semibold text-slate-900">New goal</h2>
+          <p class="text-sm text-slate-500">Make it clear and measurable.</p>
+        </div>
+        <button type="button" class="btn btn-ghost btn-sm btn-icon -mr-2 -mt-1" data-modal-close aria-label="Close"><i data-lucide="x" class="size-5"></i></button>
+      </div>
+      <div class="mt-5 space-y-4">
+        <div>
+          <label class="label" for="goal-title">Goal</label>
+          <input id="goal-title" name="title" class="input" required placeholder="e.g. Save for a new laptop" autocomplete="off">
+        </div>
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label class="label" for="goal-cat">Category</label>
+            <select id="goal-cat" name="category" class="select select-lg">
+              <option>Finance</option><option>Health</option><option>Learning</option><option selected>Personal</option><option>Work</option>
+            </select>
+          </div>
+          <div>
+            <label class="label" for="goal-deadline">Deadline</label>
+            <input id="goal-deadline" name="deadline" type="date" class="input" required>
+          </div>
+        </div>
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label class="label" for="goal-target">Target</label>
+            <input id="goal-target" name="target" type="number" min="1" step="any" class="input" required placeholder="e.g. 120000">
+          </div>
+          <div>
+            <label class="label" for="goal-unit">Unit</label>
+            <input id="goal-unit" name="unit" class="input" required value="৳" list="goal-units" autocomplete="off">
+            <datalist id="goal-units"><option value="৳"></option><option value="km"></option><option value="books"></option><option value="hours"></option><option value="kg"></option></datalist>
+          </div>
+        </div>
+      </div>
+      <div class="mt-6 flex justify-end gap-2">
+        <button type="button" class="btn btn-secondary" data-modal-close>Cancel</button>
+        <button type="submit" class="btn btn-primary">Create goal</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Markup for a new goal card (goals.js copies and fills it) -->
+  <template id="goal-template">
+    <article class="goal card flex flex-col p-5" data-status="on-track" data-current="0">
+      <div class="flex items-start gap-3">
+        <span class="icon-tile size-11" data-tile><i class="size-5" data-icon></i></span>
+        <div class="min-w-0 flex-1">
+          <h3 class="font-semibold text-slate-900" data-title></h3>
+          <p class="text-xs text-slate-500"><span data-category></span> · <span data-deadline-label></span></p>
+        </div>
+        <select class="select status-select h-7 text-xs" data-status-select aria-label="Status"><option value="on-track">On track</option><option value="behind">Behind</option><option value="completed">Completed</option></select>
+      </div>
+      <div class="mt-5 flex items-end justify-between gap-3">
+        <p class="text-3xl font-bold tracking-tight text-slate-900" data-pct>0%</p>
+        <p class="text-right text-sm text-slate-500" data-amount></p>
+      </div>
+      <div class="progress mt-2 h-2.5"><span data-bar style="width: 0%"></span></div>
+      <p class="mt-5 rounded-xl border border-dashed border-slate-200 p-3 text-center text-xs text-slate-500">Break it into milestones when you know the steps.</p>
+      <div class="mt-auto flex items-center justify-between gap-3 pt-5">
+        <p class="text-xs text-slate-500">Just started. You've got this!</p>
+        <button type="button" class="btn btn-secondary btn-sm" data-update><i data-lucide="pencil" class="size-3.5"></i>Update</button>
+      </div>
+    </article>
+  </template>
+
+  <script src="https://cdn.jsdelivr.net/npm/lucide@1.47.0/dist/umd/lucide.min.js"></script>
+  <script src="assets/js/app.js"></script>
+  <script src="assets/js/goals.js"></script>
+</body>
+</html>
