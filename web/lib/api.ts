@@ -1,0 +1,84 @@
+import { mutate } from "swr";
+import { createClient } from "./supabase/client";
+
+// All data goes through the Node.js API, which checks the sign-in token on every request.
+const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000").replace(/\/$/, "");
+
+export class ApiError extends Error {
+  constructor(public status: number, message: string, public details?: unknown) {
+    super(message);
+  }
+}
+
+type Options = { method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"; body?: unknown };
+
+async function send(path: string, options: Options, token: string | undefined) {
+  return fetch(`${API_URL}${path}`, {
+    method: options.method ?? "GET",
+    headers: {
+      ...(options.body !== undefined ? { "Content-Type": "application/json" } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+    cache: "no-store",
+  });
+}
+
+/** Calls the API as the signed-in user. Throws ApiError with a readable message. */
+export async function api<T>(path: string, options: Options = {}): Promise<T> {
+  const supabase = createClient();
+  const { data } = await supabase.auth.getSession();
+  let res: Response;
+  try {
+    res = await send(path, options, data.session?.access_token);
+    if (res.status === 401) {
+      // The token may have just expired: refresh once and try again.
+      const refreshed = await supabase.auth.refreshSession();
+      if (!refreshed.data.session) {
+        // A full page load (not router.push) so no cached data from the old session survives.
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+        window.location.assign(`/login?next=${encodeURIComponent(window.location.pathname)}`);
+        throw new ApiError(401, "Please sign in again.");
+      }
+      res = await send(path, options, refreshed.data.session.access_token);
+    }
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    throw new ApiError(0, "Cannot reach the server. Check your internet connection, or that the API is running.");
+  }
+
+  const body = await res.json().catch(() => null);
+  if (!res.ok) throw new ApiError(res.status, body?.error?.message ?? `Request failed (${res.status})`, body?.error?.details);
+  return body as T;
+}
+
+/** SWR fetcher: the key is the API path. */
+export const fetcher = <T,>(path: string) => api<T>(path);
+
+/** Reload cached API data whose path starts with any of the given prefixes (always includes the dashboard). */
+export function refresh(...prefixes: string[]) {
+  const all = [...prefixes, "/dashboard", "/notifications"];
+  return mutate((key) => typeof key === "string" && all.some((p) => key === p || key.startsWith(`${p}?`) || key.startsWith(`${p}/`)));
+}
+
+/** Reload every cached API answer (after loading or deleting all data). */
+export const refreshAll = () => mutate(() => true);
+
+/** A friendly message for any error. */
+export function errorMessage(error: unknown) {
+  if (error instanceof ApiError) return error.message;
+  if (error instanceof Error) return error.message;
+  return "Something went wrong.";
+}
+
+/** Downloads a file from the API (used for the data export). */
+export async function download(path: string, fallbackName: string) {
+  const { data } = await createClient().auth.getSession();
+  const res = await send(path, {}, data.session?.access_token);
+  if (!res.ok) throw new ApiError(res.status, "The download failed.");
+  const name = res.headers.get("content-disposition")?.match(/filename="?([^"]+)"?/)?.[1] ?? fallbackName;
+  const url = URL.createObjectURL(await res.blob());
+  const link = Object.assign(document.createElement("a"), { href: url, download: name });
+  link.click();
+  URL.revokeObjectURL(url);
+}
