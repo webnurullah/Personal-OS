@@ -1,0 +1,486 @@
+@import "tailwindcss";
+
+/* Fonts come from next/font in app/layout.tsx. Noto Sans Bengali is only used for the ৳ sign. */
+@theme inline {
+  --font-sans: var(--font-inter), var(--font-bengali), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-hand: var(--font-caveat), cursive;
+}
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+  body {
+    background: #f5f7fb;
+    color: var(--color-slate-800);
+  }
+  button:not(:disabled),
+  [role="button"],
+  label[for],
+  select,
+  summary {
+    cursor: pointer;
+  }
+  dialog {
+    margin: auto;
+  }
+  dialog::backdrop {
+    background: rgb(15 23 42 / 0.45);
+    backdrop-filter: blur(2px);
+  }
+  dialog[open] {
+    animation: pop 0.18s ease-out;
+  }
+  @keyframes pop {
+    from {
+      opacity: 0;
+      transform: translateY(8px) scale(0.98);
+    }
+  }
+  ::selection {
+    background: #dbeafe;
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent;
+  }
+}
+
+@layer components {
+  /* ---------- Cards ---------- */
+  .card {
+    background: #fff;
+    border: 1px solid rgb(226 232 240 / 0.8);
+    border-radius: 1.25rem;
+    box-shadow: 0 1px 2px rgb(15 23 42 / 0.04), 0 6px 20px -8px rgb(15 23 42 / 0.08);
+  }
+  .card-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #0f172a;
+  }
+  .icon-tile {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 0.75rem;
+  }
+  .link-more {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    white-space: nowrap;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: #2563eb;
+  }
+  .link-more:hover {
+    color: #1d4ed8;
+  }
+
+  /* ---------- Sidebar links ---------- */
+  .nav-link {
+    display: flex;
+    align-items: center;
+    gap: 0.875rem;
+    padding: 0.625rem 0.875rem;
+    border-radius: 0.75rem;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    color: #334155;
+    transition: background-color 0.15s, color 0.15s;
+  }
+  .nav-link svg {
+    color: #475569;
+  }
+  .nav-link:hover {
+    background: rgb(255 255 255 / 0.75);
+    color: #0f172a;
+  }
+  .nav-link[aria-current="page"] {
+    background: #dce8fc;
+    color: #1d4ed8;
+    font-weight: 600;
+  }
+  .nav-link[aria-current="page"] svg {
+    color: #2563eb;
+  }
+
+  /* ---------- Buttons ---------- */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    height: 2.5rem;
+    padding: 0 1rem;
+    border-radius: 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    white-space: nowrap;
+    transition: background-color 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
+  }
+  .btn:focus-visible {
+    outline: 2px solid #93c5fd;
+    outline-offset: 2px;
+  }
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .btn-primary {
+    background: #2563eb;
+    color: #fff;
+    box-shadow: 0 1px 2px rgb(37 99 235 / 0.35);
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: #1d4ed8;
+  }
+  .btn-secondary {
+    background: #fff;
+    color: #334155;
+    border: 1px solid #e2e8f0;
+  }
+  .btn-secondary:hover:not(:disabled) {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+  }
+  .btn-ghost {
+    color: #475569;
+  }
+  .btn-ghost:hover:not(:disabled) {
+    background: #f1f5f9;
+    color: #0f172a;
+  }
+  .btn-danger {
+    background: #fff;
+    color: #e11d48;
+    border: 1px solid #fecdd3;
+  }
+  .btn-danger:hover:not(:disabled) {
+    background: #fff1f2;
+  }
+  .btn-sm {
+    height: 2rem;
+    padding: 0 0.75rem;
+    font-size: 0.8125rem;
+    border-radius: 0.625rem;
+  }
+  .btn-icon {
+    width: 2.5rem;
+    padding: 0;
+  }
+  .btn-sm.btn-icon {
+    width: 2rem;
+  }
+
+  /* ---------- Form fields ---------- */
+  .input {
+    width: 100%;
+    height: 2.5rem;
+    padding: 0 0.875rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.75rem;
+    background: #fff;
+    font-size: 0.875rem;
+    color: #0f172a;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  textarea.input {
+    height: auto;
+    min-height: 6rem;
+    padding: 0.625rem 0.875rem;
+    resize: vertical;
+  }
+  .input::placeholder {
+    color: #94a3b8;
+  }
+  .input:focus,
+  .select:focus {
+    outline: none;
+    border-color: #93c5fd;
+    box-shadow: 0 0 0 4px rgb(59 130 246 / 0.12);
+  }
+  .input:disabled,
+  .select:disabled {
+    background-color: #f8fafc;
+    color: #94a3b8;
+  }
+  .label {
+    display: block;
+    margin-bottom: 0.375rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #334155;
+  }
+  .select {
+    appearance: none;
+    height: 2rem;
+    padding: 0 2rem 0 0.75rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.625rem;
+    background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") right 0.5rem center / 1rem no-repeat;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: #334155;
+  }
+  .select-lg {
+    height: 2.5rem;
+    border-radius: 0.75rem;
+    font-size: 0.875rem;
+    width: 100%;
+  }
+
+  /* Status dropdowns take the colour of their value. */
+  .status-select[data-status="on-track"],
+  .status-select[data-status="done"] {
+    background-color: #ecfdf5;
+    border-color: #a7f3d0;
+    color: #047857;
+  }
+  .status-select[data-status="behind"] {
+    background-color: #fffbeb;
+    border-color: #fde68a;
+    color: #b45309;
+  }
+  .status-select[data-status="completed"],
+  .status-select[data-status="in-progress"] {
+    background-color: #eff6ff;
+    border-color: #bfdbfe;
+    color: #1d4ed8;
+  }
+  .status-select[data-status="not-started"] {
+    background-color: #f8fafc;
+    border-color: #e2e8f0;
+    color: #64748b;
+  }
+
+  /* Small number field in a table cell: looks like text until hovered or focused. */
+  .cell-input {
+    width: 3.75rem;
+    height: 1.875rem;
+    padding: 0 0.375rem;
+    border: 1px solid transparent;
+    border-radius: 0.5rem;
+    background: transparent;
+    text-align: center;
+    font-size: 0.8125rem;
+    color: #0f172a;
+    transition: border-color 0.15s, background-color 0.15s, box-shadow 0.15s;
+  }
+  .cell-input:hover {
+    border-color: #e2e8f0;
+    background: #fff;
+  }
+  .cell-input:focus {
+    outline: none;
+    border-color: #93c5fd;
+    background: #fff;
+    box-shadow: 0 0 0 3px rgb(59 130 246 / 0.12);
+  }
+  .cell-input::placeholder {
+    color: #cbd5e1;
+  }
+
+  /* Custom checkbox: <input type="checkbox" className="checkbox"> */
+  .checkbox {
+    appearance: none;
+    flex: none;
+    width: 1.125rem;
+    height: 1.125rem;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 0.375rem;
+    background: #fff center / 0.75rem no-repeat;
+    transition: background-color 0.15s, border-color 0.15s;
+  }
+  .checkbox:hover {
+    border-color: #94a3b8;
+  }
+  .checkbox:checked {
+    background-color: var(--check, #2563eb);
+    border-color: var(--check, #2563eb);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
+  }
+  .checkbox:focus-visible {
+    outline: 2px solid #93c5fd;
+    outline-offset: 2px;
+  }
+  .checkbox:disabled {
+    cursor: default;
+    opacity: 0.8;
+  }
+  .checkbox-green {
+    --check: #16a34a;
+  }
+  .checkbox-lg {
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 0.5rem;
+    background-size: 1rem;
+  }
+
+  /* Habit day buttons: <button className="habit-dot" aria-pressed> */
+  .habit-dot {
+    flex: none;
+    width: 1.375rem;
+    height: 1.375rem;
+    border-radius: 999px;
+    border: 1.5px solid #d5dde8;
+    background: #fff center / 0.75rem no-repeat;
+    transition: background-color 0.15s, border-color 0.15s, transform 0.15s;
+  }
+  .habit-dot:hover:not(:disabled) {
+    border-color: #22c55e;
+    transform: scale(1.08);
+  }
+  .habit-dot[aria-pressed="true"] {
+    background-color: #22c55e;
+    border-color: #22c55e;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
+  }
+  .habit-dot.is-today {
+    box-shadow: 0 0 0 2px #fff, 0 0 0 3.5px #bbf7d0;
+  }
+  .habit-dot:disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+  .habit-dot-sm {
+    width: 1.125rem;
+    height: 1.125rem;
+    background-size: 0.625rem;
+  }
+  .habit-dot-lg {
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 0.75rem;
+    background-size: 1rem;
+  }
+
+  /* ---------- Badges & progress ---------- */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.125rem 0.5rem;
+    border-radius: 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1.25rem;
+    white-space: nowrap;
+  }
+  .progress {
+    height: 0.5rem;
+    border-radius: 999px;
+    background: #e8edf3;
+    overflow: hidden;
+  }
+  .progress > span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    transition: width 0.4s ease;
+  }
+
+  /* ---------- Tabs (segmented control) ---------- */
+  .segmented {
+    display: inline-flex;
+    gap: 0.25rem;
+    padding: 0.25rem;
+    border-radius: 0.75rem;
+    background: #f1f5f9;
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .segmented > button {
+    padding: 0.375rem 0.75rem;
+    border-radius: 0.5rem;
+    white-space: nowrap;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: #64748b;
+    transition: background-color 0.15s, color 0.15s, box-shadow 0.15s;
+  }
+  .segmented > button:hover {
+    color: #0f172a;
+  }
+  .segmented > button[aria-selected="true"] {
+    background: #eaf2ff;
+    color: #1d4ed8;
+    box-shadow: inset 0 0 0 1px #bfdbfe;
+  }
+
+  /* ---------- Side tabs (Settings) ---------- */
+  .side-tab {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.625rem 1rem;
+    border-radius: 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #475569;
+    white-space: nowrap;
+    transition: background-color 0.15s, color 0.15s, box-shadow 0.15s;
+  }
+  .side-tab:hover {
+    background: rgb(255 255 255 / 0.7);
+    color: #0f172a;
+  }
+  .side-tab[aria-selected="true"] {
+    background: #fff;
+    color: #1d4ed8;
+    box-shadow: 0 1px 2px rgb(15 23 42 / 0.06), 0 0 0 1px #e2e8f0;
+  }
+
+  /* ---------- Switch: <button className="switch" role="switch" aria-checked> ---------- */
+  .switch {
+    position: relative;
+    flex: none;
+    width: 2.5rem;
+    height: 1.5rem;
+    border-radius: 999px;
+    background: #cbd5e1;
+    transition: background-color 0.2s;
+  }
+  .switch::after {
+    content: "";
+    position: absolute;
+    top: 0.1875rem;
+    left: 0.1875rem;
+    width: 1.125rem;
+    height: 1.125rem;
+    border-radius: 999px;
+    background: #fff;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.2);
+    transition: transform 0.2s;
+  }
+  .switch[aria-checked="true"] {
+    background: #2563eb;
+  }
+  .switch[aria-checked="true"]::after {
+    transform: translateX(1rem);
+  }
+
+  /* Handwritten accent font for quotes */
+  .font-hand {
+    font-family: var(--font-hand);
+  }
+
+  /* Loading placeholder */
+  .skeleton {
+    border-radius: 0.75rem;
+    background: linear-gradient(90deg, #eef2f7 25%, #f8fafc 50%, #eef2f7 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s infinite;
+  }
+  @keyframes shimmer {
+    to {
+      background-position: -200% 0;
+    }
+  }
+}

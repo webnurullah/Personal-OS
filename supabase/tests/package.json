@@ -1,0 +1,12 @@
+{
+  "name": "nurullah-pos-db-tests",
+  "private": true,
+  "description": "Tests the Supabase migrations (security rules, triggers, functions) in an in-memory Postgres.",
+  "type": "module",
+  "scripts": {
+    "test": "node rls.test.mjs"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8"
+  }
+}

@@ -1,0 +1,15 @@
+# Dependencies and build output
+node_modules/
+.next/
+out/
+
+# Secrets: never commit real keys (the .env.example files are safe templates)
+.env
+.env.*
+!.env.example
+
+# Logs, packages and OS files
+*.log
+*.tgz
+.DS_Store
+Thumbs.db
