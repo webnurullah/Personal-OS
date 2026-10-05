@@ -8,14 +8,14 @@ process.env.SUPABASE_URL = 'http://127.0.0.1:9';
 process.env.SUPABASE_PUBLISHABLE_KEY = 'test-key';
 process.env.CORS_ORIGINS = 'https://pos.example.com';
 
-const { createApp } = require('../src/app');
+const app = require('../src/app');
 
 /** @type {import('node:http').Server} */
 let server;
 let base = '';
 
 test.before(async () => {
-  server = createApp().listen(0);
+  server = app.listen(0);
   await new Promise((resolve) => server.once('listening', resolve));
   const address = server.address();
   base = `http://127.0.0.1:${typeof address === 'object' && address ? address.port : 0}`;

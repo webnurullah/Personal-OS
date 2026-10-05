@@ -13,5 +13,5 @@
     "noImplicitAny": false,
     "skipLibCheck": true
   },
-  "include": ["app.js", "src/**/*.js", "src/types/*.d.ts", "test/**/*.js"]
+  "include": ["src/**/*.js", "src/types/*.d.ts", "test/**/*.js"]
 }
