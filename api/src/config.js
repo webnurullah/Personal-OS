@@ -1,5 +1,5 @@
-// Settings come from environment variables. On cPanel you can set them in
-// "Setup Node.js App", or put them in api/.env (copy .env.example).
+// Settings come from environment variables: on Vercel, Project → Settings → Environment Variables;
+// on your computer, api/.env (copy .env.example).
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -24,7 +24,7 @@ module.exports = {
     .map((origin) => origin.trim().replace(/\/$/, ''))
     .filter(Boolean),
   // Leave empty when the API has its own subdomain (api.example.com).
-  // Set to "/api" if cPanel serves it at example.com/api.
+  // Set to "/api" only if the API is served under a path (example.com/api).
   basePath: (process.env.BASE_PATH || '').replace(/\/$/, ''),
   port: Number(process.env.PORT) || 4000,
   isProduction: process.env.NODE_ENV === 'production',

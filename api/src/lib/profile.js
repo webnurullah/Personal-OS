@@ -1,8 +1,9 @@
 const { must } = require('./http');
 const { todayIn } = require('./dates');
 
-// Most requests need the user's time zone, so profiles are kept in memory for a few minutes.
-const TTL_MS = 5 * 60 * 1000;
+// Most requests need the user's time zone, so profiles are kept in memory briefly.
+// Short, because Vercel may run several copies of the API and each has its own memory.
+const TTL_MS = 30 * 1000;
 /** @type {Map<string, { profile: import('../types/database').Database['public']['Tables']['profiles']['Row']; at: number }>} */
 const cache = new Map();
 
