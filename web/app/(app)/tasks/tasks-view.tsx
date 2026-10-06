@@ -79,6 +79,8 @@ export function TasksView() {
 
   const remove = async (task: Task) => {
     if (!(await confirm({ title: "Delete this task?", message: `“${task.title}” will be removed for good.` }))) return;
+    // Gone from the list at once; it comes back if the delete fails.
+    await mutate((current) => current && { ...current, items: current.items.filter((t) => t.id !== task.id) }, { revalidate: false });
     try {
       await api(`/tasks/${task.id}`, { method: "DELETE" });
       toast("Task deleted");

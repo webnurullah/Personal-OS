@@ -7,6 +7,7 @@ import { Bell, ChevronDown, Leaf, LogOut, Menu, Search, Settings, User } from "l
 import { api, errorMessage } from "@/lib/api";
 import { colorOf } from "@/lib/colors";
 import { useProfile } from "@/lib/profile";
+import { clearCache } from "@/lib/cache";
 import { createClient } from "@/lib/supabase/client";
 import type { AppNotification } from "@/lib/types";
 import { useFeedback } from "../ui/feedback";
@@ -95,6 +96,7 @@ function ProfileMenu() {
 
   const signOut = async () => {
     await createClient().auth.signOut();
+    clearCache();
     router.replace("/login");
     router.refresh();
   };

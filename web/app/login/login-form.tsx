@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AuthCard, FormMessage } from "@/components/auth/auth-card";
+import { clearCache } from "@/lib/cache";
 import { createClient } from "@/lib/supabase/client";
 
 export function LoginForm({ next, initialError }: { next: string; initialError: string }) {
@@ -12,6 +13,13 @@ export function LoginForm({ next, initialError }: { next: string; initialError: 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(initialError);
   const [notice, setNotice] = useState("");
+
+  // Already signed in on this browser: go straight in.
+  useEffect(() => {
+    createClient().auth.getSession().then(({ data }) => {
+      if (data.session) router.replace(next);
+    });
+  }, [router, next]);
 
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -27,6 +35,8 @@ export function LoginForm({ next, initialError }: { next: string; initialError: 
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       setBusy(false);
       if (error) return setError(error.message === "Invalid login credentials" ? "That email and password do not match." : error.message);
+      // Never show data saved for someone else who used this browser.
+      clearCache();
       router.replace(next);
       router.refresh();
       return;
@@ -40,6 +50,7 @@ export function LoginForm({ next, initialError }: { next: string; initialError: 
     setBusy(false);
     if (error) return setError(error.message);
     if (data.session) {
+      clearCache();
       router.replace("/");
       router.refresh();
     } else {

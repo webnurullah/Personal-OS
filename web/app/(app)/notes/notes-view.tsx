@@ -96,10 +96,12 @@ export function NotesView() {
 
   const remove = async (note: Note) => {
     if (!(await confirm({ title: "Delete this note?", message: `“${note.title}” will be deleted for good.` }))) return;
+    // Gone at once; it comes back if the delete fails.
+    setEditing(null);
+    await notes.mutate((current) => current && { ...current, items: current.items.filter((n) => n.id !== note.id) }, { revalidate: false });
     try {
       await api(`/notes/${note.id}`, { method: "DELETE" });
       toast("Note deleted");
-      setEditing(null);
     } catch (e) {
       toast(errorMessage(e), "error");
     }

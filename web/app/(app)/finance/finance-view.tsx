@@ -66,6 +66,9 @@ export function FinanceView() {
 
   const deleteBill = async (bill: Bill) => {
     if (!(await confirm({ title: `Delete “${bill.name}”?`, message: "The bill is removed. Payments already made stay in your transactions." }))) return;
+    // Gone at once; it comes back if the delete fails.
+    setBillModal(null);
+    await mutate((current) => current && { ...current, bills: current.bills.filter((b) => b.id !== bill.id) }, { revalidate: false });
     try {
       await api(`/finance/bills/${bill.id}`, { method: "DELETE" });
       toast("Bill deleted");
@@ -73,7 +76,6 @@ export function FinanceView() {
       toast(errorMessage(e), "error");
     }
     await refresh("/finance");
-    setBillModal(null);
   };
 
   return (

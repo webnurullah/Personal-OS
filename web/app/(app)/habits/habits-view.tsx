@@ -42,6 +42,8 @@ export function HabitsView() {
 
   const remove = async (habit: Habit) => {
     if (!(await confirm({ title: "Delete this habit?", message: `“${habit.name}” and all its history will be removed.` }))) return;
+    // Gone from the list at once; it comes back if the delete fails.
+    await mutate((current) => current && { ...current, items: current.items.filter((h) => h.id !== habit.id) }, { revalidate: false });
     try {
       await api(`/habits/${habit.id}`, { method: "DELETE" });
       toast("Habit deleted");

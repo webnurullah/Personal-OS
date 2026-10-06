@@ -1,4 +1,4 @@
-import { mutate } from "swr";
+import { cacheMutate as mutate, clearCache } from "./cache";
 import { createClient } from "./supabase/client";
 
 // All data goes through this app's own API (app/api), which checks the sign-in token on every request.
@@ -35,6 +35,9 @@ export async function api<T>(path: string, options: Options = {}): Promise<T> {
       // The token may have just expired: refresh once and try again.
       const refreshed = await supabase.auth.refreshSession();
       if (!refreshed.data.session) {
+        // Forget the dead session so /login does not send you straight back here.
+        await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
+        clearCache();
         // A full page load (not router.push) so no cached data from the old session survives.
         // eslint-disable-next-line @next/next/no-location-assign-relative-destination
         window.location.assign(`/login?next=${encodeURIComponent(window.location.pathname)}`);

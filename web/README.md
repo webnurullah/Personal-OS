@@ -17,7 +17,8 @@ npm run dev                  # http://localhost:3000 · API at /api
 | `app/login`, `app/forgot-password`, `app/update-password`, `app/auth/confirm` | Sign-in pages and the email-link handler |
 | `app/api/…/route.ts` | The API. Each folder is an address, e.g. `app/api/tasks/[id]/route.ts` answers `PATCH /api/tasks/:id`. |
 | `lib/server/` | API code: `api.ts` (sign-in check, errors), `schemas.ts` (what each endpoint accepts), calculations, database types |
-| `proxy.ts`, `lib/supabase/` | Keeps the session fresh; sends signed-out visitors to `/login` |
+| `lib/supabase/`, `components/shell/app-shell.tsx` | Sign-in in the browser; signed-out visitors are sent to `/login` without a trip to the server (the API checks sign-in on every request) |
+| `lib/cache.ts`, `lib/prefetch.ts` | Last-loaded data is kept in this browser so pages open at once; every page's data is loaded in the background. Signing out clears it. |
 | `lib/api.ts` | The pages call the API through this, with the user's token (SWR keys are API paths) |
 | `lib/course.ts`, `lib/finance.ts` | Totals worked out in the browser, so numbers update while you type |
 | `components/ui/`, `components/shell/` | Shared building blocks; sidebar, top bar, notifications, Ctrl+K search |
