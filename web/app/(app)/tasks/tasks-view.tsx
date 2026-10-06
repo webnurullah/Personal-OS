@@ -1,5 +1,6 @@
 "use client";
 
+import { toArchive } from "@/lib/archive";
 import { useState, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
 import useSWR from "swr";
@@ -80,12 +81,12 @@ export function TasksView() {
   };
 
   const remove = async (task: Task) => {
-    if (!(await confirm({ title: "Delete this task?", message: `“${task.title}” will be removed for good.` }))) return;
+    if (!(await confirm({ title: "Delete this task?", message: toArchive(`“${task.title}”`) }))) return;
     // Gone from the list at once; it comes back if the delete fails.
     await mutate((current) => current && { ...current, items: current.items.filter((t) => t.id !== task.id) }, { revalidate: false });
     try {
       await api(`/tasks/${task.id}`, { method: "DELETE" });
-      toast("Task deleted");
+      toast("Task moved to the Archive");
     } catch (e) {
       toast(errorMessage(e), "error");
     }

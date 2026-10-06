@@ -1,3 +1,4 @@
+import { archiveItem } from "@/lib/server/archive";
 import { handle, ok } from "@/lib/server/api";
 import { withProgress } from "@/lib/server/goals";
 import { must } from "@/lib/server/http";
@@ -15,6 +16,6 @@ export const PATCH = handle<{ id: string }>(async ({ db, params, body, today }) 
 
 export const DELETE = handle<{ id: string }>(async ({ db, params }) => {
   const id = parse(s.id, params.id);
-  must(await db.from("goals").delete().eq("id", id).select("id").single());
+  await archiveItem(db, "goal", id);
   return ok;
 });

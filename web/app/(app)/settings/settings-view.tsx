@@ -1,5 +1,6 @@
 "use client";
 
+import { toArchive } from "@/lib/archive";
 import { useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import useSWR from "swr";
@@ -395,11 +396,11 @@ function CategoriesTab() {
   };
 
   const remove = async (category: Category) => {
-    const ok = await confirm({ title: `Delete “${category.name}”?`, message: "Tasks, events and goals in it stay, without a category." });
+    const ok = await confirm({ title: `Delete “${category.name}”?`, message: `${toArchive(`“${category.name}”`)} Tasks, events and goals in it stay, without a category (restoring it puts them back).` });
     if (!ok) return;
     try {
       await api(`/categories/${category.id}`, { method: "DELETE" });
-      toast("Category deleted");
+      toast("Category moved to the Archive");
     } catch (error) {
       toast(errorMessage(error), "error");
     }

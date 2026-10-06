@@ -1,5 +1,6 @@
 "use client";
 
+import { toArchive } from "@/lib/archive";
 import { useState, type FormEvent } from "react";
 import useSWR from "swr";
 import { ArrowDownLeft, ArrowUpRight, Banknote, CreditCard, Landmark, Pencil, PiggyBank, Plus, Receipt, Search, Smartphone, Trash2, Wallet, type LucideIcon } from "lucide-react";
@@ -65,13 +66,13 @@ export function FinanceView() {
   });
 
   const deleteBill = async (bill: Bill) => {
-    if (!(await confirm({ title: `Delete “${bill.name}”?`, message: "The bill is removed. Payments already made stay in your transactions." }))) return;
+    if (!(await confirm({ title: `Delete “${bill.name}”?`, message: `${toArchive(`“${bill.name}”`)} Payments already made stay in your transactions.` }))) return;
     // Gone at once; it comes back if the delete fails.
     setBillModal(null);
     await mutate((current) => current && { ...current, bills: current.bills.filter((b) => b.id !== bill.id) }, { revalidate: false });
     try {
       await api(`/finance/bills/${bill.id}`, { method: "DELETE" });
-      toast("Bill deleted");
+      toast("Bill moved to the Archive");
     } catch (e) {
       toast(errorMessage(e), "error");
     }
@@ -374,11 +375,11 @@ function TxForm({ tx, categories, defaultDate, onClose }: { tx?: Transaction; ca
   };
 
   const remove = async () => {
-    if (!tx || !(await confirm({ title: "Delete this transaction?", message: tx.description }))) return;
+    if (!tx || !(await confirm({ title: "Delete this transaction?", message: toArchive(`“${tx.description}”`) }))) return;
     try {
       await api(`/finance/transactions/${tx.id}`, { method: "DELETE" });
       await refresh("/finance");
-      toast("Transaction deleted");
+      toast("Transaction moved to the Archive");
       onClose();
     } catch (error) {
       toast(errorMessage(error), "error");
@@ -474,12 +475,12 @@ function CategoryForm({ category, onClose }: { category?: BudgetCategory; onClos
 
   const remove = async () => {
     if (!category) return;
-    const ok = await confirm({ title: `Delete “${category.name}”?`, message: "Its transactions stay, without a category." });
+    const ok = await confirm({ title: `Delete “${category.name}”?`, message: `${toArchive(`“${category.name}”`)} Its transactions stay, without a category.` });
     if (!ok) return;
     try {
       await api(`/finance/categories/${category.id}`, { method: "DELETE" });
       await refresh("/finance");
-      toast("Category deleted");
+      toast("Category moved to the Archive");
       onClose();
     } catch (error) {
       toast(errorMessage(error), "error");

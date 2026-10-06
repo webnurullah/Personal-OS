@@ -1,5 +1,6 @@
 "use client";
 
+import { toArchive } from "@/lib/archive";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -115,12 +116,12 @@ export function CourseView({ id }: { id: string }) {
     changeTopic(topic, { status: topic.status === "done" ? (Number(topic.actual_hours) > 0 ? "in-progress" : "not-started") : "done" });
 
   const removeCourse = async () => {
-    const ok = await confirm({ title: "Delete this course?", message: `“${course.title}” and all its units, topics and logged hours will be deleted. This cannot be undone.`, action: "Delete course" });
+    const ok = await confirm({ title: "Delete this course?", message: toArchive(`“${course.title}” and all its units, topics and logged hours`), action: "Delete course" });
     if (!ok) return;
     try {
       await api(`/courses/${course.id}`, { method: "DELETE" });
       await refresh("/learning");
-      toast("Course deleted");
+      toast("Course moved to the Archive");
       router.push("/learning");
     } catch (e) {
       toast(errorMessage(e), "error");
@@ -535,14 +536,14 @@ function UnitForm({ courseId, unit, nextCode, onClose, onSaved }: { courseId: st
     if (!unit) return;
     const ok = await confirm({
       title: `Delete ${unitName(unit)}?`,
-      message: unit.topics.length ? `Its ${plural(unit.topics.length, "topic")} and their logged hours are deleted too.` : "This unit has no topics.",
+      message: toArchive(unit.topics.length ? `${unitName(unit)} and its ${plural(unit.topics.length, "topic")} with their logged hours` : unitName(unit)),
     });
     if (!ok) return;
     try {
       await api(`/units/${unit.id}`, { method: "DELETE" });
       onSaved();
       await refresh("/learning");
-      toast("Unit deleted");
+      toast("Unit moved to the Archive");
       onClose();
     } catch (error) {
       toast(errorMessage(error), "error");
@@ -622,12 +623,12 @@ function TopicForm({ courseId, units, unitId, topic, weeks, thisWeek, onClose, o
 
   const remove = async () => {
     if (!topic) return;
-    if (!(await confirm({ title: `Delete topic ${topic.code}?`, message: topic.title }))) return;
+    if (!(await confirm({ title: `Delete topic ${topic.code}?`, message: toArchive(`“${topic.title}”`) }))) return;
     try {
       await api(`/topics/${topic.id}`, { method: "DELETE" });
       onSaved();
       await refresh("/learning");
-      toast("Topic deleted");
+      toast("Topic moved to the Archive");
       onClose();
     } catch (error) {
       toast(errorMessage(error), "error");

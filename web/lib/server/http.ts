@@ -24,6 +24,8 @@ const KNOWN: Record<string, [number, string]> = {
   "22008": [400, "That date is not valid."],
   "42501": [403, "You are not allowed to do that."],
   PGRST116: [404, "Not found."],
+  // RAISE … USING ERRCODE = 'P0002' in the Archive functions: nothing with that id.
+  P0002: [404, "Not found."],
 };
 
 export function dbError(error: DbFailure) {

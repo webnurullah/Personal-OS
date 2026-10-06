@@ -1,5 +1,6 @@
 "use client";
 
+import { toArchive } from "@/lib/archive";
 import { useState, type FormEvent, type ReactNode } from "react";
 import useSWR from "swr";
 import { Hourglass, PartyPopper, Pencil, Plus, Target, Trash2, TrendingUp, Trophy, X } from "lucide-react";
@@ -137,8 +138,8 @@ function GoalCard({ goal, today, onEdit, onUpdate }: { goal: Goal; today: string
   };
 
   const remove = async () => {
-    if (!(await confirm({ title: "Delete this goal?", message: `“${goal.title}” and its milestones will be removed.` }))) return;
-    run(() => api(`/goals/${goal.id}`, { method: "DELETE" }), "Goal deleted");
+    if (!(await confirm({ title: "Delete this goal?", message: toArchive(`“${goal.title}” and its milestones`) }))) return;
+    run(() => api(`/goals/${goal.id}`, { method: "DELETE" }), "Goal moved to the Archive");
   };
 
   return (
@@ -189,7 +190,7 @@ function GoalCard({ goal, today, onEdit, onUpdate }: { goal: Goal; today: string
                 onChange={() => run(() => api(`/milestones/${m.id}`, { method: "PATCH", body: { done: !m.done } }))}
               />
               <label htmlFor={`m-${m.id}`} className="flex-1 text-slate-600 peer-checked:text-slate-400 peer-checked:line-through">{m.title}</label>
-              <button type="button" className="text-slate-300 opacity-0 transition hover:text-rose-500 group-hover:opacity-100 focus:opacity-100" onClick={() => run(() => api(`/milestones/${m.id}`, { method: "DELETE" }))} aria-label={`Remove ${m.title}`}>
+              <button type="button" className="text-slate-300 opacity-0 transition hover:text-rose-500 group-hover:opacity-100 focus:opacity-100" onClick={() => run(() => api(`/milestones/${m.id}`, { method: "DELETE" }), "Milestone moved to the Archive")} aria-label={`Remove ${m.title}`}>
                 <X className="size-4" />
               </button>
             </li>

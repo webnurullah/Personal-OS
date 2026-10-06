@@ -1,5 +1,6 @@
 "use client";
 
+import { toArchive } from "@/lib/archive";
 import { useState, type DragEvent, type FormEvent } from "react";
 import useSWR from "swr";
 import { BriefcaseBusiness, CalendarClock, Check, ChevronDown, Download, ExternalLink, GraduationCap, LayoutGrid, Link2, List as ListIcon, Loader2, MapPin, Pencil, Plus, Sparkles, Trash2, X } from "lucide-react";
@@ -80,11 +81,11 @@ export function JobsView() {
   };
 
   const remove = async (job: JobApplication) => {
-    if (!(await confirm({ title: "Delete this job?", message: `“${job.title}” will be removed from your list.` }))) return;
+    if (!(await confirm({ title: "Delete this job?", message: toArchive(`“${job.title}”`) }))) return;
     await mutate((current) => current && { ...current, items: current.items.filter((j) => j.id !== job.id) }, { revalidate: false });
     try {
       await api(`/jobs/${job.id}`, { method: "DELETE" });
-      toast("Job deleted");
+      toast("Job moved to the Archive");
     } catch (e) {
       toast(errorMessage(e), "error");
     }

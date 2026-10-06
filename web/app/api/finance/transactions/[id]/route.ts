@@ -1,3 +1,4 @@
+import { archiveItem } from "@/lib/server/archive";
 import { handle, ok } from "@/lib/server/api";
 import { must } from "@/lib/server/http";
 import { tidy, TxFields } from "@/lib/server/schemas";
@@ -11,6 +12,6 @@ export const PATCH = handle<{ id: string }>(async ({ db, params, body }) => {
 
 export const DELETE = handle<{ id: string }>(async ({ db, params }) => {
   const id = parse(s.id, params.id);
-  must(await db.from("transactions").delete().eq("id", id).select("id").single());
+  await archiveItem(db, "transaction", id);
   return ok;
 });

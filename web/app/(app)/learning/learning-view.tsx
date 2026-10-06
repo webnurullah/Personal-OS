@@ -1,5 +1,6 @@
 "use client";
 
+import { toArchive } from "@/lib/archive";
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -60,8 +61,8 @@ export function LearningView() {
     run(() => api(`/learning/blocks/${block.id}`, { method: "PATCH", body: { done: !block.done } }));
   };
   const remove = async (block: StudyBlock) => {
-    if (!(await confirm({ title: "Remove this block?", message: `${DAYS[block.weekday]}: ${block.activity} (${num(block.hours)}h)` }))) return;
-    run(() => api(`/learning/blocks/${block.id}`, { method: "DELETE" }), "Block removed");
+    if (!(await confirm({ title: "Delete this block?", message: toArchive(`${DAYS[block.weekday]}: ${block.activity} (${num(block.hours)}h)`) }))) return;
+    run(() => api(`/learning/blocks/${block.id}`, { method: "DELETE" }), "Block moved to the Archive");
   };
 
   return (

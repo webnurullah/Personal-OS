@@ -303,5 +303,22 @@ export type Project = {
 };
 export type ProjectDetail = { today: string; project: Project & { links: ProjectLink[]; notes: string }; tasks: Task[] };
 /** The short list for pickers (GET /projects?lite=1). */
+/** One thing waiting in the Archive: a deleted item (source "item") or an archived project (source "project"). */
+export type ArchiveEntry = {
+  id: string;
+  source: "item" | "project";
+  /** "task", "note", "goal" … or "project". */
+  kind: string;
+  title: string;
+  /** A few words to tell similar things apart ("2026-10-20", "expense 450.00" …). */
+  detail: string;
+  /** How many other rows went with it (milestones, units, tasks …). */
+  related: number;
+  deleted_at: string;
+  /** The day it was deleted, in your time zone. */
+  deleted_on: string;
+  color?: ColorName | null;
+};
+
 export type ProjectChoice = { id: string; name: string; color: ColorName; status: ProjectStatus; archived_at: string | null };
 

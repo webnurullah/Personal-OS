@@ -1,5 +1,6 @@
 "use client";
 
+import { toArchive } from "@/lib/archive";
 import { useState, type FormEvent, type ReactNode } from "react";
 import useSWR from "swr";
 import { BellRing, NotebookPen, Pin, Plus, Search, Trash2 } from "lucide-react";
@@ -95,13 +96,13 @@ export function NotesView() {
   };
 
   const remove = async (note: Note) => {
-    if (!(await confirm({ title: "Delete this note?", message: `“${note.title}” will be deleted for good.` }))) return;
+    if (!(await confirm({ title: "Delete this note?", message: toArchive(`“${note.title}”`) }))) return;
     // Gone at once; it comes back if the delete fails.
     setEditing(null);
     await notes.mutate((current) => current && { ...current, items: current.items.filter((n) => n.id !== note.id) }, { revalidate: false });
     try {
       await api(`/notes/${note.id}`, { method: "DELETE" });
-      toast("Note deleted");
+      toast("Note moved to the Archive");
     } catch (e) {
       toast(errorMessage(e), "error");
     }
@@ -424,11 +425,11 @@ function ReminderForm({ reminder, onClose }: { reminder: Reminder; onClose: () =
   };
 
   const remove = async () => {
-    if (!(await confirm({ title: "Delete this reminder?", message: reminder.text }))) return;
+    if (!(await confirm({ title: "Delete this reminder?", message: toArchive(`“${reminder.text}”`) }))) return;
     try {
       await api(`/reminders/${reminder.id}`, { method: "DELETE" });
       await refresh("/reminders");
-      toast("Reminder deleted");
+      toast("Reminder moved to the Archive");
       onClose();
     } catch (error) {
       toast(errorMessage(error), "error");

@@ -6,6 +6,41 @@ export type Database = {
   __InternalSupabase: { PostgrestVersion: '13' };
   public: {
     Tables: {
+      archive_items: {
+        Row: {
+          id: string;
+          user_id: string;
+          kind: string;
+          title: string;
+          detail: string;
+          related: number;
+          data: Json;
+          deleted_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string;
+          kind: string;
+          title: string;
+          detail?: string;
+          related?: number;
+          data: Json;
+          deleted_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          kind?: string;
+          title?: string;
+          detail?: string;
+          related?: number;
+          data?: Json;
+          deleted_at?: string;
+        };
+        Relationships: [
+
+        ];
+      };
       bills: {
         Row: {
           id: string;
@@ -969,6 +1004,14 @@ export type Database = {
     };
     Views: { [_ in never]: never };
     Functions: {
+      archive_delete: {
+        Args: { p_kind: string; p_id: string };
+        Returns: string;
+      };
+      archive_restore: {
+        Args: { p_id: string };
+        Returns: Json;
+      };
       create_default_rows: {
         Args: { p_user: string };
         Returns: undefined;

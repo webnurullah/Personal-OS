@@ -1,3 +1,4 @@
+import { archiveItem } from "@/lib/server/archive";
 import { handle, ok } from "@/lib/server/api";
 import { must } from "@/lib/server/http";
 import { BudgetCategoryFields } from "@/lib/server/schemas";
@@ -12,6 +13,6 @@ export const PATCH = handle<{ id: string }>(async ({ db, params, body }) => {
 // Transactions in the category keep existing, without a category.
 export const DELETE = handle<{ id: string }>(async ({ db, params }) => {
   const id = parse(s.id, params.id);
-  must(await db.from("budget_categories").delete().eq("id", id).select("id").single());
+  await archiveItem(db, "budget_category", id);
   return ok;
 });

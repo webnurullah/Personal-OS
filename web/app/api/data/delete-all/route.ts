@@ -9,6 +9,8 @@ export const POST = handle(async ({ db, body, user }) => {
   must(await db.from("job_applications").delete().not("id", "is", null));
   // Projects too (their tasks go with them).
   must(await db.from("projects").delete().not("id", "is", null));
+  // The Archive too: "delete all" means all.
+  must(await db.from("archive_items").delete().not("id", "is", null));
   must(await db.rpc("delete_my_data"));
   forgetProfile(user.id);
   return ok;

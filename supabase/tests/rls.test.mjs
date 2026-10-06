@@ -135,12 +135,154 @@ check('you can add a picture to your own folder', (await qa(`insert into storage
 await expectError("you cannot add a picture to someone else's folder", () => qb(`insert into storage.objects (bucket_id, name, owner_id) values ('avatars', $1, $2)`, [file(A), B]), 'row-level security');
 await db.exec(`insert into storage.buckets (id, name) values ('uploads', 'uploads')`);
 await expectError('you cannot add files to other buckets', () => qa(`insert into storage.objects (bucket_id, name, owner_id) values ('uploads', $1, $2)`, [file(A), A]), 'violates');
-await expectError('a signed-out visitor cannot add a picture', () => qanon(`insert into storage.objects (bucket_id, name) values ('avatars', $1)`, [file(A)]), 'permission denied');
+await expectError('a signed-out visitor cannot add a picture (the rules refuse, not missing rights)', () => qanon(`insert into storage.objects (bucket_id, name) values ('avatars', $1)`, [file(A)]), 'row-level security');
 check("you cannot look up someone else's pictures", (await qb(`select name from storage.objects where bucket_id = 'avatars'`)).length === 0);
 check('you can look up your own pictures', (await qa(`select name from storage.objects where bucket_id = 'avatars'`)).length === 1);
 check("you cannot remove someone else's picture", (await qb(`delete from storage.objects where name = $1 returning id`, [file(A)])).length === 0);
 check('you can remove your own picture', (await qa(`delete from storage.objects where name = $1 returning id`, [file(A)])).length === 1);
-check('nothing in the bucket can be changed in place (no update policy)', (await qa(`update storage.objects set name = name returning id`)).length === 0);
+await qa(`insert into storage.objects (bucket_id, name, owner_id) values ('avatars', $1, $2)`, [file(A, 'png'), A]);
+check('nothing in the bucket can be changed in place, so no overwriting (no update policy)', (await qa(`update storage.objects set name = $1 where name = $2 returning id`, [file(A, 'webp'), file(A, 'png')])).length === 0 && (await qb(`update storage.objects set name = $1 returning id`, ['x'])).length === 0 && (await qa(`select name from storage.objects where bucket_id = 'avatars'`))[0].name === file(A, 'png'));
+check('(clean up)', (await qa(`delete from storage.objects where name = $1 returning id`, [file(A, 'png')])).length === 1);
+
+// Archive (20261008000100_archive_items.sql)
+{
+const arch = async (kind, id, q = qa) => (await q('select archive_delete($1, $2) as id', [kind, id]))[0].id;
+const restore = async (id, q = qa) => (await q('select archive_restore($1) as r', [id]))[0].r;
+const entry = async (id, q = qa) => (await q('select kind, title, detail, related from archive_items where id = $1', [id]))[0];
+const one = async (sql, params, q = qa) => (await q(sql, params))[0];
+const count = async (table, id, q = qa) => (await q(`select count(*)::int n from ${table} where id = $1`, [id]))[0].n;
+
+// a task: archived with its category and project, restored with the same id and links
+const cat = (await one(`insert into categories (name, color) values ('Arch cat', 'blue') returning id`)).id;
+const proj = (await one(`insert into projects (name) values ('Arch project') returning id`)).id;
+const task = (await one(`insert into tasks (title, category_id, project_id, due_date) values ('Archive me', $1, $2, '2026-10-20') returning id`, [cat, proj])).id;
+const a1 = await arch('task', task);
+const e1 = await entry(a1);
+check('deleting a task moves it to the Archive', (await count('tasks', task)) === 0 && e1.kind === 'task' && e1.title === 'Archive me' && e1.detail === '2026-10-20' && e1.related === 0, JSON.stringify(e1));
+const r1 = await restore(a1);
+const t1 = await one('select category_id, project_id, due_date::text d from tasks where id = $1', [task]);
+check('restoring brings the task back with the same id and its links', r1.kind === 'task' && r1.id === task && r1.title === 'Archive me' && t1.category_id === cat && t1.project_id === proj && t1.d === '2026-10-20', JSON.stringify(t1));
+check('a restored item leaves the Archive', (await count('archive_items', a1)) === 0);
+await expectError('restoring the same entry twice says it is not there', () => restore(a1), 'Not found');
+
+// links to things deleted in the meantime are cleared, not an error
+const a2 = await arch('task', task);
+await qa('delete from categories where id = $1', [cat]);
+await restore(a2);
+const t2 = await one('select category_id, project_id from tasks where id = $1', [task]);
+check('a task restored after its category was deleted comes back uncategorised', t2.category_id === null && t2.project_id === proj, JSON.stringify(t2));
+
+// a goal takes its milestones with it and brings them back
+const goal = (await one(`insert into goals (title, status) values ('Arch goal', 'behind') returning id`)).id;
+const ms = (await qa(`insert into goal_milestones (goal_id, title, position) values ($1, 'M1', 1), ($1, 'M2', 2), ($1, 'M3', 3) returning id`, [goal])).map((m) => m.id);
+const ag = await arch('goal', goal);
+const eg = await entry(ag);
+check('deleting a goal archives it with its milestones', (await count('goals', goal)) === 0 && (await qa('select id from goal_milestones where goal_id = $1', [goal])).length === 0 && eg.related === 3 && eg.detail === 'behind', JSON.stringify(eg));
+await restore(ag);
+const back = await qa('select id from goal_milestones where goal_id = $1 order by position', [goal]);
+check('restoring a goal brings its milestones back with the same ids', back.map((m) => m.id).join() === ms.join());
+
+// a milestone alone needs its goal
+const am = await arch('milestone', ms[0]);
+check('a milestone can be archived and restored on its own', (await count('goal_milestones', ms[0])) === 0 && (await restore(am)).id === ms[0] && (await count('goal_milestones', ms[0])) === 1);
+const am2 = await arch('milestone', ms[1]);
+const ag2 = await arch('goal', goal);
+await expectError('a milestone cannot come back before its goal', () => restore(am2), 'Restore the goal from the Archive first');
+await restore(ag2);
+check('after the goal is restored the milestone can follow', (await restore(am2)).id === ms[1]);
+
+// a course: units and topics
+const course = (await one(`insert into courses (title, start_date, target_date, weekly_plan) values ('Arch course', '2026-10-05', '2026-12-28', '{4,6.5}') returning id`)).id;
+const unit = (await one(`insert into course_units (course_id, code, title) values ($1, '1', 'U1') returning id`, [course])).id;
+const topics = (await qa(`insert into course_topics (course_id, unit_id, code, title, est_hours, status, actual_hours) values ($1, $2, '1.1', 'T1', 2, 'done', 1.5), ($1, $2, '1.2', 'T2', 3, 'not-started', 0) returning id`, [course, unit])).map((t) => t.id);
+const ac = await arch('course', course);
+check('deleting a course archives it with its units and topics', (await count('courses', course)) === 0 && (await count('course_units', unit)) === 0 && (await qa('select id from course_topics where course_id = $1', [course])).length === 0 && (await entry(ac)).related === 3);
+await restore(ac);
+const ct = await qa('select code, status, actual_hours::float h from course_topics where course_id = $1 order by code', [course]);
+const cc = await one('select weekly_plan::text w, target_date::text t from courses where id = $1', [course]);
+check('a restored course has its units, topics, progress and plan', (await count('course_units', unit)) === 1 && ct.length === 2 && ct[0].status === 'done' && ct[0].h === 1.5 && cc.w === '{4.00,6.50}' && cc.t === '2026-12-28', JSON.stringify({ ct, cc }));
+const at = await arch('topic', topics[0]);
+const au = await arch('unit', unit);
+await expectError('a topic cannot come back before its unit', () => restore(at), 'Restore the');
+await restore(au);
+check('unit restored with its remaining topic, then the other topic follows', (await count('course_topics', topics[1])) === 1 && (await restore(at)).id === topics[0]);
+
+// a habit keeps its history
+const habit = (await one(`insert into habits (name) values ('Arch habit') returning id`)).id;
+await qa(`insert into habit_logs (habit_id, log_date) values ($1, '2026-10-01'), ($1, '2026-10-02')`, [habit]);
+const ah = await arch('habit', habit);
+check('deleting a habit archives it with its history', (await count('habits', habit)) === 0 && (await entry(ah)).related === 2);
+await restore(ah);
+check('a restored habit has its history', (await qa('select 1 from habit_logs where habit_id = $1', [habit])).length === 2);
+
+// categories only lose their links to others: restoring links them again
+const c2 = (await one(`insert into categories (name, color) values ('Arch cat 2', 'rose') returning id`)).id;
+const tA = (await one(`insert into tasks (title, category_id) values ('In cat', $1) returning id`, [c2])).id;
+const tB = (await one(`insert into tasks (title, category_id) values ('In cat too', $1) returning id`, [c2])).id;
+const evt = (await one(`insert into events (title, event_date, all_day, category_id) values ('Evt in cat', '2026-10-10', true, $1) returning id`, [c2])).id;
+const ac2 = await arch('category', c2);
+check('deleting a category leaves its tasks and events uncategorised', (await one('select category_id from tasks where id = $1', [tA])).category_id === null && (await one('select category_id from events where id = $1', [evt])).category_id === null);
+await qa('update tasks set category_id = (select id from categories limit 1) where id = $1', [tB]); // linked to something else since: must stay
+await restore(ac2);
+check('restoring a category links its tasks and events again', (await one('select category_id from tasks where id = $1', [tA])).category_id === c2 && (await one('select category_id from events where id = $1', [evt])).category_id === c2);
+check('…but not ones that were moved to another category meanwhile', (await one('select category_id from tasks where id = $1', [tB])).category_id !== c2);
+const ac3 = await arch('category', c2);
+await qa(`insert into categories (name, color) values ('Arch cat 2', 'blue')`);
+await expectError('restoring a name that is taken again gives a clear message', () => restore(ac3), 'same name');
+check('…and the entry stays in the Archive', (await count('archive_items', ac3)) === 1);
+
+// finance: a budget category and its transactions and bills
+const bc = (await one(`insert into budget_categories (name) values ('Arch budget') returning id`)).id;
+const tx = (await one(`insert into transactions (type, amount, budget_category_id, description, tx_date) values ('expense', 450, $1, 'Lunch', '2026-10-02') returning id`, [bc])).id;
+const bill = (await one(`insert into bills (name, amount, budget_category_id, due_date) values ('Arch bill', 99, $1, '2026-10-30') returning id`, [bc])).id;
+const abc = await arch('budget_category', bc);
+check('deleting a budget category keeps its transactions and bills, without a category', (await one('select budget_category_id from transactions where id = $1', [tx])).budget_category_id === null && (await one('select budget_category_id from bills where id = $1', [bill])).budget_category_id === null);
+await restore(abc);
+check('restoring it links its transactions and bills again', (await one('select budget_category_id from transactions where id = $1', [tx])).budget_category_id === bc && (await one('select budget_category_id from bills where id = $1', [bill])).budget_category_id === bc);
+const atx = await arch('transaction', tx);
+const etx = await entry(atx);
+check('a transaction is labelled by its description and what it was', etx.title === 'Lunch' && etx.detail === 'expense 450.00', JSON.stringify(etx));
+await restore(atx);
+check('a restored transaction keeps its category', (await one('select budget_category_id from transactions where id = $1', [tx])).budget_category_id === bc);
+const abill = await arch('bill', bill);
+check('a bill can be archived and restored', (await restore(abill)).id === bill && (await count('bills', bill)) === 1);
+
+// the simple ones
+for (const [kind, sql, titleOf] of [
+  ['note', `insert into notes (title, body) values ('Arch note', 'text') returning id`, 'Arch note'],
+  ['event', `insert into events (title, event_date, all_day) values ('Arch event', '2026-10-12', true) returning id`, 'Arch event'],
+  ['reminder', `insert into reminders (text) values ('Arch reminder') returning id`, 'Arch reminder'],
+  ['study_block', `insert into study_blocks (week_start, weekday, hours, activity) values ('2026-10-05', 2, 1.5, 'Arch study') returning id`, 'Arch study'],
+  ['job', `insert into job_applications (url, title, company) values ('https://example.com/j', 'Arch job', 'Acme') returning id`, 'Arch job'],
+]) {
+  const table = { note: 'notes', event: 'events', reminder: 'reminders', study_block: 'study_blocks', job: 'job_applications' }[kind];
+  const id = (await one(sql)).id;
+  const entryId = await arch(kind, id);
+  const e = await entry(entryId);
+  const gone = (await count(table, id)) === 0;
+  const same = (await restore(entryId)).id === id && (await count(table, id)) === 1;
+  check(`a ${kind.replace('_', ' ')} goes to the Archive and comes back`, gone && e.kind === kind && e.title === titleOf && same, JSON.stringify(e));
+}
+
+// privacy and misuse
+const bTask = (await one(`insert into tasks (title) values ('Only B') returning id`, [], qb)).id;
+await expectError("user A cannot archive B's task", () => arch('task', bTask), 'Not found');
+const bEntry = await arch('task', bTask, qb);
+check("user A cannot see B's Archive", (await qa('select id from archive_items where id = $1', [bEntry])).length === 0);
+await expectError("user A cannot restore B's entry", () => restore(bEntry), 'Not found');
+check("user A cannot delete B's entry for good", (await qa('delete from archive_items where id = $1 returning id', [bEntry])).length === 0);
+await expectError('an unknown kind is refused', () => arch('profile', A), 'Unknown kind');
+await expectError('a signed-out visitor cannot archive', () => qanon('select archive_delete($1, $2)', ['task', bTask]), 'permission denied');
+await expectError('a signed-out visitor cannot read the Archive', () => qanon('select * from archive_items'), 'permission denied');
+await expectError('the Archive cannot be edited in place', () => qa(`update archive_items set title = 'x'`), 'permission denied');
+await expectError('the Archive cannot be filled by hand with another kind', () => qa(`insert into archive_items (kind, title, data) values ('profile', 'x', '{}')`), 'check constraint');
+
+// deleting for good
+const note2 = (await one(`insert into notes (title) values ('Gone for good') returning id`)).id;
+const an2 = await arch('note', note2);
+check('deleting from the Archive removes the entry for good', (await qa('delete from archive_items where id = $1 returning id', [an2])).length === 1 && (await count('notes', note2)) === 0 && (await count('archive_items', an2)) === 0);
+await expectError('an entry deleted for good cannot be restored', () => restore(an2), 'Not found');
+}
 
 // Security advisor fixes (20261006000100_security_hardening.sql)
 const fn = (await db.query(`select proconfig from pg_proc where oid = 'public.set_updated_at()'::regprocedure`)).rows[0];

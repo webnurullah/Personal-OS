@@ -1,3 +1,4 @@
+import { archiveItem } from "@/lib/server/archive";
 import { handle, ok } from "@/lib/server/api";
 import { must } from "@/lib/server/http";
 import { checkDates, CourseFields } from "@/lib/server/schemas";
@@ -29,6 +30,6 @@ export const PATCH = handle<{ id: string }>(async ({ db, params, body }) => {
 // Deletes its units and topics too.
 export const DELETE = handle<{ id: string }>(async ({ db, params }) => {
   const id = parse(s.id, params.id);
-  must(await db.from("courses").delete().eq("id", id).select("id").single());
+  await archiveItem(db, "course", id);
   return ok;
 });

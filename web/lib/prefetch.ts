@@ -8,7 +8,7 @@ const PAGE_DATA: Record<string, string[]> = {
   "/": ["/dashboard"],
   "/tasks": ["/tasks", "/categories", "/projects?lite=1"],
   "/projects": ["/projects"],
-  "/archive": ["/projects?archived=1"],
+  "/archive": ["/archive"],
   "/goals": ["/goals"],
   "/habits": ["/habits?days=7"],
   "/learning": ["/learning/week"],

@@ -1,3 +1,4 @@
+import { archiveItem } from "@/lib/server/archive";
 import { handle, ok } from "@/lib/server/api";
 import { must } from "@/lib/server/http";
 import { checkTimes, EventFields } from "@/lib/server/schemas";
@@ -12,6 +13,6 @@ export const PATCH = handle<{ id: string }>(async ({ db, params, body }) => {
 
 export const DELETE = handle<{ id: string }>(async ({ db, params }) => {
   const id = parse(s.id, params.id);
-  must(await db.from("events").delete().eq("id", id).select("id").single());
+  await archiveItem(db, "event", id);
   return ok;
 });

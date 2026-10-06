@@ -1,5 +1,6 @@
 "use client";
 
+import { toArchive } from "@/lib/archive";
 import { useState, type FormEvent } from "react";
 import useSWR from "swr";
 import Link from "next/link";
@@ -302,12 +303,12 @@ function EventForm({ editing, defaultDate, onClose }: { editing: CalendarEvent |
 
   const remove = async () => {
     if (!editing) return;
-    const message = editing.repeat === "none" ? `“${editing.title}” will be removed.` : `“${editing.title}” repeats. Every day of it will be removed.`;
+    const message = editing.repeat === "none" ? toArchive(`“${editing.title}”`) : toArchive(`“${editing.title}” (it repeats, so every day of it)`);
     if (!(await confirm({ title: "Delete this event?", message }))) return;
     try {
       await api(`/events/${editing.id}`, { method: "DELETE" });
       await refresh("/events");
-      toast("Event deleted");
+      toast("Event moved to the Archive");
       onClose();
     } catch (error) {
       toast(errorMessage(error), "error");
