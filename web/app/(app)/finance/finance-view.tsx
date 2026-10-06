@@ -135,7 +135,7 @@ export function FinanceView() {
             </div>
           </div>
           {shown.length ? (
-            <div className="overflow-x-auto">
+            <div className="relative overflow-x-auto">
               <table className="w-full min-w-[680px] text-sm">
                 <thead className="border-y border-slate-100 bg-slate-50/70 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                   <tr>

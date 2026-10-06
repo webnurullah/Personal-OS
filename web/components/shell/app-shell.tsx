@@ -76,7 +76,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <Sidebar open={false} onClose={() => {}} />
         <div className="lg:pl-60">
           <header className="sticky top-0 z-20 h-16 border-b border-slate-200/70 bg-white/90 sm:h-18" />
-          <main className="mx-auto w-full max-w-[1720px] px-4 pb-24 pt-6 sm:px-6 sm:pb-6 xl:px-8">
+          <main className="relative mx-auto w-full max-w-[1720px] overflow-x-clip px-4 pb-24 pt-6 sm:px-6 sm:pb-6 xl:px-8">
             <PageSkeleton />
           </main>
         </div>
@@ -92,7 +92,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <Sidebar open={menuOpen} onClose={() => setMenuOpen(false)} />
           <div className="lg:pl-60">
             <Topbar onMenu={() => setMenuOpen(true)} onSearch={() => setSearchOpen(true)} />
-            <main className="mx-auto w-full max-w-[1720px] px-4 pb-24 pt-6 sm:px-6 sm:pb-6 xl:px-8">{children}</main>
+            <main className="relative mx-auto w-full max-w-[1720px] overflow-x-clip px-4 pb-24 pt-6 sm:px-6 sm:pb-6 xl:px-8">{children}</main>
           </div>
           <CommandPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
           <Assistant />

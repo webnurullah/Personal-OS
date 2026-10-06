@@ -281,7 +281,7 @@ export function CourseView({ id }: { id: string }) {
           </button>
         </div>
         {units.length ? (
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="w-full min-w-[1220px] border-collapse text-sm">
               <thead className="bg-[#e8f1fc] text-xs font-semibold text-slate-700">
                 <tr>
@@ -410,7 +410,7 @@ export function CourseView({ id }: { id: string }) {
               {num(stats.plannedTotal)}h planned for {num(stats.total)}h of topics.
             </p>
           </div>
-          <div className="mt-4 overflow-x-auto">
+          <div className="relative mt-4 overflow-x-auto">
             <table className="w-full border-collapse text-center text-sm" style={{ minWidth: `${8 + stats.weeks * 3.75}rem` }}>
               <tbody>
                 <tr className="bg-slate-50 text-xs font-semibold text-slate-600">
