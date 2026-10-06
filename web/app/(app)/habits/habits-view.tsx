@@ -80,7 +80,7 @@ export function HabitsView() {
           <p className="text-xs text-slate-500">Tap a day to tick or untick it. Streaks update straight away.</p>
         </header>
         {data.items.length ? (
-          <div className="mt-4 overflow-x-auto">
+          <div className="relative mt-4 overflow-x-auto">
             <table className="w-full min-w-[760px] text-sm">
               <thead>
                 <tr className="text-xs text-slate-500">
