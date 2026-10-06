@@ -13,6 +13,7 @@ const PAGE_DATA: Record<string, string[]> = {
   "/finance": ["/finance"],
   "/health": ["/health?days=30"],
   "/notes": ["/notes", "/reminders"],
+  "/jobs": ["/jobs", "/profile"],
 };
 
 const lastLoaded = new Map<string, number>();

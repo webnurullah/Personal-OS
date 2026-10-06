@@ -19,6 +19,8 @@ export const ProfileUpdate = z.object({
   step_goal: z.number().int().positive().max(100000),
   sleep_goal_minutes: z.number().int().min(60).max(960),
   water_goal: z.number().int().min(1).max(30),
+  /** The skills you already have (Applications → Job Apply compares jobs with these). */
+  skills: z.array(z.string().trim().min(1).max(60)).max(200),
   notify: z.object({
     morning_plan: z.boolean(),
     habit_reminder: z.boolean(),
@@ -221,3 +223,26 @@ export const ReminderFields = z.object({
   due_date: s.date.nullable().optional(),
   done: z.boolean().optional(),
 }).strict();
+
+// ---------- Applications: Job Apply ----------
+export const JOB_STATUSES = ["saved", "applied", "interview", "offer", "rejected"] as const;
+
+/** Add a job: a link to the post, its text (when the site cannot be read), or both. */
+export const JobAdd = z.object({
+  url: z.url({ protocol: /^https?$/, message: "Use a full link starting with https://" }).max(2000).optional(),
+  text: s.optionalText(30000).optional(),
+}).strict().refine((j) => j.url || j.text, "Add a link or paste the job post.");
+
+export const JobFields = z.object({
+  url: z.union([z.url({ protocol: /^https?$/ }).max(2000), z.literal("")]),
+  title: s.text(200),
+  company: s.optionalText(200),
+  location: s.optionalText(200),
+  deadline: s.date.nullable(),
+  status: z.enum(JOB_STATUSES),
+  applied_on: s.date.nullable(),
+  summary: s.optionalText(2000),
+  requirements: z.array(z.string().trim().min(1).max(500)).max(60),
+  skills: z.array(z.string().trim().min(1).max(60)).max(60),
+  notes: s.optionalText(5000),
+}).partial().strict();

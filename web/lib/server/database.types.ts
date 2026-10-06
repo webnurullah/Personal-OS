@@ -554,6 +554,62 @@ export type Database = {
 
         ];
       };
+      job_applications: {
+        Row: {
+          id: string;
+          user_id: string;
+          url: string;
+          title: string;
+          company: string;
+          location: string;
+          deadline: string | null;
+          status: string;
+          applied_on: string | null;
+          summary: string;
+          requirements: string[];
+          skills: string[];
+          notes: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string;
+          url?: string;
+          title: string;
+          company?: string;
+          location?: string;
+          deadline?: string | null;
+          status?: string;
+          applied_on?: string | null;
+          summary?: string;
+          requirements?: string[];
+          skills?: string[];
+          notes?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          url?: string;
+          title?: string;
+          company?: string;
+          location?: string;
+          deadline?: string | null;
+          status?: string;
+          applied_on?: string | null;
+          summary?: string;
+          requirements?: string[];
+          skills?: string[];
+          notes?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+
+        ];
+      };
       notes: {
         Row: {
           id: string;
@@ -609,6 +665,7 @@ export type Database = {
           water_goal: number;
           notify: Json;
           notifications_read_at: string | null;
+          skills: string[];
           created_at: string;
           updated_at: string;
         };
@@ -628,6 +685,7 @@ export type Database = {
           water_goal?: number;
           notify?: Json;
           notifications_read_at?: string | null;
+          skills?: string[];
           created_at?: string;
           updated_at?: string;
         };
@@ -647,6 +705,7 @@ export type Database = {
           water_goal?: number;
           notify?: Json;
           notifications_read_at?: string | null;
+          skills?: string[];
           created_at?: string;
           updated_at?: string;
         };

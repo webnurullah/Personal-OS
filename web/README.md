@@ -19,6 +19,8 @@ npm run dev                  # http://localhost:3000 · API at /api
 | `lib/server/` | API code: `api.ts` (sign-in check, errors), `schemas.ts` (what each endpoint accepts), calculations, database types |
 | `lib/supabase/`, `components/shell/app-shell.tsx` | Sign-in in the browser; signed-out visitors are sent to `/login` without a trip to the server (the API checks sign-in on every request) |
 | `lib/cache.ts`, `lib/prefetch.ts` | Last-loaded data is kept in this browser so pages open at once; every page's data is loaded in the background. Signing out clears it. |
+| `app/api/assistant`, `lib/server/assistant/` | The chat assistant: Claude calls this app's own API (as you) through one `call_api` tool; `catalog.ts` lists the endpoints it may use |
+| `app/api/jobs`, `lib/server/jobs.ts`, `lib/jobs.ts` | Applications → Job Apply: read a job link, pull out deadline/skills with Claude, compare with your skills |
 | `lib/api.ts` | The pages call the API through this, with the user's token (SWR keys are API paths) |
 | `lib/course.ts`, `lib/finance.ts` | Totals worked out in the browser, so numbers update while you type |
 | `components/ui/`, `components/shell/` | Shared building blocks; sidebar, top bar, notifications, Ctrl+K search |

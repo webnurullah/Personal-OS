@@ -25,6 +25,7 @@ export type Profile = {
   water_goal: number;
   notify: Record<NotifyKey, boolean>;
   notifications_read_at: string | null;
+  skills: string[];
 };
 
 export type Category = { id: string; name: string; color: ColorName; position: number };
@@ -234,3 +235,20 @@ export type SearchItem = { type: string; id: string; title: string; hint: string
 export type AppNotification = { id: string; icon: string; tone: ColorName; title: string; meta: string; href: string };
 
 export type List<T> = { today?: string; items: T[] };
+
+export type JobStatus = "saved" | "applied" | "interview" | "offer" | "rejected";
+export type JobApplication = {
+  id: string;
+  url: string;
+  title: string;
+  company: string;
+  location: string;
+  deadline: string | null;
+  status: JobStatus;
+  applied_on: string | null;
+  summary: string;
+  requirements: string[];
+  skills: string[];
+  notes: string;
+  created_at: string;
+};

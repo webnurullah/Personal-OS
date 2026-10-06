@@ -1,4 +1,4 @@
-import { CalendarDays, ChartColumn, FileText, GraduationCap, Heart, House, Settings, SquareCheck, Target, Wallet, type LucideIcon } from "lucide-react";
+import { BriefcaseBusiness, CalendarDays, ChartColumn, FileText, GraduationCap, Heart, House, Settings, SquareCheck, Target, Wallet, type LucideIcon } from "lucide-react";
 
 export type NavItem = { href: string; label: string; icon: LucideIcon };
 
@@ -14,9 +14,12 @@ export const NAV: NavItem[] = [
   { href: "/notes", label: "Notes", icon: FileText },
 ];
 
+// Applications → Job Apply (more kinds of applications can go here later).
+export const APPLICATIONS_NAV: NavItem[] = [{ href: "/jobs", label: "Job Apply", icon: BriefcaseBusiness }];
+
 export const SETTINGS_NAV: NavItem = { href: "/settings", label: "Settings", icon: Settings };
 
 /** Which menu item a URL belongs to ("/learning/abc" → Learning). */
 export function activeItem(pathname: string) {
-  return [...NAV, SETTINGS_NAV].find((item) => (item.href === "/" ? pathname === "/" : pathname === item.href || pathname.startsWith(`${item.href}/`)));
+  return [...NAV, ...APPLICATIONS_NAV, SETTINGS_NAV].find((item) => (item.href === "/" ? pathname === "/" : pathname === item.href || pathname.startsWith(`${item.href}/`)));
 }

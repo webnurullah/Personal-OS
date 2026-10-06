@@ -9,6 +9,7 @@ import { ProfileProvider } from "@/lib/profile";
 import { createClient } from "@/lib/supabase/client";
 import { PageSkeleton } from "../ui/states";
 import { FeedbackProvider } from "../ui/feedback";
+import { Assistant } from "./assistant";
 import { CommandPalette } from "./command-palette";
 import { Sidebar } from "./sidebar";
 import { Topbar } from "./topbar";
@@ -94,6 +95,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <main className="mx-auto w-full max-w-[1720px] px-4 py-6 sm:px-6 xl:px-8">{children}</main>
           </div>
           <CommandPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
+          <Assistant />
         </ProfileProvider>
       </FeedbackProvider>
     </SWRConfig>

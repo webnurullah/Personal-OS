@@ -58,12 +58,13 @@ Frontend and backend are **one Vercel project**. Every push to GitHub `main` put
    - Project Name: `nurullah-pos`
    - **Root Directory: `web`** (click **Edit**, choose `web`, **Continue**)
    - Framework Preset: **Next.js** (automatic). Leave the build settings as they are.
-3. **Environment Variables** (only these two):
+3. **Environment Variables**:
 
    | Key | Value |
    |---|---|
    | `NEXT_PUBLIC_SUPABASE_URL` | your Project URL |
    | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | your publishable key |
+   | `ANTHROPIC_API_KEY` | a Claude API key from console.anthropic.com → API Keys (for the assistant and Job Apply; mark it **Sensitive**) |
 
 4. **Deploy** (1–2 minutes). Open the address Vercel shows (`https://nurullah-pos….vercel.app`):
    - `…/api` should show `{"ok":true,"name":"Nurullah POS API",…}`
