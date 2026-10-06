@@ -2,7 +2,8 @@
 
 import { useState, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
-import { ArrowRight, CalendarDays, ChartNoAxesColumn, ChartColumn, Clock, FileText, Footprints, HeartPulse, Leaf, Moon, Plus, SquareCheck, Sun, Target, TrendingUp, Wallet } from "lucide-react";
+import useSWR from "swr";
+import { ArrowRight, CalendarDays, ChartNoAxesColumn, ChartColumn, Clock, FileText, Footprints, GraduationCap, HeartPulse, Leaf, Moon, Pin, Plus, SquareCheck, Sun, Target, TrendingUp, Wallet } from "lucide-react";
 import { api, errorMessage, refresh } from "@/lib/api";
 import { colorOf } from "@/lib/colors";
 import { formatDate } from "@/lib/dates";
@@ -10,7 +11,7 @@ import { count, hm, minutesOf, pct } from "@/lib/format";
 import { useCategories, useNowMinutes } from "@/lib/hooks";
 import { useProfile } from "@/lib/profile";
 import { taskDateLabel } from "@/lib/tasks";
-import type { Dashboard, Task } from "@/lib/types";
+import type { Dashboard, LearningWeek, List, Note, Task } from "@/lib/types";
 import { Donut, Progress } from "../ui/charts";
 import { Segmented } from "../ui/controls";
 import { useFeedback } from "../ui/feedback";
@@ -59,7 +60,7 @@ export function ScheduleWidget({ data }: Props) {
   const next = timed.find((e) => minutesOf(e.start_time!) > now);
 
   return (
-    <section className="card flex flex-col p-5 xl:row-span-2">
+    <section className="card flex flex-col p-5">
       <header className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3">
           <span className="icon-tile bg-blue-50 text-blue-600">
@@ -224,7 +225,7 @@ export function HabitsWidget({ data }: Props) {
 // ---------- Goals ----------
 export function GoalsWidget({ data }: Props) {
   return (
-    <Widget icon={<Target className="size-4.5" />} tile="bg-emerald-50 text-emerald-600" title="Goals" link={{ href: "/goals", label: "View All" }} className="md:col-span-2 min-[100rem]:col-span-1">
+    <Widget icon={<Target className="size-4.5" />} tile="bg-emerald-50 text-emerald-600" title="Goals" link={{ href: "/goals", label: "View All" }}>
       {data.goals.length ? (
         <ul className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-x-8 min-[100rem]:grid-cols-1">
           {data.goals.map((goal) => {
@@ -351,6 +352,9 @@ export function HealthWidget({ data }: Props) {
 export function RemindersWidget({ data }: Props) {
   const act = useAction();
   const [text, setText] = useState("");
+  // Pinned notes first, then the latest (the API sorts them that way).
+  const { data: notes } = useSWR<List<Note>>("/notes");
+  const latest = notes?.items.slice(0, 3) ?? [];
 
   const add = async (e: FormEvent) => {
     e.preventDefault();
@@ -362,6 +366,21 @@ export function RemindersWidget({ data }: Props) {
 
   return (
     <Widget icon={<FileText className="size-4.5" />} tile="bg-sky-50 text-sky-600" title="Notes & Reminders" link={{ href: "/notes", label: "View All" }}>
+      {latest.length > 0 && (
+        <ul className="mt-4 space-y-2">
+          {latest.map((note) => (
+            <li key={note.id}>
+              <Link href="/notes" className={`block rounded-xl border px-3 py-2 transition hover:shadow-sm ${colorOf(note.color).note}`}>
+                <p className="flex items-center gap-1.5 truncate text-sm font-semibold text-slate-800">
+                  {note.pinned && <Pin className="size-3.5 shrink-0 text-slate-400" />}
+                  {note.title}
+                </p>
+                {note.body && <p className="truncate text-xs text-slate-500">{note.body}</p>}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
       <ul className="mt-4 space-y-3">
         {data.reminders.map((r) => (
           <li key={r.id} className="flex items-start gap-2.5">
@@ -380,6 +399,63 @@ export function RemindersWidget({ data }: Props) {
           <input value={text} onChange={(e) => setText(e.target.value)} maxLength={200} placeholder="Add a reminder…" className="min-w-0 flex-1 bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400" />
         </label>
       </form>
+    </Widget>
+  );
+}
+
+// ---------- Learning: courses and this week's study plan ----------
+export function LearningWidget() {
+  const { data } = useSWR<LearningWeek>("/learning/week");
+  const planned = data?.blocks.reduce((sum, b) => sum + Number(b.hours), 0) ?? 0;
+  const studied = data?.blocks.filter((b) => b.done).reduce((sum, b) => sum + Number(b.hours), 0) ?? 0;
+  const goal = data?.goal_hours ?? 0;
+
+  return (
+    <Widget icon={<GraduationCap className="size-4.5" />} tile="bg-violet-50 text-violet-600" title="Learning" link={{ href: "/learning", label: "View All" }}>
+      {!data ? (
+        <div className="mt-4 space-y-3" aria-busy="true">
+          {[0, 1, 2].map((i) => <div key={i} className="h-10 animate-pulse rounded-xl bg-slate-100" />)}
+        </div>
+      ) : (
+        <>
+          <div className="mt-4 rounded-xl bg-violet-50/60 p-3 ring-1 ring-violet-100">
+            <div className="flex items-baseline justify-between gap-2 text-sm">
+              <span className="font-medium text-slate-700">This week</span>
+              <span className="text-slate-600">
+                <b className="font-semibold text-slate-900">{hm(studied)}</b> of {hm(goal || planned)}
+              </span>
+            </div>
+            <Progress value={pct(studied, goal || planned)} fill="bg-violet-500" track="bg-violet-100" className="mt-2 h-2" />
+            {data.topic && <p className="mt-2 truncate text-xs text-slate-500">Focus: {data.topic}</p>}
+          </div>
+          {data.courses.length ? (
+            <ul className="mt-3 divide-y divide-slate-100">
+              {data.courses.slice(0, 4).map((course) => {
+                const color = colorOf(course.color);
+                return (
+                  <li key={course.id}>
+                    <Link href={`/learning/${course.id}`} className="block py-2.5">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="min-w-0 truncate text-sm font-medium text-slate-800">{course.title}</p>
+                        <span className={`text-xs font-semibold ${color.text}`}>{course.percent}%</span>
+                      </div>
+                      <Progress value={course.percent} fill={color.bar} track="bg-slate-100" className="mt-1.5 h-1.5" />
+                      <p className="mt-1 text-xs text-slate-400">
+                        {hm(course.done_hours)} of {hm(course.est_hours)} · {course.days_left > 0 ? `${course.days_left} days left` : "Target date passed"}
+                      </p>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <p className="py-6 text-center text-sm text-slate-500">
+              No courses yet.{" "}
+              <Link href="/learning" className="font-medium text-blue-600">Add a course</Link>
+            </p>
+          )}
+        </>
+      )}
     </Widget>
   );
 }

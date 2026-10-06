@@ -3,22 +3,20 @@
 import { useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
-import { Check, Database, Flame, Heart, Sprout, Target } from "lucide-react";
+import { Database, Sprout } from "lucide-react";
 import { api, errorMessage, refreshAll } from "@/lib/api";
 import { formatDate } from "@/lib/dates";
-import { firstName, greeting, pct } from "@/lib/format";
+import { firstName, greeting } from "@/lib/format";
 import type { Dashboard } from "@/lib/types";
-import { Progress } from "../ui/charts";
 import { useFeedback } from "../ui/feedback";
 import { LoadError, PageSkeleton } from "../ui/states";
-import { BudgetWidget, GoalsWidget, HabitsWidget, HealthWidget, ProductivityWidget, RemindersWidget, ScheduleWidget, TasksWidget } from "./widgets";
+import { BudgetWidget, GoalsWidget, HabitsWidget, HealthWidget, LearningWidget, ProductivityWidget, RemindersWidget, ScheduleWidget, TasksWidget } from "./widgets";
 
 export function DashboardView() {
   const { data, error, mutate } = useSWR<Dashboard>("/dashboard");
   if (error && !data) return <LoadError error={error} retry={() => mutate()} />;
   if (!data) return <PageSkeleton />;
 
-  const { stats } = data;
   const isEmpty = !data.schedule.length && !data.tasks.today.length && !data.tasks.week.length && !data.habits.items.length && !data.goals.length && !data.reminders.length && !data.budget.spent;
   const name = firstName(data.name);
 
@@ -46,90 +44,17 @@ export function DashboardView() {
 
       {isEmpty && <Welcome />}
 
-      {/* Summary cards — every number is calculated by the API from your data. */}
-      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <article className="flex items-center gap-4 rounded-2xl bg-[#eef3ff] p-5 ring-1 ring-blue-100">
-          <span className="grid size-12 shrink-0 place-items-center rounded-full bg-blue-500 text-white shadow-md shadow-blue-500/25">
-            <Check className="size-6" strokeWidth={3} />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-slate-600">Tasks Completed</p>
-            <p className="mt-0.5 text-2xl font-bold text-slate-900">
-              {stats.tasks.done} / {stats.tasks.total}
-            </p>
-            <div className="mt-2.5 flex items-center gap-3">
-              <Progress value={pct(stats.tasks.done, stats.tasks.total)} fill="bg-blue-500" track="bg-blue-100" className="h-2 flex-1" />
-              <span className="w-9 text-right text-xs font-semibold text-slate-600">{pct(stats.tasks.done, stats.tasks.total)}%</span>
-            </div>
-          </div>
-        </article>
-
-        <article className="flex items-center gap-4 rounded-2xl bg-[#ecfaf2] p-5 ring-1 ring-emerald-100" title="Goals you marked as on track">
-          <span className="grid size-12 shrink-0 place-items-center text-emerald-600">
-            <Target className="size-11" strokeWidth={2.25} />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-slate-600">Goals on Track</p>
-            <p className="mt-0.5 text-2xl font-bold text-slate-900">
-              {stats.goals.on_track} / {stats.goals.active}
-            </p>
-            <div className="mt-2.5 flex items-center gap-3">
-              <Progress value={pct(stats.goals.on_track, stats.goals.active)} fill="bg-emerald-500" track="bg-emerald-100" className="h-2 flex-1" />
-              <span className="w-9 text-right text-xs font-semibold text-slate-600">{pct(stats.goals.on_track, stats.goals.active)}%</span>
-            </div>
-          </div>
-        </article>
-
-        <article className="flex items-center gap-4 rounded-2xl bg-[#fff6e8] p-5 ring-1 ring-amber-100">
-          <span className="grid size-12 shrink-0 place-items-center">
-            <Flame className="size-11 fill-orange-300 text-orange-500" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-slate-600">Best Habit Streak</p>
-            <p className="mt-0.5 text-2xl font-bold text-slate-900">
-              {stats.streak.days} {stats.streak.days === 1 ? "day" : "days"}
-            </p>
-            <p className="mt-1.5 truncate text-sm text-slate-600">{stats.streak.name ? <><span className="font-medium text-slate-700">{stats.streak.name}</span> · keep going!</> : "Tick a habit to start a streak"}</p>
-          </div>
-        </article>
-
-        <Link href="/health" className="flex items-center gap-4 rounded-2xl bg-[#fdf0f4] p-5 ring-1 ring-pink-100 transition hover:ring-pink-200" title="Your own rating from today's health check-in">
-          <span className="grid size-12 shrink-0 place-items-center">
-            <Heart className="size-11 fill-pink-400 text-pink-500" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-slate-600">Wellness Score</p>
-            {stats.wellness ? (
-              <>
-                <p className="mt-0.5 text-2xl font-bold text-slate-900">{stats.wellness} / 10</p>
-                <div className="mt-2.5 flex items-center gap-3">
-                  <Progress value={stats.wellness * 10} fill="bg-pink-500" track="bg-pink-100" className="h-2 flex-1" />
-                  <span className="w-9 text-right text-xs font-semibold text-slate-600">{stats.wellness * 10}%</span>
-                </div>
-              </>
-            ) : (
-              <>
-                <p className="mt-0.5 text-2xl font-bold text-slate-900">— / 10</p>
-                <p className="mt-1.5 text-sm text-pink-700">Rate how you feel today →</p>
-              </>
-            )}
-          </div>
-        </Link>
-      </div>
-
-      <div className="mt-6 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,22.5rem)_minmax(0,1fr)]">
+      {/* Tasks, learning and notes first; then everything else. */}
+      <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+        <TasksWidget data={data} />
+        <LearningWidget />
+        <RemindersWidget data={data} />
         <ScheduleWidget data={data} />
-        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 min-[100rem]:grid-cols-3">
-          <TasksWidget data={data} />
-          <HabitsWidget data={data} />
-          <GoalsWidget data={data} />
-        </div>
-        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 min-[112.5rem]:grid-cols-4">
-          <BudgetWidget data={data} />
-          <HealthWidget data={data} />
-          <RemindersWidget data={data} />
-          <ProductivityWidget data={data} />
-        </div>
+        <HabitsWidget data={data} />
+        <GoalsWidget data={data} />
+        <BudgetWidget data={data} />
+        <HealthWidget data={data} />
+        <ProductivityWidget data={data} />
       </div>
     </>
   );
