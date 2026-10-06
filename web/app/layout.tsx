@@ -3,9 +3,11 @@ import { Caveat, Inter, Noto_Sans_Bengali } from "next/font/google";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
-const caveat = Caveat({ subsets: ["latin"], weight: ["500", "600"], variable: "--font-caveat", display: "swap" });
+// Handwriting for a few quotes: not preloaded, so it never delays the first paint.
+const caveat = Caveat({ subsets: ["latin"], weight: ["500", "600"], variable: "--font-caveat", display: "swap", preload: false });
 // Only used for the ৳ sign, so it looks the same on every computer.
-const bengali = Noto_Sans_Bengali({ subsets: ["bengali"], weight: ["400", "600", "700"], variable: "--font-bengali", display: "swap" });
+// Not preloaded: the browser downloads it only on pages that show a ৳.
+const bengali = Noto_Sans_Bengali({ subsets: ["bengali"], weight: ["400", "600", "700"], variable: "--font-bengali", display: "swap", preload: false });
 
 export const metadata: Metadata = {
   title: { default: "Personal OS", template: "%s · POS" },

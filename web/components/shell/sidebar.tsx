@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Sprout, X } from "lucide-react";
+import { prefetchPage } from "@/lib/prefetch";
 import { NAV, SETTINGS_NAV, activeItem, type NavItem } from "./nav";
 
 function Hills() {
@@ -29,7 +30,15 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
 
   const link = (item: NavItem) => (
     <li key={item.href}>
-      <Link href={item.href} className="nav-link" aria-current={current === item ? "page" : undefined} onClick={onClose}>
+      <Link
+        href={item.href}
+        className="nav-link"
+        aria-current={current === item ? "page" : undefined}
+        onClick={onClose}
+        onMouseEnter={() => prefetchPage(item.href)}
+        onFocus={() => prefetchPage(item.href)}
+        onTouchStart={() => prefetchPage(item.href)}
+      >
         <item.icon className="size-5 shrink-0" />
         <span>{item.label}</span>
       </Link>

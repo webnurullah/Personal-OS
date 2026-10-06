@@ -55,14 +55,22 @@ export async function api<T>(path: string, options: Options = {}): Promise<T> {
 /** SWR fetcher: the key is the API path. */
 export const fetcher = <T,>(path: string) => api<T>(path);
 
-/** Reload cached API data whose path starts with any of the given prefixes (always includes the dashboard). */
+/**
+ * Reload cached API data whose path starts with any of the given prefixes (always includes the dashboard).
+ * The reload runs in the background and this returns at once, so a form can close as soon as the
+ * save itself succeeded (one trip to the server instead of two); the lists update a moment later.
+ */
 export function refresh(...prefixes: string[]) {
   const all = [...prefixes, "/dashboard", "/notifications"];
-  return mutate((key) => typeof key === "string" && all.some((p) => key === p || key.startsWith(`${p}?`) || key.startsWith(`${p}/`)));
+  mutate((key) => typeof key === "string" && all.some((p) => key === p || key.startsWith(`${p}?`) || key.startsWith(`${p}/`))).catch(() => undefined);
+  return Promise.resolve();
 }
 
-/** Reload every cached API answer (after loading or deleting all data). */
-export const refreshAll = () => mutate(() => true);
+/** Reload every cached API answer (after loading or deleting all data), in the background. */
+export function refreshAll() {
+  mutate(() => true).catch(() => undefined);
+  return Promise.resolve();
+}
 
 /** A friendly message for any error. */
 export function errorMessage(error: unknown) {
