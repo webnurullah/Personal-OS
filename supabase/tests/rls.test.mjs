@@ -78,6 +78,20 @@ await db.exec(`delete from profiles where id = '${B}'; delete from categories wh
 const ensured = await qb('select id from ensure_profile()');
 check('ensure_profile repairs a missing profile', ensured[0].id === B && (await qb('select count(*)::int n from categories'))[0].n === 6);
 
+// Security advisor fixes (20261006000100_security_hardening.sql)
+const fn = (await db.query(`select proconfig from pg_proc where oid = 'public.set_updated_at()'::regprocedure`)).rows[0];
+check('set_updated_at has a fixed search path', JSON.stringify(fn.proconfig).includes('search_path'), JSON.stringify(fn.proconfig));
+const stamped = await qa(`insert into tasks (title) values ('Stamp me') returning id`);
+const edited = await qa(`update tasks set title = 'Stamped' where id = $1 returning updated_at > created_at as moved`, [stamped[0].id]);
+check('"last edited" time still updates', edited[0]?.moved === true);
+const callable = (await db.query(`select has_function_privilege('anon', 'public.handle_new_user()', 'execute') as anon, has_function_privilege('authenticated', 'public.handle_new_user()', 'execute') as signed_in`)).rows[0];
+check('sign-up function cannot be called through the API', !callable.anon && !callable.signed_in, JSON.stringify(callable));
+// Supabase Auth creates accounts with its own role, not the owner: sign-up must still set up the profile.
+const C = '33333333-3333-3333-3333-333333333333';
+await db.exec(`create role fake_auth_admin nologin; grant usage on schema auth to fake_auth_admin; grant insert on auth.users to fake_auth_admin;`);
+await db.exec(`set role fake_auth_admin; insert into auth.users (id, email) values ('${C}', 'c@x.com'); reset role;`);
+check('sign-up still creates the profile and categories', (await as(db, C)('select count(*)::int n from categories'))[0].n === 6);
+
 console.log(results.join('\n'));
 const failed = results.some((r) => r.startsWith('FAIL'));
 console.log(failed ? '\nSOME CHECKS FAILED' : `\nALL ${results.length} CHECKS PASSED`);
