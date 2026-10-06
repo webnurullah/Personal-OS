@@ -98,7 +98,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
           placeholder="Search pages, actions, tasks, notes…"
           className="h-14 min-w-0 flex-1 bg-transparent text-[15px] text-slate-800 outline-none placeholder:text-slate-400"
         />
-        <kbd className="rounded-md border border-slate-200 px-1.5 py-0.5 font-sans text-[11px] text-slate-500">Esc</kbd>
+        <kbd className="rounded-md border border-slate-200 px-1.5 py-0.5 font-sans text-[11px] text-slate-500 max-sm:hidden">Esc</kbd>
       </div>
       <ul role="listbox" className="max-h-[55vh] overflow-y-auto p-2">
         {items.length === 0 && <li className="px-3 py-10 text-center text-sm text-slate-500">{debounced.length >= 2 && !data ? "Searching…" : `No results for “${query}”`}</li>}
@@ -116,14 +116,14 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
                 className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-slate-700 aria-selected:bg-blue-50 aria-selected:text-blue-700"
               >
                 <item.icon className="size-4.5 shrink-0 text-slate-400" />
-                <span className="flex-1 truncate">{item.label}</span>
-                {item.hint && <span className="truncate text-xs text-slate-400">{item.hint}</span>}
+                <span className="min-w-[40%] flex-1 truncate">{item.label}</span>
+                {item.hint && <span className="max-w-[45%] shrink-0 truncate text-xs text-slate-400">{item.hint}</span>}
               </button>
             </li>
           );
         })}
       </ul>
-      <div className="flex items-center gap-5 border-t border-slate-100 px-4 py-2.5 text-xs text-slate-500">
+      <div className="flex items-center gap-5 border-t border-slate-100 px-4 py-2.5 text-xs text-slate-500 max-sm:hidden">
         <span>
           <kbd className="font-sans font-semibold">↑ ↓</kbd> move
         </span>

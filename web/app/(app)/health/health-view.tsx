@@ -277,14 +277,14 @@ export function HealthView() {
               <p className={`text-sm font-medium ${moodTone}`}>{moodLabel}</p>
             </div>
           </div>
-          <div className="mt-5 grid grid-cols-10 gap-1.5" role="group" aria-label="Wellness score from 1 to 10">
+          <div className="mt-5 grid grid-cols-5 gap-1.5 sm:grid-cols-10" role="group" aria-label="Wellness score from 1 to 10">
             {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
               <button
                 key={n}
                 type="button"
                 aria-pressed={n === todayLog.mood}
                 onClick={() => saveDay(today, { mood: n })}
-                className="h-9 rounded-lg border border-slate-200 text-sm font-semibold text-slate-600 transition hover:border-pink-300 aria-pressed:border-pink-500 aria-pressed:bg-pink-500 aria-pressed:text-white"
+                className="h-10 rounded-lg border border-slate-200 text-sm font-semibold text-slate-600 transition hover:border-pink-300 aria-pressed:border-pink-500 aria-pressed:bg-pink-500 aria-pressed:text-white"
               >
                 {n}
               </button>
@@ -371,7 +371,7 @@ function BarChart({ days, today, values, goal, max, done, notDone, format }: {
 function LineChart({ points, today }: { points: { date: string; value: number }[]; today: string }) {
   const w = 640;
   const h = 180;
-  const padX = 36;
+  const padX = 52;
   const padY = 14;
   const values = points.map((p) => p.value);
   const min = Math.floor(Math.min(...values) - 2);
@@ -395,7 +395,8 @@ function LineChart({ points, today }: { points: { date: string; value: number }[
           <stop offset="1" stopColor="#ec4899" stopOpacity="0" />
         </linearGradient>
       </defs>
-      <g fill="#94a3b8" fontSize="11">
+      {/* The chart is scaled down on a phone, so its letters start bigger there. */}
+      <g fill="#94a3b8" className="text-[22px] sm:text-[11px]">
         {ticks.map((t) => (
           <g key={t}>
             <line x1={padX} x2={w - 10} y1={y(t)} y2={y(t)} stroke="#e2e8f0" strokeDasharray="4 4" />

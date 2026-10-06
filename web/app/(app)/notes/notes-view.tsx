@@ -118,8 +118,8 @@ export function NotesView() {
         onClick={() => setEditing(note)}
       >
         <div className="flex items-start justify-between gap-3">
-          <h3 className="font-semibold text-slate-900">
-            <button type="button" className="text-left focus-visible:underline focus-visible:outline-none" onClick={() => setEditing(note)}>
+          <h3 className="min-w-0 font-semibold text-slate-900">
+            <button type="button" className="max-w-full text-left focus-visible:underline focus-visible:outline-none" onClick={() => setEditing(note)}>
               {note.title}
             </button>
           </h3>
@@ -159,12 +159,12 @@ export function NotesView() {
       <div className="mt-6 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <label className="relative flex-1 sm:max-w-sm">
+            <label className="relative min-w-48 flex-1 sm:max-w-sm">
               <span className="sr-only">Search notes</span>
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
               <input type="search" placeholder="Search notes" className="input pl-9" value={query} onChange={(e) => setQuery(e.target.value)} />
             </label>
-            <select className="select select-lg w-auto" value={tag} onChange={(e) => setTag(e.target.value)} aria-label="Tag">
+            <select className="select select-lg w-auto max-w-full" value={tag} onChange={(e) => setTag(e.target.value)} aria-label="Tag">
               <option value="">All tags</option>
               {tags.map((t) => (
                 <option key={t} value={t}>{t}</option>
@@ -356,7 +356,7 @@ function RemindersPanel({ data, error, retry }: { data: List<Reminder> | undefin
                   checked={r.done}
                   onChange={() => act(() => api(`/reminders/${r.id}`, { method: "PATCH", body: { done: !r.done } }), r.done ? undefined : "Reminder done")}
                 />
-                <label htmlFor={`rem-${r.id}`} className="flex-1 text-sm text-slate-700 peer-checked:text-slate-400 peer-checked:line-through">
+                <label htmlFor={`rem-${r.id}`} className="min-w-0 flex-1 text-sm text-slate-700 peer-checked:text-slate-400 peer-checked:line-through">
                   {r.text}
                 </label>
                 {r.due_date && (
@@ -364,8 +364,8 @@ function RemindersPanel({ data, error, retry }: { data: List<Reminder> | undefin
                     {relativeDay(r.due_date, today)}
                   </span>
                 )}
-                <button type="button" className="-my-1 rounded-md p-1 text-slate-300 opacity-0 transition hover:text-slate-600 group-hover:opacity-100 focus:opacity-100" onClick={() => setEditing(r)} aria-label="Edit reminder">
-                  <NotebookPen className="size-3.5" />
+                <button type="button" className="reveal -my-2 -mr-1 shrink-0 rounded-md p-2 text-slate-400 hover:text-slate-600" onClick={() => setEditing(r)} aria-label="Edit reminder">
+                  <NotebookPen className="size-4" />
                 </button>
               </li>
             );

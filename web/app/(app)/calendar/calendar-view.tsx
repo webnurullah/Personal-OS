@@ -80,7 +80,7 @@ export function CalendarView() {
       <div className="mt-6 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <section className="card overflow-hidden" aria-label="Month view">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-4 sm:px-5">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <h2 className="min-w-44 text-xl font-bold text-slate-900">{formatDate(month, "month")}</h2>
               <button type="button" className="btn btn-ghost btn-sm btn-icon" onClick={() => setMonth(addMonths(month, -1))} aria-label="Previous month">
                 <ChevronLeft className="size-4" />
@@ -207,9 +207,9 @@ export function CalendarView() {
                       <span className="pt-0.5 text-xs font-medium text-slate-500">{e.all_day ? "All day" : time(e.start_time!)}</span>
                       <span className={`mt-0.5 h-9 w-1 rounded-full ${color(e).dot}`} />
                       <span className="min-w-0">
-                        <span className="flex items-center gap-1.5 truncate text-sm font-semibold text-slate-800">
-                          {e.title}
-                          {e.repeat !== "none" && <Repeat className="size-3.5 shrink-0 text-slate-400" aria-label="Repeats" />}
+                        <span className="flex items-start gap-1.5 text-sm font-semibold text-slate-800">
+                          <span className="min-w-0 line-clamp-2">{e.title}</span>
+                          {e.repeat !== "none" && <Repeat className="mt-0.5 size-3.5 shrink-0 text-slate-400" aria-label="Repeats" />}
                         </span>
                         <span className="block truncate text-xs text-slate-500">
                           {e.all_day ? (e.category_id ? byId.get(e.category_id)?.name : "All day") : hm((minutesOf(e.end_time!) - minutesOf(e.start_time!)) / 60)}

@@ -128,13 +128,13 @@ export function TasksView() {
                 { value: "done", label: "Completed" },
               ]}
             />
-            <div className="flex grow gap-2 sm:grow-0">
-              <label className="relative flex-1 sm:w-52 sm:flex-none">
+            <div className="flex min-w-0 max-w-full grow gap-2 sm:grow-0">
+              <label className="relative min-w-0 flex-1 sm:w-52 sm:flex-none">
                 <span className="sr-only">Search tasks</span>
                 <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
                 <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search tasks" className="input h-9 pl-9" />
               </label>
-              <select className="select h-9" value={categoryId} onChange={(e) => setCategoryId(e.target.value)} aria-label="Category">
+              <select className="select h-9 min-w-0 max-w-[55%] sm:max-w-none" value={categoryId} onChange={(e) => setCategoryId(e.target.value)} aria-label="Category">
                 <option value="">All categories</option>
                 {categories.map((c) => (
                   <option key={c.id} value={c.id}>{c.name}</option>
@@ -170,10 +170,12 @@ export function TasksView() {
                         const overdue = isOverdue(task, today);
                         return (
                           <li key={task.id} className="group flex items-center gap-3 rounded-xl px-3 py-2.5 transition hover:bg-slate-50">
-                            <input type="checkbox" className="checkbox" checked={Boolean(task.done_at)} onChange={() => toggle(task)} aria-label={`Done: ${task.title}`} />
+                            <label className="-m-2 shrink-0 p-2">
+                              <input type="checkbox" className="checkbox" checked={Boolean(task.done_at)} onChange={() => toggle(task)} aria-label={`Done: ${task.title}`} />
+                            </label>
                             <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setEditing(task)}>
                               <span className={`block truncate text-sm font-medium ${task.done_at ? "text-slate-400 line-through" : "text-slate-800"}`}>{task.title}</span>
-                              <span className="mt-0.5 flex items-center gap-3 text-xs text-slate-500">
+                              <span className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
                                 <span className={`flex shrink-0 items-center gap-1 whitespace-nowrap ${overdue ? "text-rose-500" : ""}`}>
                                   <CalendarDays className="size-3.5 shrink-0" />
                                   {taskDateLabel(task, today)}
@@ -188,6 +190,7 @@ export function TasksView() {
                                     <span className="truncate">{project.name}</span>
                                   </span>
                                 )}
+                                {category && <span className={`badge max-w-full truncate sm:hidden ${colorOf(category.color).badge}`}>{category.name}</span>}
                               </span>
                             </button>
                             {project && (
@@ -195,8 +198,8 @@ export function TasksView() {
                                 {project.name}
                               </Link>
                             )}
-                            {category && <span className={`badge ${colorOf(category.color).badge}`}>{category.name}</span>}
-                            <button type="button" className="btn btn-ghost btn-sm btn-icon opacity-0 transition group-hover:opacity-100 focus:opacity-100" onClick={() => remove(task)} aria-label={`Delete ${task.title}`}>
+                            {category && <span className={`badge hidden max-w-40 truncate sm:inline-flex ${colorOf(category.color).badge}`}>{category.name}</span>}
+                            <button type="button" className="btn btn-ghost btn-sm btn-icon reveal" onClick={() => remove(task)} aria-label={`Delete ${task.title}`}>
                               <Trash2 className="size-4" />
                             </button>
                           </li>
@@ -266,9 +269,9 @@ export function TasksView() {
 
 function Summary({ icon, tile, label, value }: { icon: ReactNode; tile: string; label: string; value: ReactNode }) {
   return (
-    <div className="card flex items-center gap-4 p-4">
-      <span className={`icon-tile size-11 ${tile}`}>{icon}</span>
-      <div>
+    <div className="card flex items-center gap-3 p-3 sm:gap-4 sm:p-4">
+      <span className={`icon-tile size-11 shrink-0 ${tile}`}>{icon}</span>
+      <div className="min-w-0">
         <p className="text-sm text-slate-500">{label}</p>
         <p className="text-xl font-bold text-slate-900">{value}</p>
       </div>
@@ -291,7 +294,7 @@ function TaskDates({ due, end }: { due: string; end: string }) {
   };
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
       <Field label={endDate ? "Start date" : "Due date"} htmlFor="task-due">
         <input id="task-due" name="due_date" type="date" className="input" value={dueDate} onChange={(e) => changeDue(e.target.value)} />
       </Field>

@@ -134,7 +134,7 @@ export function ProjectView({ id }: { id: string }) {
   const taskRow = (task: Task) => (
     <li key={task.id} className="flex items-center gap-3 py-2.5">
       <input id={`pt-${task.id}`} type="checkbox" className="checkbox peer" checked={Boolean(task.done_at)} onChange={() => toggle(task)} />
-      <label htmlFor={`pt-${task.id}`} className="min-w-0 flex-1 truncate text-sm text-slate-700 peer-checked:text-slate-400 peer-checked:line-through">
+      <label htmlFor={`pt-${task.id}`} className="min-w-0 flex-1 text-sm text-slate-700 peer-checked:text-slate-400 peer-checked:line-through">
         {task.title}
       </label>
       {task.due_date && !task.done_at && <span className="whitespace-nowrap text-xs text-slate-400">{taskDateLabel(task, today)}</span>}

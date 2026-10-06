@@ -260,7 +260,7 @@ export function Assistant() {
             </button>
           </header>
 
-          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4" aria-live="polite">
+          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overflow-x-hidden px-4 py-4" aria-live="polite">
             {!messages.length && (
               <div>
                 <p className="text-sm text-slate-600">Add things without opening a page. Tap an example, change it, and press Enter:</p>
@@ -286,9 +286,9 @@ export function Assistant() {
             )}
             {messages.map((m, i) =>
               m.role === "user" ? (
-                <div key={i} className="ml-10 whitespace-pre-wrap rounded-2xl rounded-br-md bg-blue-600 px-3.5 py-2 text-sm text-white">{m.content}</div>
+                <div key={i} className="ml-10 min-w-0 whitespace-pre-wrap rounded-2xl rounded-br-md bg-blue-600 px-3.5 py-2 text-sm text-white">{m.content}</div>
               ) : (
-                <div key={i} className={`mr-6 rounded-2xl rounded-bl-md px-3.5 py-2 text-sm ${m.error ? "bg-rose-50 text-rose-700" : "bg-slate-100 text-slate-800"}`}>
+                <div key={i} className={`mr-6 min-w-0 rounded-2xl rounded-bl-md px-3.5 py-2 text-sm ${m.error ? "bg-rose-50 text-rose-700" : "bg-slate-100 text-slate-800"}`}>
                   <Rich text={m.content} />
                 </div>
               ),

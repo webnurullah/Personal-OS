@@ -13,6 +13,12 @@
   body {
     background: #f5f7fb;
     color: var(--color-slate-800);
+    /* A long word or web address wraps instead of pushing a card or the whole page wider than the screen. */
+    overflow-wrap: anywhere;
+  }
+  /* Table columns keep their words whole; a wide table scrolls inside its own box instead. */
+  table {
+    overflow-wrap: normal;
   }
   button:not(:disabled),
   [role="button"],
@@ -47,6 +53,21 @@
 }
 
 @layer components {
+  /* Buttons that appear when you point at a row. A phone cannot hover, so there they are always shown. */
+  .reveal {
+    opacity: 1;
+  }
+  @media (hover: hover) {
+    .reveal {
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+    .group:hover .reveal,
+    .group:focus-within .reveal,
+    .reveal:focus-visible {
+      opacity: 1;
+    }
+  }
   /* ---------- Cards ---------- */
   .card {
     background: #fff;
@@ -71,6 +92,8 @@
     display: inline-flex;
     align-items: center;
     gap: 0.25rem;
+    padding-block: 0.375rem;
+    margin-block: -0.375rem;
     white-space: nowrap;
     font-size: 0.8125rem;
     font-weight: 500;
@@ -348,9 +371,16 @@
     cursor: default;
   }
   .habit-dot-sm {
+    position: relative;
     width: 1.125rem;
     height: 1.125rem;
     background-size: 0.625rem;
+  }
+  /* The small dot is hard to hit with a thumb: its tappable area reaches a little past what is drawn. */
+  .habit-dot-sm::after {
+    content: "";
+    position: absolute;
+    inset: -0.375rem;
   }
   .habit-dot-lg {
     width: 2.25rem;
@@ -392,8 +422,7 @@
     border-radius: 0.75rem;
     background: #f1f5f9;
     max-width: 100%;
-    overflow-x: auto;
-    scrollbar-width: none;
+    flex-wrap: wrap;
   }
   .segmented > button {
     padding: 0.375rem 0.75rem;

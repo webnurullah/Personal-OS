@@ -41,12 +41,12 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
   return (
     <FeedbackContext.Provider value={{ toast, confirm }}>
       {children}
-      <div className="pointer-events-none fixed bottom-4 right-4 z-[60] flex flex-col items-end gap-2" aria-live="polite">
+      <div className="pointer-events-none fixed inset-x-4 bottom-20 z-[60] flex flex-col items-end gap-2 sm:inset-x-auto sm:bottom-4 sm:right-4" aria-live="polite">
         {toasts.map((t) => {
           const Icon = t.tone === "error" ? CircleAlert : t.tone === "info" ? Info : CircleCheck;
           const color = t.tone === "error" ? "text-rose-500" : t.tone === "info" ? "text-blue-600" : "text-emerald-600";
           return (
-            <div key={t.id} className="pointer-events-auto flex max-w-sm items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-lg">
+            <div key={t.id} className="pointer-events-auto flex max-w-sm min-w-0 items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-lg">
               <Icon className={`size-5 shrink-0 ${color}`} />
               <span>{t.message}</span>
             </div>

@@ -136,15 +136,15 @@ export function FinanceView() {
           </div>
           {shown.length ? (
             <div className="relative overflow-x-auto">
-              <table className="w-full min-w-[680px] text-sm">
+              <table className="w-full text-sm sm:min-w-[680px]">
                 <thead className="border-y border-slate-100 bg-slate-50/70 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                   <tr>
                     <th className="px-5 py-2.5">Description</th>
-                    <th className="px-4 py-2.5">Date</th>
-                    <th className="px-4 py-2.5">Category</th>
-                    <th className="px-4 py-2.5">Paid with</th>
+                    <th className="hidden px-4 py-2.5 sm:table-cell">Date</th>
+                    <th className="hidden px-4 py-2.5 sm:table-cell">Category</th>
+                    <th className="hidden px-4 py-2.5 sm:table-cell">Paid with</th>
                     <th className="px-5 py-2.5 text-right">Amount</th>
-                    <th className="w-12"><span className="sr-only">Edit</span></th>
+                    <th className="hidden w-12 sm:table-cell"><span className="sr-only">Edit</span></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -154,35 +154,38 @@ export function FinanceView() {
                     const [MethodIcon, methodTone] = METHOD_ICON[tx.method] ?? METHOD_ICON.Other;
                     return (
                       <tr key={tx.id} className="group cursor-pointer hover:bg-slate-50/70" onClick={() => setTxModal(tx)}>
-                        <td className="px-5 py-3">
+                        <td className="px-3 py-3 sm:px-5">
                           <div className="flex items-center gap-3">
-                            <span className={`icon-tile size-9 ${income ? "bg-emerald-50 text-emerald-700" : category ? colorOf(category.color).badge : "bg-slate-100 text-slate-500"}`}>
+                            <span className={`icon-tile size-9 shrink-0 max-sm:hidden ${income ? "bg-emerald-50 text-emerald-700" : category ? colorOf(category.color).badge : "bg-slate-100 text-slate-500"}`}>
                               {income ? <Banknote className="size-4" /> : <Icon name={category?.icon ?? "receipt"} className="size-4" />}
                             </span>
                             <div className="min-w-0">
                               <p className="font-medium text-slate-800">{tx.description}</p>
                               {tx.note && <p className="text-xs text-slate-500">{tx.note}</p>}
+                              <p className="text-xs text-slate-500 sm:hidden">
+                                {relativeDay(tx.tx_date, data.today)} · {income ? "Income" : category?.name ?? "No category"} · {tx.method}
+                              </p>
                             </div>
                           </div>
                         </td>
-                        <td className="whitespace-nowrap px-4 py-3 text-slate-600">{relativeDay(tx.tx_date, data.today)}</td>
-                        <td className="px-4 py-3">
-                          <span className={`badge ${income ? "bg-emerald-50 text-emerald-700" : category ? colorOf(category.color).badge : "bg-slate-100 text-slate-500"}`}>
+                        <td className="hidden whitespace-nowrap px-4 py-3 text-slate-600 sm:table-cell">{relativeDay(tx.tx_date, data.today)}</td>
+                        <td className="hidden px-4 py-3 sm:table-cell">
+                          <span className={`badge max-w-48 truncate ${income ? "bg-emerald-50 text-emerald-700" : category ? colorOf(category.color).badge : "bg-slate-100 text-slate-500"}`}>
                             {income ? "Income" : category?.name ?? "No category"}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-slate-600">
+                        <td className="hidden px-4 py-3 text-slate-600 sm:table-cell">
                           <span className="inline-flex items-center gap-1.5">
                             <MethodIcon className={`size-3.5 ${methodTone}`} />
                             {tx.method}
                           </span>
                         </td>
-                        <td className={`whitespace-nowrap px-5 py-3 text-right font-semibold ${income ? "text-emerald-600" : "text-slate-900"}`}>
+                        <td className={`whitespace-nowrap px-3 py-3 text-right font-semibold sm:px-5 ${income ? "text-emerald-600" : "text-slate-900"}`}>
                           {income ? "+" : "−"}
                           {money(Number(tx.amount))}
                         </td>
-                        <td className="pr-3 text-right">
-                          <Pencil className="ml-auto size-4 text-slate-300 opacity-0 transition group-hover:opacity-100" />
+                        <td className="hidden pr-3 text-right sm:table-cell">
+                          <Pencil className="reveal ml-auto size-4 text-slate-300" />
                         </td>
                       </tr>
                     );
@@ -235,8 +238,8 @@ export function FinanceView() {
                         </span>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-baseline justify-between gap-2 text-sm">
-                            <span className="font-medium text-slate-800 group-hover:text-blue-700">{row.name}</span>
-                            <span className={`text-xs ${over ? "font-semibold text-rose-600" : "text-slate-500"}`}>
+                            <span className="min-w-0 font-medium text-slate-800 group-hover:text-blue-700">{row.name}</span>
+                            <span className={`shrink-0 whitespace-nowrap text-xs ${over ? "font-semibold text-rose-600" : "text-slate-500"}`}>
                               {money(row.spent)} / {money(limit)}
                             </span>
                           </div>
@@ -273,14 +276,14 @@ export function FinanceView() {
                         <Icon name={bill.icon} className="size-4" />
                       </span>
                       <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setBillModal(bill)} title="Edit bill">
-                        <p className="truncate font-medium text-slate-800 hover:text-blue-700">{bill.name}</p>
+                        <p className="font-medium text-slate-800 hover:text-blue-700 sm:truncate">{bill.name}</p>
                         <p className={`text-xs ${days < 0 ? "text-rose-500" : days <= 3 ? "text-amber-600" : "text-slate-500"}`}>
                           {days < 0 ? `Overdue since ${formatDate(bill.due_date, "short")}` : `Due ${relativeDay(bill.due_date, data.today)}`}
                           {bill.repeats_monthly && " · monthly"}
                         </p>
                       </button>
                       <span className="whitespace-nowrap font-semibold text-slate-900">{money(Number(bill.amount))}</span>
-                      <button type="button" className="btn btn-secondary btn-sm" onClick={() => setPaying(bill)}>
+                      <button type="button" className="btn btn-secondary btn-sm shrink-0" onClick={() => setPaying(bill)}>
                         Pay
                       </button>
                     </li>
@@ -337,7 +340,7 @@ function SummaryCard({ label, icon: IconComponent, tile, value, note, valueClass
           <IconComponent className="size-4.5" />
         </span>
       </div>
-      <p className={`mt-2 text-2xl font-bold ${valueClass}`}>{value}</p>
+      <p className={`mt-2 whitespace-nowrap text-xl font-bold sm:text-2xl ${valueClass}`}>{value}</p>
       <p className="text-xs text-slate-500">{note}</p>
     </div>
   );

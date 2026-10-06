@@ -109,7 +109,7 @@ export function LearningView() {
             </p>
           </div>
 
-          <div className="mt-6 grid gap-4 md:grid-cols-2">
+          <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="flex items-center gap-4 rounded-2xl bg-slate-50 p-5 ring-1 ring-slate-100">
               <BookOpen className="size-9 shrink-0 fill-blue-100 text-blue-500" />
               <div className="min-w-0 flex-1">
@@ -122,7 +122,7 @@ export function LearningView() {
                 ) : (
                   <button type="button" className="group flex max-w-full items-center gap-2 text-left" onClick={() => setEditingTopic(true)}>
                     <span className="truncate text-xl font-bold text-slate-900">{data.topic || "Add a topic"}</span>
-                    <Pencil className="size-4 shrink-0 text-slate-400 opacity-0 transition group-hover:opacity-100" />
+                    <Pencil className="reveal size-4 shrink-0 text-slate-400" />
                   </button>
                 )}
               </div>
@@ -144,7 +144,7 @@ export function LearningView() {
             </div>
           </div>
 
-          <div className="mt-6 grid gap-4 md:grid-cols-[minmax(0,1fr)_17rem] md:items-center">
+          <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_17rem] md:items-center">
             <div>
               <div className="flex items-end justify-between gap-3 font-semibold">
                 <p className="text-slate-800"><span className="text-lg">{hm(done)}</span> completed</p>
@@ -171,15 +171,15 @@ export function LearningView() {
             {data.blocks.length ? (
               <ul className="mt-4 space-y-3">
                 {data.blocks.map((block) => (
-                  <li key={block.id} className="group grid grid-cols-[auto_1fr_auto_auto] items-center gap-x-3 gap-y-1 rounded-2xl border border-slate-200 bg-white px-4 py-3.5 sm:grid-cols-[auto_8rem_4rem_1fr_auto_auto] sm:gap-x-6">
+                  <li key={block.id} className="group grid grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-x-3 gap-y-2 rounded-2xl border border-slate-200 bg-white px-3 py-3.5 sm:grid-cols-[auto_8rem_4rem_minmax(0,1fr)_auto_auto] sm:gap-x-6 sm:px-4">
                     <input type="checkbox" className="checkbox checkbox-green checkbox-lg" checked={block.done} onChange={() => toggle(block)} aria-label={`Done: ${DAYS[block.weekday]}, ${block.activity}`} />
                     <span className="font-semibold text-slate-900">{DAYS[block.weekday]}</span>
                     <span className="text-slate-600 sm:border-l sm:border-slate-200 sm:pl-6">{num(block.hours)}h</span>
-                    <span className="col-span-3 col-start-2 row-start-2 text-slate-700 sm:col-span-1 sm:col-start-auto sm:row-start-auto sm:border-l sm:border-slate-200 sm:pl-6">{block.activity}</span>
-                    <span className={`col-start-4 row-start-1 badge px-3 py-1 text-sm font-semibold sm:col-start-auto sm:row-start-auto ${block.done ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100" : "bg-slate-100 text-slate-600"}`}>
+                    <span className="col-span-2 col-start-2 row-start-2 min-w-0 text-slate-700 sm:col-span-1 sm:col-start-auto sm:row-start-auto sm:border-l sm:border-slate-200 sm:pl-6">{block.activity}</span>
+                    <span className={`col-start-4 row-start-2 justify-self-end badge px-3 py-1 text-sm font-semibold sm:col-start-auto sm:row-start-auto ${block.done ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100" : "bg-slate-100 text-slate-600"}`}>
                       {block.done ? "Completed" : "Pending"}
                     </span>
-                    <button type="button" className="btn btn-ghost btn-sm btn-icon hidden opacity-0 transition group-hover:opacity-100 focus:opacity-100 sm:inline-flex" onClick={() => remove(block)} aria-label="Remove block">
+                    <button type="button" className="btn btn-ghost btn-sm btn-icon reveal col-start-4 row-start-1 justify-self-end sm:col-start-auto sm:row-start-auto" onClick={() => remove(block)} aria-label="Remove block">
                       <Trash2 className="size-4" />
                     </button>
                   </li>

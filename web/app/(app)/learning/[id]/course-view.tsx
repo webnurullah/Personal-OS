@@ -167,23 +167,23 @@ export function CourseView({ id }: { id: string }) {
         </div>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {tiles.map((tile) => (
-            <div key={tile.label} className={`rounded-2xl p-4 text-center ring-1 ${tile.box}`}>
+            <div key={tile.label} className={`rounded-2xl p-3 text-center ring-1 sm:p-4 ${tile.box}`}>
               <p className="flex items-center justify-center gap-2 text-[13px] font-semibold leading-tight text-slate-700">
                 <tile.icon className={`size-5 shrink-0 ${tile.tint}`} />
                 {tile.label}
               </p>
-              <p className={`mt-2 whitespace-nowrap font-bold ${tile.valueColor}`}>
-                <span className="text-3xl">{tile.value}</span> <span className="text-lg">{tile.unit}</span>
+              <p className={`mt-2 font-bold ${tile.valueColor}`}>
+                <span className="text-2xl sm:text-3xl">{tile.value}</span> <span className="text-base sm:text-lg">{tile.unit}</span>
               </p>
               <p className="text-sm text-slate-500">{tile.note}</p>
             </div>
           ))}
-          <div className="rounded-2xl bg-violet-50 p-4 text-center ring-1 ring-violet-100">
+          <div className="rounded-2xl bg-violet-50 p-3 text-center ring-1 ring-violet-100 sm:p-4">
             <p className="flex items-center justify-center gap-2 text-[13px] font-semibold leading-tight text-slate-700">
               <CalendarCheck className="size-5 shrink-0 text-violet-600" />
               Target Date
             </p>
-            <p className="mt-2 whitespace-nowrap text-2xl font-bold leading-9 text-[#12305a]">{formatDate(course.target_date, "gb")}</p>
+            <p className="mt-2 text-xl font-bold leading-9 text-[#12305a] sm:text-2xl">{formatDate(course.target_date, "gb")}</p>
             <p className="text-sm text-slate-500">
               ({stats.daysLeft < 0 ? "date passed" : stats.daysLeft < 7 ? plural(stats.daysLeft, "day") + " left" : plural(Math.ceil(stats.daysLeft / 7), "week") + " left"})
             </p>
@@ -281,7 +281,84 @@ export function CourseView({ id }: { id: string }) {
           </button>
         </div>
         {units.length ? (
-          <div className="relative overflow-x-auto">
+          <div className="divide-y divide-slate-100 sm:hidden">
+            {stats.units.map(({ unit, est }) => (
+              <div key={unit.id}>
+                <button type="button" className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left ${colorOf(unit.color).soft}`} onClick={() => setUnitModal(unit)}>
+                  <span className="min-w-0">
+                    <span className="block font-bold text-[#12305a]">{unitName(unit)}</span>
+                    <span className="text-sm font-normal text-slate-600">({num(est)} hours)</span>
+                  </span>
+                  <Pencil className="size-4 shrink-0 text-slate-500" aria-hidden />
+                  <span className="sr-only">Edit unit {unitName(unit)}</span>
+                </button>
+                <ul className="divide-y divide-slate-100">
+                  {unit.topics.map((topic) => (
+                    <li key={topic.id} className="space-y-2 px-4 py-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-medium text-slate-800">
+                            <span className="text-slate-500">{topic.code}</span> {topic.title}
+                          </p>
+                          {topic.outcome && <p className="mt-0.5 text-sm text-slate-600">{topic.outcome}</p>}
+                          {topic.notes && <p className="mt-0.5 text-xs text-slate-500">{topic.notes}</p>}
+                        </div>
+                        <button type="button" className="btn btn-ghost btn-sm btn-icon -mr-2 shrink-0" onClick={() => setTopicModal({ unitId: unit.id, topic })} aria-label={`Edit topic ${topic.code}`}>
+                          <Pencil className="size-4" />
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-slate-600">
+                        <select
+                          className="select status-select h-8 w-auto text-xs"
+                          data-status={topic.status}
+                          value={topic.status}
+                          onChange={(e) => changeTopic(topic, { status: e.target.value as TopicStatus })}
+                          aria-label={`Status of topic ${topic.code}`}
+                        >
+                          {STATUSES.map((st) => (
+                            <option key={st.value} value={st.value}>{st.label}</option>
+                          ))}
+                        </select>
+                        <span>{num(Number(topic.est_hours))}h planned</span>
+                        {topic.planned_week ? <span className={topic.planned_week === stats.thisWeek ? "font-semibold text-blue-700" : ""}>W{topic.planned_week}</span> : null}
+                        <label className="flex items-center gap-1.5">
+                          <span>Spent</span>
+                          <input
+                            type="number"
+                            min={0}
+                            max={1000}
+                            step={0.5}
+                            defaultValue={Number(topic.actual_hours) || ""}
+                            placeholder="–"
+                            className="cell-input w-16"
+                            aria-label={`Actual hours for topic ${topic.code}`}
+                            onChange={(e) => {
+                              const value = e.target.value === "" ? 0 : e.target.valueAsNumber;
+                              if (Number.isNaN(value)) return;
+                              changeTopic(topic, { actual_hours: Math.min(1000, Math.max(0, value)) }, true);
+                            }}
+                          />
+                          <span>h</span>
+                        </label>
+                      </div>
+                    </li>
+                  ))}
+                  <li className="px-2 py-1">
+                    <button type="button" className="btn btn-ghost btn-sm text-slate-500" onClick={() => setTopicModal({ unitId: unit.id })}>
+                      <Plus className="size-4" /> Add topic to {unitName(unit)}
+                    </button>
+                  </li>
+                </ul>
+              </div>
+            ))}
+            <p className="flex flex-wrap justify-between gap-x-4 gap-y-1 bg-[#e8f1fc] px-4 py-3 text-sm font-bold text-slate-900">
+              <span>Total</span>
+              <span>{num(stats.total)}h planned · {num(stats.spent)}h spent · {num(stats.left)}h left</span>
+            </p>
+          </div>
+        ) : null}
+        {units.length ? (
+          <div className="relative hidden overflow-x-auto sm:block">
             <table className="w-full min-w-[1220px] border-collapse text-sm">
               <thead className="bg-[#e8f1fc] text-xs font-semibold text-slate-700">
                 <tr>
@@ -304,7 +381,7 @@ export function CourseView({ id }: { id: string }) {
                     <button type="button" className="group rounded-lg px-1 py-1 hover:bg-white/60" onClick={() => setUnitModal(unit)} title="Edit unit">
                       <span className="block text-lg font-bold text-[#12305a]">{unitName(unit)}</span>
                       <span className="text-sm font-normal text-slate-600">({num(est)} hours)</span>
-                      <Pencil className="mx-auto mt-1 size-3.5 text-slate-400 opacity-0 transition group-hover:opacity-100" />
+                      <Pencil className="reveal mx-auto mt-1 size-3.5 text-slate-400" />
                     </button>
                   </th>
                 );
@@ -355,7 +432,7 @@ export function CourseView({ id }: { id: string }) {
                         <td className="px-2 py-2 text-center">
                           <button
                             type="button"
-                            className="btn btn-ghost btn-sm btn-icon opacity-0 transition group-hover:opacity-100 focus:opacity-100"
+                            className="btn btn-ghost btn-sm btn-icon reveal"
                             onClick={() => setTopicModal({ unitId: unit.id, topic })}
                             aria-label={`Edit topic ${topic.code}`}
                           >

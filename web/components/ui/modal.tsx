@@ -60,7 +60,7 @@ export function Modal({
       {open && (
         <div className="p-6">
           <div className="flex items-start justify-between gap-4">
-            <div>
+            <div className="min-w-0">
               <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
               {description && <p className="text-sm text-slate-500">{description}</p>}
             </div>
@@ -78,9 +78,9 @@ export function Modal({
 /** Cancel + main button row for the bottom of a form in a modal; `left` holds e.g. a Delete button; `disabled` greys out the main button without saying "Saving…". */
 export function ModalActions({ onCancel, submitLabel, busy, danger, left, disabled, cancelDisabled }: { onCancel: () => void; submitLabel: string; busy?: boolean; danger?: boolean; left?: ReactNode; disabled?: boolean; cancelDisabled?: boolean }) {
   return (
-    <div className="mt-6 flex items-center justify-between gap-2">
+    <div className="mt-6 flex flex-wrap items-center justify-between gap-2">
       <div>{left}</div>
-      <div className="flex gap-2">
+      <div className="ml-auto flex gap-2">
         <button type="button" className="btn btn-secondary" onClick={onCancel} disabled={cancelDisabled}>
           Cancel
         </button>

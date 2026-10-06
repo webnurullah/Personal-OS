@@ -63,16 +63,16 @@ export function ScheduleWidget({ data }: Props) {
   return (
     <section className="card flex flex-col p-5">
       <header className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-3">
-          <span className="icon-tile bg-blue-50 text-blue-600">
+        <div className="flex min-w-0 items-start gap-3">
+          <span className="icon-tile shrink-0 bg-blue-50 text-blue-600">
             <CalendarDays className="size-5" />
           </span>
-          <div>
-            <h2 className="card-title whitespace-nowrap">Today&apos;s Schedule</h2>
+          <div className="min-w-0">
+            <h2 className="card-title">Today&apos;s Schedule</h2>
             <p className="text-xs text-slate-500">{formatDate(data.today, "full")}</p>
           </div>
         </div>
-        <Link href="/calendar" className="link-more mt-1">
+        <Link href="/calendar" className="link-more mt-1 shrink-0">
           View Calendar <ArrowRight className="size-3.5" />
         </Link>
       </header>
@@ -156,7 +156,7 @@ export function TasksWidget({ data }: Props) {
                   {task.title}
                 </label>
                 {(tab !== "today" || task.end_date) && task.due_date && <span className={`whitespace-nowrap text-xs ${tab === "overdue" ? "font-medium text-rose-500" : "text-slate-400"}`}>{taskDateLabel(task, data.today)}</span>}
-                {category && <span className={`badge ${colorOf(category.color).badge}`}>{category.name}</span>}
+                {category && <span className={`badge hidden max-w-40 truncate sm:inline-flex ${colorOf(category.color).badge}`}>{category.name}</span>}
               </li>
             );
           })}
@@ -237,8 +237,8 @@ export function GoalsWidget({ data }: Props) {
                   <Icon name={goal.icon} className="size-5" />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="flex items-center gap-1.5 truncate text-sm font-medium text-slate-800">
-                    {goal.title}
+                  <p className="flex items-center gap-1.5 text-sm font-medium text-slate-800">
+                    <span className="truncate">{goal.title}</span>
                     {goal.status === "behind" && <span className="size-1.5 shrink-0 rounded-full bg-amber-400" title="Behind schedule" />}
                   </p>
                   <div className="mt-1.5 flex items-center gap-3">
@@ -372,9 +372,9 @@ export function RemindersWidget({ data }: Props) {
           {latest.map((note) => (
             <li key={note.id}>
               <Link href="/notes" className={`block rounded-xl border px-3 py-2 transition hover:shadow-sm ${colorOf(note.color).note}`}>
-                <p className="flex items-center gap-1.5 truncate text-sm font-semibold text-slate-800">
+                <p className="flex items-center gap-1.5 text-sm font-semibold text-slate-800">
                   {note.pinned && <Pin className="size-3.5 shrink-0 text-slate-400" />}
-                  {note.title}
+                  <span className="truncate">{note.title}</span>
                 </p>
                 {note.body && <p className="truncate text-xs text-slate-500">{note.body}</p>}
               </Link>
@@ -386,7 +386,7 @@ export function RemindersWidget({ data }: Props) {
         {data.reminders.map((r) => (
           <li key={r.id} className="flex items-start gap-2.5">
             <input id={`dr-${r.id}`} type="checkbox" className="checkbox peer mt-0.5" checked={r.done} onChange={() => act(() => api(`/reminders/${r.id}`, { method: "PATCH", body: { done: !r.done } }), "/reminders")} />
-            <label htmlFor={`dr-${r.id}`} className="text-sm text-slate-700 peer-checked:text-slate-400 peer-checked:line-through">
+            <label htmlFor={`dr-${r.id}`} className="min-w-0 flex-1 text-sm text-slate-700 peer-checked:text-slate-400 peer-checked:line-through">
               {r.text}
               {r.due_date && <span className="text-slate-400"> (due {formatDate(r.due_date, "short")})</span>}
             </label>

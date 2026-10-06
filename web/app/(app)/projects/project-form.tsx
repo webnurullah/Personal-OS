@@ -82,7 +82,7 @@ export function ProjectForm({ project, onClose, onSaved, onArchive }: {
         <input id="p-name" name="name" className="input" defaultValue={project?.name ?? ""} maxLength={120} placeholder="e.g. Rahim's bakery website" required autoFocus />
       </Field>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Type" htmlFor="p-kind">
           <select id="p-kind" name="kind" className="input" defaultValue={project?.kind ?? "website"}>
             {PROJECT_KINDS.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
@@ -114,7 +114,7 @@ export function ProjectForm({ project, onClose, onSaved, onArchive }: {
         <input id="p-goal" name="goal" className="input" defaultValue={project?.goal ?? ""} maxLength={300} placeholder="e.g. Launch the site by Eid" />
       </Field>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Start date (optional)" htmlFor="p-start">
           <input id="p-start" type="date" className="input" value={start} onChange={(e) => setStart(e.target.value)} />
         </Field>

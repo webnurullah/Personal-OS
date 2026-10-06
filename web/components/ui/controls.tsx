@@ -44,7 +44,7 @@ export function ColorPicker({ name, value, colors = PICKER_COLORS }: { name: str
 /** Grid of icon choices (inside a form: sends `name`). */
 export function IconPicker({ name, value, icons }: { name: string; value: string; icons: IconName[] }) {
   return (
-    <div className="grid grid-cols-8 gap-2">
+    <div className="grid grid-cols-6 gap-2 min-[400px]:grid-cols-8">
       {icons.map((icon) => (
         <label key={icon} title={icon}>
           <input type="radio" name={name} value={icon} defaultChecked={icon === value} className="peer sr-only" />

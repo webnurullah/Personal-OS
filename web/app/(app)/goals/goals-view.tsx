@@ -144,11 +144,11 @@ function GoalCard({ goal, today, onEdit, onUpdate }: { goal: Goal; today: string
 
   return (
     <article className="card flex flex-col p-5">
-      <div className="flex items-start gap-3">
-        <span className={`icon-tile size-11 ${color.tile}`}>
+      <div className="flex flex-wrap items-start gap-3">
+        <span className={`icon-tile size-11 shrink-0 ${color.tile}`}>
           <Icon name={goal.icon} className="size-5" />
         </span>
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 basis-40">
           <h3 className="font-semibold text-slate-900">{goal.title}</h3>
           <p className="text-xs text-slate-500">{category ? `${category.name} · ` : ""}{deadline}</p>
         </div>
@@ -189,8 +189,8 @@ function GoalCard({ goal, today, onEdit, onUpdate }: { goal: Goal; today: string
                 title={m.at_value !== null ? "Ticks itself when the goal reaches this value" : undefined}
                 onChange={() => run(() => api(`/milestones/${m.id}`, { method: "PATCH", body: { done: !m.done } }))}
               />
-              <label htmlFor={`m-${m.id}`} className="flex-1 text-slate-600 peer-checked:text-slate-400 peer-checked:line-through">{m.title}</label>
-              <button type="button" className="text-slate-300 opacity-0 transition hover:text-rose-500 group-hover:opacity-100 focus:opacity-100" onClick={() => run(() => api(`/milestones/${m.id}`, { method: "DELETE" }), "Milestone moved to the Archive")} aria-label={`Remove ${m.title}`}>
+              <label htmlFor={`m-${m.id}`} className="min-w-0 flex-1 text-slate-600 peer-checked:text-slate-400 peer-checked:line-through">{m.title}</label>
+              <button type="button" className="reveal -m-1.5 shrink-0 p-1.5 text-slate-400 hover:text-rose-500" onClick={() => run(() => api(`/milestones/${m.id}`, { method: "DELETE" }), "Milestone moved to the Archive")} aria-label={`Remove ${m.title}`}>
                 <X className="size-4" />
               </button>
             </li>
@@ -201,7 +201,7 @@ function GoalCard({ goal, today, onEdit, onUpdate }: { goal: Goal; today: string
       {goal.status === "completed" ? (
         <div className="mt-5 flex items-center gap-3 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">
           <PartyPopper className="size-5 shrink-0" />
-          {goal.note || "Done! Well played."}
+          <span className="min-w-0">{goal.note || "Done! Well played."}</span>
         </div>
       ) : (
         <form onSubmit={addMilestone} className="mt-4">
@@ -334,7 +334,7 @@ function GoalForm({ editing, onClose }: { editing: Goal | null; onClose: () => v
           <input id="goal-deadline" name="deadline" type="date" className="input" defaultValue={editing?.deadline ?? ""} />
         </Field>
       </div>
-      <fieldset>
+      <fieldset className="min-w-0">
         <legend className="label">How is progress measured?</legend>
         <Segmented
           label="Progress"

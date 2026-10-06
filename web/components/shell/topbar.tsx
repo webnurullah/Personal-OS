@@ -99,8 +99,8 @@ function Notifications() {
                       <Icon name={n.icon} className="size-4" />
                     </span>
                     <span className="min-w-0">
-                      <span className="block text-sm font-medium text-slate-800">{n.title}</span>
-                      <span className="block text-xs text-slate-500">{n.meta}</span>
+                      <span className="block text-sm font-medium text-slate-800 [overflow-wrap:anywhere]">{n.title}</span>
+                      <span className="block text-xs text-slate-500 [overflow-wrap:anywhere]">{n.meta}</span>
                     </span>
                   </Link>
                 </li>

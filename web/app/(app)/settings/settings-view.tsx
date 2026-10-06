@@ -1,7 +1,7 @@
 "use client";
 
 import { toArchive } from "@/lib/archive";
-import { useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import { Bell, Camera, Database, Download, KeyRound, Pencil, Plus, ShieldCheck, SlidersHorizontal, Sparkles, Tag, Trash2, User, X, type LucideIcon } from "lucide-react";
@@ -61,6 +61,12 @@ export function SettingsView() {
   const requested = params.get("tab");
   const tab = TABS.find((t) => t.id === requested)?.id ?? "profile";
   const { data: profile, error, mutate } = useSWR<Profile>("/profile");
+  const tabs = useRef<HTMLDivElement>(null);
+  const loaded = profile !== undefined;
+  // On a phone the tabs scroll sideways: keep the open one in view (it may be far to the right when opened from a link).
+  useEffect(() => {
+    tabs.current?.querySelector<HTMLElement>('[aria-selected="true"]')?.scrollIntoView({ inline: "center", block: "nearest" });
+  }, [tab, loaded]);
 
   if (error && !profile) return <LoadError error={error} retry={() => mutate()} />;
   if (!profile) return <PageSkeleton />;
@@ -70,7 +76,7 @@ export function SettingsView() {
       <PageHeader title="Settings" description="Make the app work the way you do." />
 
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[14rem_minmax(0,1fr)]">
-        <div role="tablist" aria-orientation="vertical" className="flex gap-1 overflow-x-auto pb-1 lg:flex-col lg:self-start lg:pb-0">
+        <div ref={tabs} role="tablist" aria-orientation="vertical" className="flex gap-1 overflow-x-auto pb-1 lg:flex-col lg:self-start lg:pb-0">
           {TABS.map((t) => (
             <button
               key={t.id}
@@ -421,10 +427,10 @@ function CategoriesTab() {
             <li key={c.id} className="flex items-center gap-2 rounded-full border border-slate-200 bg-white py-1.5 pl-3 pr-1.5 text-sm font-medium text-slate-700">
               <span className={`size-2.5 rounded-full ${colorOf(c.color).dot}`} />
               {c.name}
-              <button type="button" className="grid size-6 place-items-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700" onClick={() => setEditing(c)} aria-label={`Edit ${c.name}`}>
+              <button type="button" className="grid size-8 place-items-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700" onClick={() => setEditing(c)} aria-label={`Edit ${c.name}`}>
                 <Pencil className="size-3.5" />
               </button>
-              <button type="button" className="-ml-1.5 grid size-6 place-items-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700" onClick={() => remove(c)} aria-label={`Delete ${c.name}`}>
+              <button type="button" className="-ml-2 grid size-8 place-items-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700" onClick={() => remove(c)} aria-label={`Delete ${c.name}`}>
                 <X className="size-3.5" />
               </button>
             </li>

@@ -87,7 +87,7 @@ function Welcome() {
         <p className="text-lg font-semibold">Welcome! Your account is empty.</p>
         <p className="text-sm text-blue-100">Load the sample data to see how everything works (you can delete it later in Settings), or start adding your own.</p>
       </div>
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <button type="button" className="btn bg-white text-blue-700 hover:bg-blue-50" onClick={load} disabled={busy}>
           {busy ? "Loading…" : "Load sample data"}
         </button>

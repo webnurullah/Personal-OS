@@ -236,7 +236,7 @@ function daysTone(deadline: string | null, today: string) {
 function StatusSelect({ status, onChange }: { status: JobStatus; onChange: (status: JobStatus) => void }) {
   const current = STATUSES.find((s) => s.value === status) ?? STATUSES[0];
   return (
-    <select aria-label="Status" className={`rounded-lg border-0 py-1 pl-2 pr-7 text-xs font-semibold ${current.badge}`} value={status} onChange={(e) => onChange(e.target.value as JobStatus)}>
+    <select aria-label="Status" className={`rounded-lg border-0 py-2 pl-2 pr-7 text-xs font-semibold ${current.badge}`} value={status} onChange={(e) => onChange(e.target.value as JobStatus)}>
       {STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
     </select>
   );
@@ -261,7 +261,7 @@ function JobCard({ job, today, mySkills, onChange, onEdit, onDelete, onLearned }
             {job.location && <span className="inline-flex items-center gap-1"><MapPin className="size-3.5" />{job.location}</span>}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {job.deadline ? (
             <span className={`badge ${job.status === "saved" ? daysTone(job.deadline, today) : "bg-slate-100 text-slate-500"}`} title={`Last date to apply: ${formatDate(job.deadline, "date")}`}>
               <CalendarClock className="mr-1 size-3.5" />
@@ -283,10 +283,10 @@ function JobCard({ job, today, mySkills, onChange, onEdit, onDelete, onLearned }
           <ul className="mt-3 flex flex-wrap gap-1.5" aria-label="Skills this job asks for">
             {job.skills.map((skill) =>
               haveKeys.has(skillKey(skill)) ? (
-                <li key={skill} className="badge bg-emerald-50 text-emerald-700">✓ {skill}</li>
+                <li key={skill} className="badge max-w-full whitespace-normal bg-emerald-50 text-left text-emerald-700">✓ {skill}</li>
               ) : (
                 <li key={skill}>
-                  <button type="button" className="badge bg-rose-50 text-rose-700 transition hover:bg-rose-100" title="Click when you have learned it" onClick={() => onLearned(skill)}>
+                  <button type="button" className="badge max-w-full whitespace-normal bg-rose-50 text-left text-rose-700 transition hover:bg-rose-100" title="Click when you have learned it" onClick={() => onLearned(skill)}>
                     {skill}
                   </button>
                 </li>
@@ -424,9 +424,9 @@ function SkillsCard({ skills, onSave }: { skills: string[]; onSave: (skills: str
       {skills.length > 0 && (
         <ul className="mt-4 flex flex-wrap gap-1.5">
           {skills.map((skill) => (
-            <li key={skill} className="badge gap-1 bg-emerald-50 text-emerald-700">
+            <li key={skill} className="badge max-w-full gap-1 whitespace-normal bg-emerald-50 text-left text-emerald-700">
               {skill}
-              <button type="button" className="rounded-full p-0.5 hover:bg-emerald-100" aria-label={`Remove ${skill}`} onClick={() => onSave(skills.filter((s) => s !== skill))}>
+              <button type="button" className="rounded-full p-1.5 hover:bg-emerald-100" aria-label={`Remove ${skill}`} onClick={() => onSave(skills.filter((s) => s !== skill))}>
                 <X className="size-3" />
               </button>
             </li>
@@ -536,12 +536,12 @@ function JobForm({ job, today, onClose }: { job: JobApplication | null; today: s
       {!job && (
         <div className="rounded-xl bg-slate-50 p-3 ring-1 ring-slate-100">
           <label className="label" htmlFor="job-url">Job link</label>
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row">
             <div className="relative min-w-0 flex-1">
               <Link2 className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
               <input id="job-url" className="input pl-9" value={f.url} onChange={set("url")} placeholder="https://jobs.bdjobs.com/…" autoFocus />
             </div>
-            <button type="button" className="btn btn-secondary shrink-0" disabled={reading || !f.url.trim()} onClick={() => read({ url: fixLink(f.url) })}>
+            <button type="button" className="btn btn-secondary shrink-0 max-sm:w-full" disabled={reading || !f.url.trim()} onClick={() => read({ url: fixLink(f.url) })}>
               {reading ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
               Read link
             </button>

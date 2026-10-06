@@ -1,7 +1,7 @@
 "use client";
 
 import { toArchive } from "@/lib/archive";
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import useSWR from "swr";
 import { ChartPie, CircleCheck, Flame, Lightbulb, Pencil, Plus, Repeat, Sparkles, Trash2, TriangleAlert, Trophy } from "lucide-react";
 import { api, errorMessage, refresh } from "@/lib/api";
@@ -22,6 +22,14 @@ export function HabitsView() {
   const { data, error, mutate } = useSWR<HabitsResponse>(KEY);
   const { toast, confirm } = useFeedback();
   const [editing, setEditing] = useState<Habit | "new" | null>(null);
+  const scroller = useRef<HTMLDivElement>(null);
+  // On a phone the table is wider than the screen: start with today's column in view (the habit names stay put on the left).
+  const habitCount = data?.items.length ?? 0;
+  useEffect(() => {
+    const box = scroller.current;
+    const today = box?.querySelector<HTMLElement>("[data-today]");
+    if (box && today) box.scrollLeft = Math.max(0, today.offsetLeft + today.offsetWidth - box.clientWidth + 24);
+  }, [habitCount]);
   useNewAction(() => setEditing("new"));
 
   if (error && !data) return <LoadError error={error} retry={() => mutate()} />;
@@ -69,7 +77,8 @@ export function HabitsView() {
           icon={<Flame className="size-5" />}
           tile="bg-orange-50 text-orange-500"
           label="Best streak"
-          value={<>{summary.best.days} {summary.best.days === 1 ? "day" : "days"} {summary.best.name && <span className="text-sm font-medium text-slate-500">{summary.best.name}</span>}</>}
+          value={`${summary.best.days} ${summary.best.days === 1 ? "day" : "days"}`}
+          sub={summary.best.name}
         />
         <Summary icon={<ChartPie className="size-5" />} tile="bg-blue-50 text-blue-600" label="Last 7 days" value={`${summary.share}%`} />
         <Summary icon={<Sparkles className="size-5" />} tile="bg-violet-50 text-violet-600" label="Perfect days" value={`${summary.perfect_days} of ${days.length}`} />
@@ -81,15 +90,15 @@ export function HabitsView() {
           <p className="text-xs text-slate-500">Tap a day to tick or untick it. Streaks update straight away.</p>
         </header>
         {data.items.length ? (
-          <div className="relative mt-4 overflow-x-auto">
+          <div ref={scroller} className="relative mt-4 overflow-x-auto">
             <table className="w-full min-w-[760px] text-sm">
               <thead>
                 <tr className="text-xs text-slate-500">
-                  <th className="pb-3 text-left font-medium">Habit</th>
+                  <th className="sticky left-0 z-10 bg-white pb-3 text-left font-medium">Habit</th>
                   {days.map((day, i) => {
                     const isToday = i === days.length - 1;
                     return (
-                      <th key={day} className="pb-3 text-center font-medium">
+                      <th key={day} data-today={isToday ? "" : undefined} className="pb-3 text-center font-medium">
                         <span className={`block ${isToday ? "text-blue-600" : ""}`}>{isToday ? "Today" : formatDate(day, "weekday")}</span>
                         <span className={`mt-0.5 inline-grid size-6 place-items-center rounded-full text-[11px] ${isToday ? "bg-blue-600 text-white" : "text-slate-400"}`}>{Number(day.slice(8))}</span>
                       </th>
@@ -103,14 +112,22 @@ export function HabitsView() {
               <tbody>
                 {data.items.map((habit) => (
                   <tr key={habit.id} className="group border-t border-slate-100">
-                    <td className="py-3 pr-4">
+                    <td className="sticky left-0 z-10 w-40 bg-white py-3 pr-3 sm:static sm:w-auto sm:pr-4">
                       <div className="flex items-center gap-3">
-                        <span className={`icon-tile ${colorOf(habit.color).tile}`}>
+                        <span className={`icon-tile max-sm:hidden ${colorOf(habit.color).tile}`}>
                           <Icon name={habit.icon} className="size-4.5" />
                         </span>
-                        <div>
+                        <div className="min-w-0">
                           <p className="font-medium text-slate-800">{habit.name}</p>
                           {habit.goal_text && <p className="text-xs text-slate-500">{habit.goal_text}</p>}
+                          <span className="-ml-2 mt-1 flex sm:hidden">
+                            <button type="button" className="btn btn-ghost btn-sm btn-icon" onClick={() => setEditing(habit)} aria-label={`Edit ${habit.name}`}>
+                              <Pencil className="size-4" />
+                            </button>
+                            <button type="button" className="btn btn-ghost btn-sm btn-icon" onClick={() => remove(habit)} aria-label={`Delete ${habit.name}`}>
+                              <Trash2 className="size-4" />
+                            </button>
+                          </span>
                         </div>
                       </div>
                     </td>
@@ -138,7 +155,7 @@ export function HabitsView() {
                       </div>
                     </td>
                     <td className="w-20 text-right">
-                      <span className="inline-flex opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">
+                      <span className="reveal hidden sm:inline-flex">
                         <button type="button" className="btn btn-ghost btn-sm btn-icon" onClick={() => setEditing(habit)} aria-label={`Edit ${habit.name}`}>
                           <Pencil className="size-4" />
                         </button>
@@ -179,10 +196,10 @@ export function HabitsView() {
             </div>
           </header>
           <div className="mt-5 flex gap-3">
-            <div className="grid grid-rows-7 gap-1 text-[10px] text-slate-400 sm:gap-1.5 [&>span]:self-center">
+            <div className="grid grid-rows-7 gap-0.5 text-[10px] text-slate-400 sm:gap-1.5 [&>span]:self-center">
               <span>Mon</span><span /><span>Wed</span><span /><span>Fri</span><span /><span>Sun</span>
             </div>
-            <div className="grid flex-1 auto-cols-fr grid-flow-col grid-rows-7 gap-1 sm:gap-1.5">
+            <div className="grid flex-1 auto-cols-fr grid-flow-col grid-rows-7 gap-0.5 sm:gap-1.5">
               {data.heatmap.map((cell) => {
                 if (cell.share === null) return <span key={cell.date} className="aspect-square" />;
                 const tone = cell.share === 0 ? "bg-slate-100" : cell.share < 0.5 ? "bg-emerald-100" : cell.share < 0.8 ? "bg-emerald-300" : cell.share < 1 ? "bg-emerald-500" : "bg-emerald-700";
@@ -209,13 +226,14 @@ export function HabitsView() {
   );
 }
 
-function Summary({ icon, tile, label, value }: { icon: ReactNode; tile: string; label: string; value: ReactNode }) {
+function Summary({ icon, tile, label, value, sub }: { icon: ReactNode; tile: string; label: string; value: ReactNode; sub?: string }) {
   return (
-    <div className="card flex items-center gap-4 p-4">
-      <span className={`icon-tile size-11 ${tile}`}>{icon}</span>
+    <div className="card flex items-center gap-3 p-3 sm:gap-4 sm:p-4">
+      <span className={`icon-tile size-11 shrink-0 max-[380px]:hidden ${tile}`}>{icon}</span>
       <div className="min-w-0">
         <p className="text-sm text-slate-500">{label}</p>
         <p className="truncate text-xl font-bold text-slate-900">{value}</p>
+        {sub && <p className="truncate text-xs text-slate-500">{sub}</p>}
       </div>
     </div>
   );
@@ -224,8 +242,8 @@ function Summary({ icon, tile, label, value }: { icon: ReactNode; tile: string; 
 function Insight({ icon, tile, title, text }: { icon: ReactNode; tile: string; title: string; text: string }) {
   return (
     <li className="flex gap-3">
-      <span className={`icon-tile size-9 ${tile}`}>{icon}</span>
-      <div>
+      <span className={`icon-tile size-9 shrink-0 ${tile}`}>{icon}</span>
+      <div className="min-w-0">
         <p className="font-medium text-slate-800">{title}</p>
         <p className="text-slate-500">{text}</p>
       </div>
