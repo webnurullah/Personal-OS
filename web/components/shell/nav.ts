@@ -6,7 +6,6 @@ export const NAV: NavItem[] = [
   { href: "/", label: "Dashboard", icon: House },
   { href: "/tasks", label: "Tasks", icon: SquareCheck },
   { href: "/projects", label: "Projects", icon: FolderKanban },
-  { href: "/archive", label: "Archive", icon: Archive },
   { href: "/learning", label: "Learning", icon: GraduationCap },
   { href: "/calendar", label: "Calendar", icon: CalendarDays },
   { href: "/goals", label: "Goals", icon: Target },
@@ -14,14 +13,14 @@ export const NAV: NavItem[] = [
   { href: "/finance", label: "Finance", icon: Wallet },
   { href: "/health", label: "Health", icon: Heart },
   { href: "/notes", label: "Notes", icon: FileText },
+  { href: "/jobs", label: "Job Apply", icon: BriefcaseBusiness },
 ];
 
-// Applications → Job Apply (more kinds of applications can go here later).
-export const APPLICATIONS_NAV: NavItem[] = [{ href: "/jobs", label: "Job Apply", icon: BriefcaseBusiness }];
-
+// Below the main list, after a line: Settings, then the Archive (where everything you delete waits until you delete it for good).
 export const SETTINGS_NAV: NavItem = { href: "/settings", label: "Settings", icon: Settings };
+export const ARCHIVE_NAV: NavItem = { href: "/archive", label: "Archive", icon: Archive };
 
 /** Which menu item a URL belongs to ("/learning/abc" → Learning). */
 export function activeItem(pathname: string) {
-  return [...NAV, ...APPLICATIONS_NAV, SETTINGS_NAV].find((item) => (item.href === "/" ? pathname === "/" : pathname === item.href || pathname.startsWith(`${item.href}/`)));
+  return [...NAV, SETTINGS_NAV, ARCHIVE_NAV].find((item) => (item.href === "/" ? pathname === "/" : pathname === item.href || pathname.startsWith(`${item.href}/`)));
 }

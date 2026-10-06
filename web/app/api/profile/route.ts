@@ -6,7 +6,11 @@ import { ProfileUpdate } from "@/lib/server/schemas";
 import type { Row } from "@/lib/server/supabase";
 import { nonEmpty, parse } from "@/lib/server/validate";
 
-export const GET = handle(async (ctx) => presentProfile(ctx, await ctx.profile()));
+export const GET = handle(async (ctx) => {
+  // Always read it fresh: another server copy may hold the 30-second saved profile with a photo that has just been replaced.
+  forgetProfile(ctx.user.id);
+  return presentProfile(ctx, await ctx.profile());
+});
 
 export const PATCH = handle(async (ctx) => {
   const { notify, ...rest } = nonEmpty(parse(ProfileUpdate, await ctx.body()));

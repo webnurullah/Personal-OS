@@ -10,6 +10,7 @@ export function Modal({
   title,
   description,
   size = "md",
+  dismissible = true,
   children,
 }: {
   open: boolean;
@@ -17,6 +18,8 @@ export function Modal({
   title: string;
   description?: string;
   size?: "sm" | "md" | "lg";
+  /** false while something is being saved: Esc, the X and a click outside then do nothing. */
+  dismissible?: boolean;
   children: ReactNode;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -34,12 +37,22 @@ export function Modal({
   return (
     <dialog
       ref={ref}
-      onClose={onClose}
+      onCancel={(e) => {
+        if (!dismissible) e.preventDefault();
+      }}
+      onClose={() => {
+        // Some browsers close a dialog on a second Esc even when the first was refused: open it again.
+        if (!dismissible) {
+          if (ref.current && !ref.current.open) ref.current.showModal();
+          return;
+        }
+        onClose();
+      }}
       onMouseDown={(e) => {
         pressedOnBackdrop.current = e.target === ref.current;
       }}
       onClick={(e) => {
-        if (e.target === ref.current && pressedOnBackdrop.current) onClose();
+        if (dismissible && e.target === ref.current && pressedOnBackdrop.current) onClose();
       }}
       aria-label={title}
       className={`w-[calc(100%-2rem)] ${width} rounded-2xl bg-white p-0 shadow-2xl`}
@@ -51,7 +64,7 @@ export function Modal({
               <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
               {description && <p className="text-sm text-slate-500">{description}</p>}
             </div>
-            <button type="button" className="btn btn-ghost btn-sm btn-icon -mr-2 -mt-1" onClick={onClose} aria-label="Close">
+            <button type="button" className="btn btn-ghost btn-sm btn-icon -mr-2 -mt-1" onClick={onClose} aria-label="Close" disabled={!dismissible}>
               <X className="size-5" />
             </button>
           </div>
@@ -63,12 +76,12 @@ export function Modal({
 }
 
 /** Cancel + main button row for the bottom of a form in a modal; `left` holds e.g. a Delete button; `disabled` greys out the main button without saying "Saving…". */
-export function ModalActions({ onCancel, submitLabel, busy, danger, left, disabled }: { onCancel: () => void; submitLabel: string; busy?: boolean; danger?: boolean; left?: ReactNode; disabled?: boolean }) {
+export function ModalActions({ onCancel, submitLabel, busy, danger, left, disabled, cancelDisabled }: { onCancel: () => void; submitLabel: string; busy?: boolean; danger?: boolean; left?: ReactNode; disabled?: boolean; cancelDisabled?: boolean }) {
   return (
     <div className="mt-6 flex items-center justify-between gap-2">
       <div>{left}</div>
       <div className="flex gap-2">
-        <button type="button" className="btn btn-secondary" onClick={onCancel}>
+        <button type="button" className="btn btn-secondary" onClick={onCancel} disabled={cancelDisabled}>
           Cancel
         </button>
         <button type="submit" className={`btn ${danger ? "btn-danger" : "btn-primary"}`} disabled={busy || disabled}>

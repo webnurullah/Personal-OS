@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import useSWR from "swr";
@@ -20,6 +20,22 @@ import { activeItem } from "./nav";
 export function Avatar({ className, src }: { className: string; src?: string | null }) {
   const [broken, setBroken] = useState<string | null>(null);
   const photo = src && broken !== src ? src : null;
+  // One failed load (a bad connection, say) must not hide the photo for good: try again when the phone is back
+  // online or the app comes to the front, and at the latest after a minute.
+  useEffect(() => {
+    if (!broken) return;
+    const retry = () => {
+      if (document.visibilityState === "visible") setBroken(null);
+    };
+    window.addEventListener("online", retry);
+    document.addEventListener("visibilitychange", retry);
+    const timer = setTimeout(retry, 60_000);
+    return () => {
+      window.removeEventListener("online", retry);
+      document.removeEventListener("visibilitychange", retry);
+      clearTimeout(timer);
+    };
+  }, [broken]);
   return (
     <span className={`${className} block shrink-0 overflow-hidden rounded-full shadow-sm ring-2 ring-white`}>
       {photo ? (

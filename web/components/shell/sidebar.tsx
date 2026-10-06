@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Sprout, X } from "lucide-react";
 import { prefetchPage } from "@/lib/prefetch";
-import { APPLICATIONS_NAV, NAV, SETTINGS_NAV, activeItem, type NavItem } from "./nav";
+import { ARCHIVE_NAV, NAV, SETTINGS_NAV, activeItem, type NavItem } from "./nav";
 
 function Hills() {
   return (
@@ -65,10 +65,11 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
         </div>
         <nav className="min-h-0 flex-1 overflow-y-auto px-3 pb-4 pt-2">
           <ul className="space-y-1">{NAV.map(link)}</ul>
-          <p className="mx-3 mb-1.5 mt-5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Applications</p>
-          <ul className="space-y-1">{APPLICATIONS_NAV.map(link)}</ul>
           <div className="mx-3 my-3 border-t border-slate-200/80" />
-          <ul>{link(SETTINGS_NAV)}</ul>
+          <ul className="space-y-1">
+            {link(SETTINGS_NAV)}
+            {link(ARCHIVE_NAV)}
+          </ul>
         </nav>
         <div className="shrink-0 px-4 [@media(max-height:820px)]:hidden max-lg:[@media(max-height:1000px)]:hidden">
           <figure className="rounded-2xl bg-white/70 px-4 py-4 text-center ring-1 ring-slate-200/60">
