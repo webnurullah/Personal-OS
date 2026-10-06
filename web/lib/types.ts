@@ -35,6 +35,8 @@ export type Task = {
   title: string;
   category_id: string | null;
   due_date: string | null;
+  /** Last day of a task that runs over several days (null = one day). */
+  end_date: string | null;
   priority: Priority;
   notes: string;
   done_at: string | null;

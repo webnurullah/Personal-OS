@@ -40,10 +40,20 @@ export const TaskCreate = z.object({
   title: s.text(200),
   category_id: s.id.nullable().optional(),
   due_date: s.date.nullable().optional(),
+  /** Optional last day, for tasks that run over several days. */
+  end_date: s.date.nullable().optional(),
   priority: z.enum(["low", "medium", "high"]).optional(),
   notes: s.optionalText(2000).optional(),
 }).strict();
 export const TaskUpdate = TaskCreate.partial().extend({ done: z.boolean().optional() }).strict();
+
+/** An end date needs a due date, and cannot come before it. */
+export function checkTaskDates<T extends { due_date?: string | null; end_date?: string | null }>(t: T): T {
+  if (!t.end_date || !("due_date" in t)) return t;
+  if (!t.due_date) throw new HttpError(400, "Add a due date before the end date.");
+  if (t.end_date < t.due_date) throw new HttpError(400, "The end date cannot be before the due date.");
+  return t;
+}
 
 // ---------- Events ----------
 export const EventFields = z.object({

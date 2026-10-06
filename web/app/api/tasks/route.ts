@@ -1,6 +1,6 @@
 import { handle } from "@/lib/server/api";
 import { must } from "@/lib/server/http";
-import { TaskCreate } from "@/lib/server/schemas";
+import { checkTaskDates, TaskCreate } from "@/lib/server/schemas";
 import { parse } from "@/lib/server/validate";
 
 // Open tasks, plus tasks finished in the last 14 days.
@@ -16,6 +16,6 @@ export const GET = handle(async ({ db, today }) => {
 });
 
 export const POST = handle(async ({ db, body }) => {
-  const input = parse(TaskCreate, await body());
+  const input = checkTaskDates(parse(TaskCreate, await body()));
   return must(await db.from("tasks").insert(input).select().single());
 }, { status: 201 });

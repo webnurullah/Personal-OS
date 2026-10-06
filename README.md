@@ -26,7 +26,12 @@ Frontend and backend are **one Vercel project**. Every push to GitHub `main` put
 ## 1. Supabase (database + sign-in)
 
 1. Go to [supabase.com](https://supabase.com) → **New project**. Pick the region **Southeast Asia (Singapore)**, the closest to Bangladesh. Save the database password somewhere safe.
-2. Open **SQL Editor** → **New query**. Paste the whole of `supabase/migrations/20261001000000_init.sql` and click **Run**. Then do the same with `supabase/migrations/20261001000100_sample_data.sql`.
+2. Open **SQL Editor** → **New query**. Run every file in `supabase/migrations/` **in name order**, one at a time (paste the whole file, click **Run**):
+   1. `20261001000000_init.sql`
+   2. `20261001000100_sample_data.sql`
+   3. `20261006000000_task_end_date.sql` (end date for tasks)
+
+   Already set up? Only run the files you have not run yet. Each new file is listed here when it is added.
 3. **Authentication → URL Configuration**
    - Site URL: `https://pos.nurullah.com.bd`
    - Redirect URLs: add `https://pos.nurullah.com.bd/**` and `http://localhost:3000/**`

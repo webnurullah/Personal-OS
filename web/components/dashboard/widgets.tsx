@@ -5,10 +5,11 @@ import Link from "next/link";
 import { ArrowRight, CalendarDays, ChartNoAxesColumn, ChartColumn, Clock, FileText, Footprints, HeartPulse, Leaf, Moon, Plus, SquareCheck, Sun, Target, TrendingUp, Wallet } from "lucide-react";
 import { api, errorMessage, refresh } from "@/lib/api";
 import { colorOf } from "@/lib/colors";
-import { formatDate, relativeDay } from "@/lib/dates";
+import { formatDate } from "@/lib/dates";
 import { count, hm, minutesOf, pct } from "@/lib/format";
 import { useCategories, useNowMinutes } from "@/lib/hooks";
 import { useProfile } from "@/lib/profile";
+import { taskDateLabel } from "@/lib/tasks";
 import type { Dashboard, Task } from "@/lib/types";
 import { Donut, Progress } from "../ui/charts";
 import { Segmented } from "../ui/controls";
@@ -152,7 +153,7 @@ export function TasksWidget({ data }: Props) {
                 <label htmlFor={`dt-${task.id}`} className="min-w-0 flex-1 truncate text-sm text-slate-700 peer-checked:text-slate-400 peer-checked:line-through">
                   {task.title}
                 </label>
-                {tab !== "today" && task.due_date && <span className={`text-xs ${tab === "overdue" ? "font-medium text-rose-500" : "text-slate-400"}`}>{relativeDay(task.due_date, data.today)}</span>}
+                {(tab !== "today" || task.end_date) && task.due_date && <span className={`whitespace-nowrap text-xs ${tab === "overdue" ? "font-medium text-rose-500" : "text-slate-400"}`}>{taskDateLabel(task, data.today)}</span>}
                 {category && <span className={`badge ${colorOf(category.color).badge}`}>{category.name}</span>}
               </li>
             );
