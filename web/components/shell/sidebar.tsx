@@ -56,7 +56,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
             <Sprout className="size-6" />
           </span>
           <Link href="/" className="min-w-0 leading-tight" onClick={onClose}>
-            <span className="block text-[15px] font-bold text-slate-900">Nurullah POS</span>
+            <span className="block text-[15px] font-bold text-slate-900">POS</span>
             <span className="block text-xs text-slate-500">Live well. Plan better.</span>
           </Link>
           <button type="button" className="btn btn-ghost btn-sm btn-icon ml-auto lg:hidden" onClick={onClose} aria-label="Close menu">

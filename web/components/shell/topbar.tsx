@@ -147,7 +147,7 @@ function ProfileMenu() {
 
 export function Topbar({ onMenu, onSearch }: { onMenu: () => void; onSearch: () => void }) {
   const pathname = usePathname();
-  const label = activeItem(pathname)?.label ?? "Nurullah POS";
+  const label = activeItem(pathname)?.label ?? "POS";
 
   return (
     <header className="sticky top-0 z-20 border-b border-slate-200/70 bg-white/90 backdrop-blur">
@@ -159,7 +159,7 @@ export function Topbar({ onMenu, onSearch }: { onMenu: () => void; onSearch: () 
           <Leaf className="hidden size-8 shrink-0 fill-emerald-100 text-emerald-600 sm:block" />
           <span className="min-w-0">
             <span className="block truncate text-lg font-bold tracking-tight text-slate-900 sm:hidden">{label}</span>
-            <span className="hidden truncate text-xl font-bold tracking-tight text-slate-900 sm:block">Personal Life Management System</span>
+            <span className="hidden truncate text-xl font-bold tracking-tight text-slate-900 sm:block">Life Management System</span>
             <span className="hidden truncate text-sm text-slate-500 md:block">A more intentional you, every day.</span>
           </span>
         </Link>

@@ -2,5 +2,5 @@
 export const dynamic = "force-dynamic";
 
 export function GET() {
-  return Response.json({ ok: true, name: "Nurullah POS API", time: new Date().toISOString() });
+  return Response.json({ ok: true, name: "POS API", time: new Date().toISOString() });
 }

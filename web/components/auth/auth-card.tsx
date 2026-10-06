@@ -11,7 +11,7 @@ export function AuthCard({ title, subtitle, children }: { title: string; subtitl
             <Sprout className="size-6" />
           </span>
           <div className="leading-tight">
-            <p className="text-lg font-bold text-slate-900">Nurullah POS</p>
+            <p className="text-lg font-bold text-slate-900">POS</p>
             <p className="text-xs text-slate-500">Live well. Plan better.</p>
           </div>
         </div>
