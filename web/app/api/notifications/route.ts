@@ -4,6 +4,7 @@ import { habitBoard } from "@/lib/server/habits";
 import { must } from "@/lib/server/http";
 import { loadHabits } from "@/lib/server/queries";
 import { byTime, occurrences } from "@/lib/server/recurrence";
+import { isOnDay, isOverdue } from "@/lib/tasks";
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
@@ -24,9 +25,8 @@ export const GET = handle(async ({ db, profile: getProfile }) => {
   const notify = (profile.notify || {}) as Record<string, boolean>;
   const nowMinutes = minutesNowIn(zone);
 
-  const [overdue, todayTasks, bills, events, blocks, habitData] = await Promise.all([
-    db.from("tasks").select("id", { count: "exact", head: true }).is("done_at", null).lt("due_date", today),
-    db.from("tasks").select("id", { count: "exact", head: true }).is("done_at", null).eq("due_date", today),
+  const [openTasks, bills, events, blocks, habitData] = await Promise.all([
+    db.from("tasks").select("due_date, end_date").is("done_at", null).lte("due_date", today).then(must),
     db.from("bills").select("*").is("paid_at", null).lte("due_date", addDays(today, 3)).order("due_date").then(must),
     db.from("events").select("*").lte("event_date", today).or(`repeat.neq.none,event_date.eq.${today}`).then(must),
     db.from("study_blocks").select("*").eq("week_start", mondayOf(today)).eq("weekday", weekdayIndex(today)).eq("done", false).then(must),
@@ -34,12 +34,14 @@ export const GET = handle(async ({ db, profile: getProfile }) => {
   ]);
 
   const items: Item[] = [];
+  const overdue = openTasks.filter((t) => isOverdue(t, today)).length;
+  const todayCount = openTasks.filter((t) => isOnDay(t, today)).length;
 
-  if (overdue.count) items.push({ id: "overdue", icon: "circle-alert", tone: "rose", title: `${plural(overdue.count, "task")} overdue`, meta: "Tasks", href: "/tasks" });
+  if (overdue) items.push({ id: "overdue", icon: "circle-alert", tone: "rose", title: `${plural(overdue, "task")} overdue`, meta: "Tasks", href: "/tasks" });
 
   if (notify.morning_plan) {
     const todayEvents = events.filter((e) => occurrences(e, today, today).length);
-    items.push({ id: "plan", icon: "sunrise", tone: "amber", title: `Today: ${plural(todayTasks.count || 0, "task")} and ${plural(todayEvents.length, "event")}`, meta: "Your day", href: "/" });
+    items.push({ id: "plan", icon: "sunrise", tone: "amber", title: `Today: ${plural(todayCount, "task")} and ${plural(todayEvents.length, "event")}`, meta: "Your day", href: "/" });
   }
 
   if (notify.bills_due) {

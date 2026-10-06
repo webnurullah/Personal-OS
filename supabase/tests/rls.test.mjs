@@ -64,6 +64,10 @@ await expectError('cannot pay the same bill twice', () => qa('select pay_bill($1
 await expectError('bad colour rejected', () => qa(`insert into notes (title, color) values ('x', 'purple')`), 'color_name');
 await expectError('event end before start rejected', () => qa(`insert into events (title, event_date, start_time, end_time) values ('x', $1, '10:00', '09:00')`, [today]), 'check constraint');
 await expectError('study week must start on Monday', () => qa(`insert into study_weeks (week_start) values ('2026-10-01')`), 'check constraint');
+await expectError('task end date before due date rejected', () => qa(`insert into tasks (title, due_date, end_date) values ('x', '2026-10-06', '2026-10-05')`), 'check constraint');
+await expectError('task end date without due date rejected', () => qa(`insert into tasks (title, end_date) values ('x', '2026-10-06')`), 'check constraint');
+const range = await qa(`insert into tasks (title, due_date, end_date) values ('Trip', '2026-10-06', '2026-10-09') returning end_date::text`);
+check('task with an end date saves', range[0]?.end_date === '2026-10-09');
 
 await qa('select delete_my_data()');
 check('delete_my_data empties the account', (await qa('select count(*)::int n from tasks'))[0].n === 0 && (await qa('select count(*)::int n from transactions'))[0].n === 0);

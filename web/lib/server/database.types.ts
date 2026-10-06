@@ -748,6 +748,7 @@ export type Database = {
           title: string;
           category_id: string | null;
           due_date: string | null;
+          end_date: string | null;
           priority: string;
           notes: string;
           done_at: string | null;
@@ -760,6 +761,7 @@ export type Database = {
           title: string;
           category_id?: string | null;
           due_date?: string | null;
+          end_date?: string | null;
           priority?: string;
           notes?: string;
           done_at?: string | null;
@@ -772,6 +774,7 @@ export type Database = {
           title?: string;
           category_id?: string | null;
           due_date?: string | null;
+          end_date?: string | null;
           priority?: string;
           notes?: string;
           done_at?: string | null;

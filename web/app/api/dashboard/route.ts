@@ -6,6 +6,7 @@ import { dbError, must } from "@/lib/server/http";
 import { fetchAll } from "@/lib/server/paging";
 import { loadHabits } from "@/lib/server/queries";
 import { byTime, occurrences } from "@/lib/server/recurrence";
+import { isOnDay, isOverdue } from "@/lib/tasks";
 
 // Everything on the dashboard in one request. Every number is worked out
 // here from the stored facts (ticked tasks, habit days, transactions …).
@@ -31,12 +32,12 @@ export const GET = handle(async ({ db, profile: getProfile }) => {
   // ----- Schedule -----
   const schedule = events.filter((e) => occurrences(e, today, today).length).sort(byTime);
 
-  // ----- Tasks: today's (done or not), the rest of the week, and overdue -----
-  const doneToday = recentlyDone.filter((t) => t.due_date === today);
-  const todayTasks = [...openTasks.filter((t) => t.due_date === today), ...doneToday]
+  // ----- Tasks: today's (done or not, including tasks running over several days), the rest of the week, and overdue -----
+  const doneToday = recentlyDone.filter((t) => isOnDay(t, today));
+  const todayTasks = [...openTasks.filter((t) => isOnDay(t, today)), ...doneToday]
     .sort((a, b) => Number(Boolean(b.done_at)) - Number(Boolean(a.done_at)) || a.created_at.localeCompare(b.created_at));
   const weekTasks = openTasks.filter((t) => t.due_date && t.due_date > today);
-  const overdueTasks = openTasks.filter((t) => t.due_date && t.due_date < today);
+  const overdueTasks = openTasks.filter((t) => isOverdue(t, today));
 
   // ----- Habits (last 5 days) -----
   const board = habitBoard(habitData.habits, habitData.logs, today, 5, 1);

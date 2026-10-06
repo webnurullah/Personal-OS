@@ -5,10 +5,11 @@ import useSWR from "swr";
 import { CalendarClock, CalendarDays, ChevronDown, CircleAlert, CircleCheck, Flag, Lightbulb, Plus, Search, SearchX, Sun, Trash2 } from "lucide-react";
 import { api, errorMessage, refresh } from "@/lib/api";
 import { colorOf } from "@/lib/colors";
-import { addDays, relativeDay } from "@/lib/dates";
+import { addDays } from "@/lib/dates";
 import { pct, plural } from "@/lib/format";
 import { useCategories } from "@/lib/hooks";
 import { useNewAction } from "@/lib/new-action";
+import { isOnDay, isOverdue, isUpcoming, taskDateLabel } from "@/lib/tasks";
 import type { List, Priority, Task } from "@/lib/types";
 import { Donut } from "@/components/ui/charts";
 import { Field, Segmented } from "@/components/ui/controls";
@@ -40,29 +41,28 @@ export function TasksView() {
   const today = data.today!;
   const tasks = data.items;
   const open = tasks.filter((t) => !t.done_at);
-  const todays = tasks.filter((t) => t.due_date === today);
+  const todays = tasks.filter((t) => isOnDay(t, today));
   const doneToday = todays.filter((t) => t.done_at).length;
 
   const matches = (t: Task) => {
     const q = query.trim().toLowerCase();
     if (q && !`${t.title} ${t.notes}`.toLowerCase().includes(q)) return false;
     if (categoryId && t.category_id !== categoryId) return false;
-    const due = t.due_date;
     switch (filter) {
-      case "today": return due === today;
-      case "upcoming": return !t.done_at && !!due && due > today;
-      case "overdue": return !t.done_at && !!due && due < today;
+      case "today": return isOnDay(t, today);
+      case "upcoming": return isUpcoming(t, today);
+      case "overdue": return isOverdue(t, today);
       case "done": return Boolean(t.done_at);
       default: return true;
     }
   };
   const visible = tasks.filter(matches);
   const groups: { key: string; title: string; tone: string; items: Task[] }[] = [
-    { key: "overdue", title: "Overdue", tone: "text-rose-500", items: visible.filter((t) => !t.done_at && t.due_date && t.due_date < today) },
-    { key: "today", title: "Today", tone: "text-slate-500", items: visible.filter((t) => t.due_date === today) },
-    { key: "upcoming", title: "Upcoming", tone: "text-slate-500", items: visible.filter((t) => !t.done_at && t.due_date && t.due_date > today) },
+    { key: "overdue", title: "Overdue", tone: "text-rose-500", items: visible.filter((t) => isOverdue(t, today)) },
+    { key: "today", title: "Today", tone: "text-slate-500", items: visible.filter((t) => isOnDay(t, today)) },
+    { key: "upcoming", title: "Upcoming", tone: "text-slate-500", items: visible.filter((t) => isUpcoming(t, today)) },
     { key: "someday", title: "No date", tone: "text-slate-500", items: visible.filter((t) => !t.done_at && !t.due_date) },
-    { key: "done", title: "Completed", tone: "text-emerald-600", items: visible.filter((t) => t.done_at && t.due_date !== today) },
+    { key: "done", title: "Completed", tone: "text-emerald-600", items: visible.filter((t) => t.done_at && !isOnDay(t, today)) },
   ];
 
   // Instant tick: update the list on screen first, then save.
@@ -103,8 +103,8 @@ export function TasksView() {
 
       <div className="mt-6 grid grid-cols-2 gap-4 xl:grid-cols-4">
         <Summary icon={<Sun className="size-5" />} tile="bg-blue-50 text-blue-600" label="Today" value={`${doneToday} / ${todays.length}`} />
-        <Summary icon={<CircleAlert className="size-5" />} tile="bg-rose-50 text-rose-600" label="Overdue" value={open.filter((t) => t.due_date && t.due_date < today).length} />
-        <Summary icon={<CalendarClock className="size-5" />} tile="bg-violet-50 text-violet-600" label="Next 7 days" value={open.filter((t) => t.due_date && t.due_date > today && t.due_date <= addDays(today, 7)).length} />
+        <Summary icon={<CircleAlert className="size-5" />} tile="bg-rose-50 text-rose-600" label="Overdue" value={open.filter((t) => isOverdue(t, today)).length} />
+        <Summary icon={<CalendarClock className="size-5" />} tile="bg-violet-50 text-violet-600" label="Next 7 days" value={open.filter((t) => isUpcoming(t, today) && (t.due_date ?? "") <= addDays(today, 7)).length} />
         <Summary icon={<CircleCheck className="size-5" />} tile="bg-emerald-50 text-emerald-600" label="Done (14 days)" value={tasks.filter((t) => t.done_at).length} />
       </div>
 
@@ -161,7 +161,7 @@ export function TasksView() {
                     <ul className="mt-1.5">
                       {group.items.map((task) => {
                         const category = task.category_id ? byId.get(task.category_id) : undefined;
-                        const overdue = !task.done_at && task.due_date && task.due_date < today;
+                        const overdue = isOverdue(task, today);
                         return (
                           <li key={task.id} className="group flex items-center gap-3 rounded-xl px-3 py-2.5 transition hover:bg-slate-50">
                             <input type="checkbox" className="checkbox" checked={Boolean(task.done_at)} onChange={() => toggle(task)} aria-label={`Done: ${task.title}`} />
@@ -170,7 +170,7 @@ export function TasksView() {
                               <span className="mt-0.5 flex items-center gap-3 text-xs text-slate-500">
                                 <span className={`flex items-center gap-1 ${overdue ? "text-rose-500" : ""}`}>
                                   <CalendarDays className="size-3.5" />
-                                  {task.due_date ? relativeDay(task.due_date, today) : "No date"}
+                                  {taskDateLabel(task, today)}
                                 </span>
                                 <span className={`flex items-center gap-1 ${PRIORITY[task.priority].color}`}>
                                   <Flag className="size-3.5" />
@@ -259,6 +259,41 @@ function Summary({ icon, tile, label, value }: { icon: ReactNode; tile: string; 
   );
 }
 
+/**
+ * Due date, plus an optional end date for tasks that take several days.
+ * Once there is an end date, the first date is the start.
+ */
+function TaskDates({ due, end }: { due: string; end: string }) {
+  const [dueDate, setDueDate] = useState(due);
+  const [endDate, setEndDate] = useState(end);
+
+  const changeDue = (value: string) => {
+    setDueDate(value);
+    if (!value) setEndDate(""); // no end date without a due date
+    else if (endDate && endDate < value) setEndDate(value);
+  };
+
+  return (
+    <div className="grid gap-4 sm:grid-cols-2">
+      <Field label={endDate ? "Start date" : "Due date"} htmlFor="task-due">
+        <input id="task-due" name="due_date" type="date" className="input" value={dueDate} onChange={(e) => changeDue(e.target.value)} />
+      </Field>
+      <Field label="End date (optional)" htmlFor="task-end" hint={dueDate ? "For tasks that take several days." : "Pick a due date first."}>
+        <input
+          id="task-end"
+          name="end_date"
+          type="date"
+          className="input"
+          value={endDate}
+          min={dueDate || undefined}
+          disabled={!dueDate}
+          onChange={(e) => setEndDate(e.target.value)}
+        />
+      </Field>
+    </div>
+  );
+}
+
 /** New task, or edit an existing one. */
 function TaskModal({ task, today, onClose }: { task: Task | "new" | null; today: string; onClose: () => void }) {
   const { categories } = useCategories();
@@ -273,6 +308,7 @@ function TaskModal({ task, today, onClose }: { task: Task | "new" | null; today:
       title: String(form.get("title")),
       category_id: String(form.get("category_id")) || null,
       due_date: String(form.get("due_date")) || null,
+      end_date: (form.get("end_date") as string | null) || null,
       priority: String(form.get("priority")),
       notes: String(form.get("notes")),
     };
@@ -302,19 +338,16 @@ function TaskModal({ task, today, onClose }: { task: Task | "new" | null; today:
         <Field label="Title" htmlFor="task-title">
           <input id="task-title" name="title" className="input" required maxLength={200} defaultValue={editing?.title} placeholder="e.g. Call the plumber" autoComplete="off" autoFocus />
         </Field>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Category" htmlFor="task-category">
-            <select id="task-category" name="category_id" className="select select-lg" defaultValue={editing ? editing.category_id ?? "" : categories.find((c) => c.name === "Personal")?.id ?? ""}>
-              <option value="">No category</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Due date" htmlFor="task-due">
-            <input id="task-due" name="due_date" type="date" className="input" defaultValue={editing ? editing.due_date ?? "" : today} />
-          </Field>
-        </div>
+        <Field label="Category" htmlFor="task-category">
+          {/* key: start again once the categories have loaded, so the default ("Personal") is picked */}
+          <select key={categories.length} id="task-category" name="category_id" className="select select-lg" defaultValue={editing ? editing.category_id ?? "" : categories.find((c) => c.name === "Personal")?.id ?? ""}>
+            <option value="">No category</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+        </Field>
+        <TaskDates key={editing?.id ?? "new"} due={editing ? editing.due_date ?? "" : today} end={editing?.end_date ?? ""} />
         <fieldset>
           <legend className="label">Priority</legend>
           <div className="grid grid-cols-3 gap-2">
