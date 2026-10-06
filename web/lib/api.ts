@@ -1,8 +1,8 @@
 import { mutate } from "swr";
 import { createClient } from "./supabase/client";
 
-// All data goes through the Node.js API, which checks the sign-in token on every request.
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000").replace(/\/$/, "");
+// All data goes through this app's own API (app/api), which checks the sign-in token on every request.
+const API_URL = "/api";
 
 export class ApiError extends Error {
   constructor(public status: number, message: string, public details?: unknown) {
@@ -44,7 +44,7 @@ export async function api<T>(path: string, options: Options = {}): Promise<T> {
     }
   } catch (error) {
     if (error instanceof ApiError) throw error;
-    throw new ApiError(0, "Cannot reach the server. Check your internet connection, or that the API is running.");
+    throw new ApiError(0, "Cannot reach the server. Check your internet connection.");
   }
 
   const body = await res.json().catch(() => null);

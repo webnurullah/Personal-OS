@@ -1,0 +1,17 @@
+import { handle, ok } from "@/lib/server/api";
+import { must } from "@/lib/server/http";
+import { checkTimes, EventFields } from "@/lib/server/schemas";
+import { nonEmpty, parse, s } from "@/lib/server/validate";
+
+// Changes apply to the whole series of a repeating event.
+export const PATCH = handle<{ id: string }>(async ({ db, params, body }) => {
+  const id = parse(s.id, params.id);
+  const changes = checkTimes(nonEmpty(parse(EventFields.partial().strict(), await body())));
+  return must(await db.from("events").update(changes).eq("id", id).select().single());
+});
+
+export const DELETE = handle<{ id: string }>(async ({ db, params }) => {
+  const id = parse(s.id, params.id);
+  must(await db.from("events").delete().eq("id", id).select("id").single());
+  return ok;
+});
