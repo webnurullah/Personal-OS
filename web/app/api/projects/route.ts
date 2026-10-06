@@ -1,0 +1,26 @@
+import { handle } from "@/lib/server/api";
+import { must } from "@/lib/server/http";
+import { summarise } from "@/lib/projects";
+import { checkProjectDates, ProjectCreate } from "@/lib/server/schemas";
+import { fetchAll } from "@/lib/server/paging";
+import { parse, z } from "@/lib/server/validate";
+
+// Your projects with task progress and how they stand in time (all worked out here, never stored).
+// ?lite=1 is the short list for pickers (the task form): id, name, colour and status only.
+export const GET = handle(async ({ db, query, today }) => {
+  const { lite } = parse(z.object({ lite: z.literal("1").optional() }), query);
+  if (lite) return { items: must(await db.from("projects").select("id, name, color, status").order("name")) };
+
+  const [projects, tasks] = await Promise.all([
+    db.from("projects").select("id, name, kind, status, color, client, goal, start_date, due_date, created_at").order("created_at", { ascending: false }).then(must),
+    // Past 1,000 linked tasks Supabase would cut the list short, so it is read page by page.
+    fetchAll(() => db.from("tasks").select("project_id, done_at").not("project_id", "is", null).order("id")),
+  ]);
+  const t = await today();
+  return { today: t, items: summarise(projects, tasks, t) };
+});
+
+export const POST = handle(async ({ db, body }) => {
+  const input = checkProjectDates(parse(ProjectCreate, await body()));
+  return must(await db.from("projects").insert(input).select().single());
+}, { status: 201 });

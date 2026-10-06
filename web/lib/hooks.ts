@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import useSWR from "swr";
-import type { Category, List } from "./types";
+import type { Category, List, ProjectChoice } from "./types";
 
 /** Your task/event/goal categories, plus a lookup by id. */
 export function useCategories() {
@@ -10,6 +10,14 @@ export function useCategories() {
   const items = data?.items ?? [];
   const byId = new Map(items.map((c) => [c.id, c]));
   return { categories: items, byId };
+}
+
+/** Your projects as a short list (for pickers and badges), plus a lookup by id. */
+export function useProjects() {
+  const { data } = useSWR<List<ProjectChoice>>("/projects?lite=1");
+  const items = data?.items ?? [];
+  const byId = new Map(items.map((p) => [p.id, p]));
+  return { projects: items, byId };
 }
 
 /** Minutes since midnight on this device, updated every minute (for "Now" markers). */

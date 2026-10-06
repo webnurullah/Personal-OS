@@ -59,12 +59,12 @@ export async function api<T>(path: string, options: Options = {}): Promise<T> {
 export const fetcher = <T,>(path: string) => api<T>(path);
 
 /**
- * Reload cached API data whose path starts with any of the given prefixes (always includes the dashboard).
+ * Reload cached API data whose path starts with any of the given prefixes (always includes the dashboard, the bell and the projects).
  * The reload runs in the background and this returns at once, so a form can close as soon as the
  * save itself succeeded (one trip to the server instead of two); the lists update a moment later.
  */
 export function refresh(...prefixes: string[]) {
-  const all = [...prefixes, "/dashboard", "/notifications"];
+  const all = [...prefixes, "/dashboard", "/notifications", "/projects"];
   mutate((key) => typeof key === "string" && all.some((p) => key === p || key.startsWith(`${p}?`) || key.startsWith(`${p}/`))).catch(() => undefined);
   return Promise.resolve();
 }

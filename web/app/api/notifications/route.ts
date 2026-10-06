@@ -25,7 +25,7 @@ export const GET = handle(async ({ db, profile: getProfile }) => {
   const notify = (profile.notify || {}) as Record<string, boolean>;
   const nowMinutes = minutesNowIn(zone);
 
-  const [openTasks, bills, events, blocks, habitData, jobs] = await Promise.all([
+  const [openTasks, bills, events, blocks, habitData, jobs, projects] = await Promise.all([
     db.from("tasks").select("due_date, end_date").is("done_at", null).lte("due_date", today).then(must),
     db.from("bills").select("*").is("paid_at", null).lte("due_date", addDays(today, 3)).order("due_date").then(must),
     db.from("events").select("*").lte("event_date", today).or(`repeat.neq.none,event_date.eq.${today}`).then(must),
@@ -33,6 +33,8 @@ export const GET = handle(async ({ db, profile: getProfile }) => {
     notify.habit_reminder ? loadHabits(db, today) : Promise.resolve(null),
     // Saved jobs (not applied yet) whose last date to apply is within 3 days.
     db.from("job_applications").select("id, title, company, deadline").eq("status", "saved").gte("deadline", today).lte("deadline", addDays(today, 3)).order("deadline").then(must),
+    // Active projects with a due date (ongoing projects have none) that is within 3 days or already past.
+    db.from("projects").select("id, name, due_date").eq("status", "active").not("due_date", "is", null).lte("due_date", addDays(today, 3)).order("due_date").then(must),
   ]);
 
   const items: Item[] = [];
@@ -58,6 +60,12 @@ export const GET = handle(async ({ db, profile: getProfile }) => {
     const days = daysBetween(today, job.deadline!);
     const when = days === 0 ? "today" : days === 1 ? "tomorrow" : `in ${plural(days, "day")}`;
     items.push({ id: `job-${job.id}`, icon: "briefcase", tone: days <= 1 ? "rose" : "amber", title: `Apply for ${job.title}${job.company ? ` (${job.company})` : ""}: last day ${when}`, meta: "Job Apply", href: "/jobs" });
+  }
+
+  for (const project of projects) {
+    const days = daysBetween(today, project.due_date!);
+    const when = days < 0 ? `overdue by ${plural(-days, "day")}` : days === 0 ? "due today" : `due in ${plural(days, "day")}`;
+    items.push({ id: `project-${project.id}`, icon: "briefcase", tone: days < 0 ? "rose" : "amber", title: `${project.name} is ${when}`, meta: "Projects", href: `/projects/${project.id}` });
   }
 
   // The next event still to come today.

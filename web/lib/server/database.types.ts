@@ -713,6 +713,59 @@ export type Database = {
 
         ];
       };
+      projects: {
+        Row: {
+          id: string;
+          user_id: string;
+          name: string;
+          kind: string;
+          status: string;
+          color: string;
+          client: string;
+          goal: string;
+          start_date: string | null;
+          due_date: string | null;
+          links: Json;
+          notes: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string;
+          name: string;
+          kind?: string;
+          status?: string;
+          color?: string;
+          client?: string;
+          goal?: string;
+          start_date?: string | null;
+          due_date?: string | null;
+          links?: Json;
+          notes?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          name?: string;
+          kind?: string;
+          status?: string;
+          color?: string;
+          client?: string;
+          goal?: string;
+          start_date?: string | null;
+          due_date?: string | null;
+          links?: Json;
+          notes?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+
+        ];
+      };
       reminders: {
         Row: {
           id: string;
@@ -806,6 +859,7 @@ export type Database = {
           user_id: string;
           title: string;
           category_id: string | null;
+          project_id: string | null;
           due_date: string | null;
           end_date: string | null;
           priority: string;
@@ -819,6 +873,7 @@ export type Database = {
           user_id?: string;
           title: string;
           category_id?: string | null;
+          project_id?: string | null;
           due_date?: string | null;
           end_date?: string | null;
           priority?: string;
@@ -832,6 +887,7 @@ export type Database = {
           user_id?: string;
           title?: string;
           category_id?: string | null;
+          project_id?: string | null;
           due_date?: string | null;
           end_date?: string | null;
           priority?: string;
@@ -846,6 +902,13 @@ export type Database = {
             columns: ['category_id'];
             isOneToOne: false;
             referencedRelation: 'categories';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'tasks_project_id_fkey';
+            columns: ['project_id'];
+            isOneToOne: false;
+            referencedRelation: 'projects';
             referencedColumns: ['id'];
           },
         ];

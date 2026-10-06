@@ -26,8 +26,8 @@ const ENDPOINTS: [string, string, string, z.ZodType?][] = [
   ["DELETE", "/categories/:id", "Delete a category (its items stay, uncategorised)"],
 
   ["GET", "/tasks", "Open tasks plus tasks done in the last 14 days"],
-  ["POST", "/tasks", "New task (end_date only for tasks running over several days)", TaskCreate],
-  ["PATCH", "/tasks/:id", "Change a task; {done:true} ticks it, {done:false} unticks it", TaskUpdate],
+  ["POST", "/tasks", "New task (end_date only for tasks running over several days)", TaskCreate.omit({ project_id: true })],
+  ["PATCH", "/tasks/:id", "Change a task; {done:true} ticks it, {done:false} unticks it", TaskUpdate.omit({ project_id: true })],
   ["DELETE", "/tasks/:id", "Delete a task"],
 
   ["GET", "/events?from=YYYY-MM-DD&to=YYYY-MM-DD", "Calendar events between two dates (repeats expanded)"],

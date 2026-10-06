@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, type FormEvent, type ReactNode } from "react";
+import Link from "next/link";
 import useSWR from "swr";
 import { CalendarClock, CalendarDays, ChevronDown, CircleAlert, CircleCheck, Flag, Lightbulb, Plus, Search, SearchX, Sun, Trash2 } from "lucide-react";
 import { api, errorMessage, refresh } from "@/lib/api";
 import { colorOf } from "@/lib/colors";
 import { addDays } from "@/lib/dates";
 import { pct, plural } from "@/lib/format";
-import { useCategories } from "@/lib/hooks";
+import { useCategories, useProjects } from "@/lib/hooks";
 import { useNewAction } from "@/lib/new-action";
 import { isOnDay, isOverdue, isUpcoming, taskDateLabel } from "@/lib/tasks";
 import type { List, Priority, Task } from "@/lib/types";
@@ -27,6 +28,7 @@ const PRIORITY: Record<Priority, { label: string; color: string }> = {
 export function TasksView() {
   const { data, error, mutate } = useSWR<List<Task>>("/tasks");
   const { categories, byId } = useCategories();
+  const { byId: projectsById } = useProjects();
   const { toast, confirm } = useFeedback();
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
@@ -163,6 +165,7 @@ export function TasksView() {
                     <ul className="mt-1.5">
                       {group.items.map((task) => {
                         const category = task.category_id ? byId.get(task.category_id) : undefined;
+                        const project = task.project_id ? projectsById.get(task.project_id) : undefined;
                         const overdue = isOverdue(task, today);
                         return (
                           <li key={task.id} className="group flex items-center gap-3 rounded-xl px-3 py-2.5 transition hover:bg-slate-50">
@@ -180,6 +183,11 @@ export function TasksView() {
                                 </span>
                               </span>
                             </button>
+                            {project && (
+                              <Link href={`/projects/${project.id}`} className={`badge max-w-32 truncate ${colorOf(project.color).badge}`} title={`Project: ${project.name}`}>
+                                {project.name}
+                              </Link>
+                            )}
                             {category && <span className={`badge ${colorOf(category.color).badge}`}>{category.name}</span>}
                             <button type="button" className="btn btn-ghost btn-sm btn-icon opacity-0 transition group-hover:opacity-100 focus:opacity-100" onClick={() => remove(task)} aria-label={`Delete ${task.title}`}>
                               <Trash2 className="size-4" />
@@ -299,9 +307,12 @@ function TaskDates({ due, end }: { due: string; end: string }) {
 /** New task, or edit an existing one. */
 function TaskModal({ task, today, onClose }: { task: Task | "new" | null; today: string; onClose: () => void }) {
   const { categories } = useCategories();
+  const { projects, byId: projectsById } = useProjects();
   const { toast } = useFeedback();
   const [busy, setBusy] = useState(false);
   const editing = task && task !== "new" ? task : null;
+  // Done projects are not offered for new work, but a task keeps showing the project it is already in.
+  const projectChoices = projects.filter((p) => p.status !== "done" || p.id === editing?.project_id);
 
   const submit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -314,9 +325,14 @@ function TaskModal({ task, today, onClose }: { task: Task | "new" | null; today:
       priority: String(form.get("priority")),
       notes: String(form.get("notes")),
     };
+    // The project is only sent when it changed ("" = no project). While the project list is still loading, a task's
+    // own project is not in it yet: then leave the project alone instead of unlinking the task by mistake.
+    const project = String(form.get("project_id") ?? "") || null;
+    const known = !editing?.project_id || projectsById.has(editing.project_id);
+    const projectChange = known && project !== (editing?.project_id ?? null) ? { project_id: project } : {};
     setBusy(true);
     try {
-      await api(editing ? `/tasks/${editing.id}` : "/tasks", { method: editing ? "PATCH" : "POST", body });
+      await api(editing ? `/tasks/${editing.id}` : "/tasks", { method: editing ? "PATCH" : "POST", body: { ...body, ...projectChange } });
       await refresh("/tasks");
       toast(editing ? "Task saved" : "Task added");
       onClose();
@@ -349,6 +365,16 @@ function TaskModal({ task, today, onClose }: { task: Task | "new" | null; today:
             ))}
           </select>
         </Field>
+        {(projectChoices.length > 0 || editing?.project_id) && (
+          <Field label="Project" htmlFor="task-project">
+            <select key={projects.length} id="task-project" name="project_id" className="select select-lg" defaultValue={editing?.project_id ?? ""}>
+              <option value="">No project</option>
+              {projectChoices.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </Field>
+        )}
         <TaskDates key={editing?.id ?? "new"} due={editing ? editing.due_date ?? "" : today} end={editing?.end_date ?? ""} />
         <fieldset>
           <legend className="label">Priority</legend>

@@ -30,6 +30,10 @@ Frontend and backend are **one Vercel project**. Every push to GitHub `main` put
    1. `20261001000000_init.sql`
    2. `20261001000100_sample_data.sql`
    3. `20261006000000_task_end_date.sql` (end date for tasks)
+   4. `20261006000100_security_hardening.sql` (Supabase security advisor fixes)
+   5. `20261006000200_foreign_key_indexes.sql` (speed)
+   6. `20261006000300_job_applications.sql` (Applications → Job Apply, your skills)
+   7. `20261007000000_projects.sql` (Projects, and a project link on tasks)
 
    Already set up? Only run the files you have not run yet. Each new file is listed here when it is added.
 3. **Authentication → URL Configuration**

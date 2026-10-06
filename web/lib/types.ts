@@ -1,4 +1,5 @@
 // The shapes of the API's answers (see api/src/routes).
+import type { Timeframe } from "./projects";
 
 export type ColorName =
   | "white" | "slate" | "blue" | "sky" | "cyan" | "teal" | "emerald" | "lime"
@@ -35,6 +36,8 @@ export type Task = {
   id: string;
   title: string;
   category_id: string | null;
+  /** The project this task belongs to (older cached answers may not have it). */
+  project_id?: string | null;
   due_date: string | null;
   /** Last day of a task that runs over several days (null = one day). */
   end_date: string | null;
@@ -267,3 +270,31 @@ export type JobAnalysis = {
   /** Things it could not find, to show next to the form. */
   hints: string[];
 };
+
+export type ProjectKind = "website" | "social" | "brand" | "other";
+export type ProjectStatus = "active" | "paused" | "done";
+export type ProjectLink = { label: string; url: string };
+
+/** A project as listed: its own facts plus what is worked out from its tasks and dates. */
+export type Project = {
+  id: string;
+  name: string;
+  kind: ProjectKind;
+  status: ProjectStatus;
+  color: ColorName;
+  client: string;
+  goal: string;
+  start_date: string | null;
+  /** No due date = an ongoing project. */
+  due_date: string | null;
+  created_at: string;
+  timeframe: Timeframe;
+  tasks_total: number;
+  tasks_done: number;
+  tasks_open: number;
+  percent: number;
+};
+export type ProjectDetail = { today: string; project: Project & { links: ProjectLink[]; notes: string }; tasks: Task[] };
+/** The short list for pickers (GET /projects?lite=1). */
+export type ProjectChoice = { id: string; name: string; color: ColorName; status: ProjectStatus };
+

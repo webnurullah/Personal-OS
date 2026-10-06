@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import useSWR from "swr";
-import { Banknote, CalendarDays, CalendarPlus, CircleDot, FileText, GraduationCap, HeartPulse, NotebookPen, PiggyBank, Plus, Repeat, Search, SquareCheck, Target, Timer, type LucideIcon } from "lucide-react";
+import { Banknote, CalendarDays, CalendarPlus, CircleDot, FileText, FolderKanban, GraduationCap, HeartPulse, NotebookPen, PiggyBank, Plus, Repeat, Search, SquareCheck, Target, Timer, type LucideIcon } from "lucide-react";
 import { formatDate } from "@/lib/dates";
 import type { SearchItem } from "@/lib/types";
 import { NAV, SETTINGS_NAV } from "./nav";
@@ -13,6 +13,7 @@ type Command = { group: string; label: string; href: string; icon: LucideIcon; h
 const COMMANDS: Command[] = [
   ...[...NAV, SETTINGS_NAV].map((n) => ({ group: "Pages", label: n.label, href: n.href, icon: n.icon })),
   { group: "Quick actions", label: "New task", href: "/tasks", icon: Plus, action: true },
+  { group: "Quick actions", label: "New project", href: "/projects", icon: FolderKanban, action: true },
   { group: "Quick actions", label: "New event", href: "/calendar", icon: CalendarPlus, action: true },
   { group: "Quick actions", label: "Log a study session", href: "/learning", icon: Timer, action: true },
   { group: "Quick actions", label: "Add a transaction", href: "/finance", icon: Banknote, action: true },
@@ -23,7 +24,7 @@ const COMMANDS: Command[] = [
 ];
 
 const RESULT_ICONS: Record<string, LucideIcon> = {
-  Task: SquareCheck, Note: FileText, Goal: Target, Event: CalendarDays, Habit: Repeat, Course: GraduationCap, Transaction: PiggyBank,
+  Task: SquareCheck, Note: FileText, Goal: Target, Event: CalendarDays, Habit: Repeat, Course: GraduationCap, Transaction: PiggyBank, Project: FolderKanban,
 };
 
 /** Ctrl+K: jump to a page, start a quick action, or search your data. */

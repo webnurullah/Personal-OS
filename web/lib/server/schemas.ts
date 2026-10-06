@@ -41,6 +41,8 @@ export const CategoryCreate = z.object({
 export const TaskCreate = z.object({
   title: s.text(200),
   category_id: s.id.nullable().optional(),
+  /** The project this task belongs to (null = none). */
+  project_id: s.id.nullable().optional(),
   due_date: s.date.nullable().optional(),
   /** Optional last day, for tasks that run over several days. */
   end_date: s.date.nullable().optional(),
@@ -249,3 +251,30 @@ export const JobFields = z.object({
 
 /** A new job: the title is the only thing that must be there. */
 export const JobCreate = JobFields.required({ title: true });
+
+// ---------- Projects ----------
+export const ProjectLink = z.object({ label: s.text(60), url: z.url({ protocol: /^https?$/ }).max(500) }).strict();
+
+export const ProjectFields = z.object({
+  name: s.text(120),
+  kind: z.enum(["website", "social", "brand", "other"]),
+  status: z.enum(["active", "paused", "done"]),
+  color: s.color,
+  /** Who it is for (empty = your own project). */
+  client: s.optionalText(120),
+  goal: s.optionalText(300),
+  /** Both optional: a project with no due date is ongoing. */
+  start_date: s.date.nullable(),
+  due_date: s.date.nullable(),
+  links: z.array(ProjectLink).max(12),
+  notes: s.optionalText(10000),
+}).partial().strict();
+
+/** A new project: the name is the only thing that must be there. */
+export const ProjectCreate = ProjectFields.required({ name: true });
+
+/** The due date cannot come before the start date. */
+export function checkProjectDates<T extends { start_date?: string | null; due_date?: string | null }>(p: T): T {
+  if (p.start_date && p.due_date && p.due_date < p.start_date) throw new HttpError(400, "The due date cannot be before the start date.");
+  return p;
+}

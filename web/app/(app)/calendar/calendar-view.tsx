@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from "react";
 import useSWR from "swr";
 import Link from "next/link";
-import { BriefcaseBusiness, ChevronLeft, ChevronRight, Plus, Repeat, Trash2 } from "lucide-react";
+import { BriefcaseBusiness, ChevronLeft, FolderKanban, ChevronRight, Plus, Repeat, Trash2 } from "lucide-react";
 import { api, errorMessage, refresh } from "@/lib/api";
 import { colorOf } from "@/lib/colors";
 import { addDays, addMonths, daysBetween, formatDate, monthGrid, relativeDay, weekdayNames } from "@/lib/dates";
@@ -19,7 +19,9 @@ import { LoadError, PageHeader, PageSkeleton } from "@/components/ui/states";
 
 /** A job whose last day to apply is this date (saved jobs only). */
 type JobDeadline = { id: string; title: string; company: string; date: string };
-type EventsResponse = List<CalendarEvent> & { today: string; from: string; to: string; deadlines?: JobDeadline[] };
+/** A project's due date (active projects with a due date only). */
+type ProjectDate = { id: string; project_id: string; title: string; kind: "deadline"; date: string; color: string };
+type EventsResponse = List<CalendarEvent> & { today: string; from: string; to: string; deadlines?: JobDeadline[]; project_dates?: ProjectDate[] };
 const byTime = (a: CalendarEvent, b: CalendarEvent) => (a.all_day === b.all_day ? (a.start_time ?? "").localeCompare(b.start_time ?? "") : a.all_day ? -1 : 1);
 
 export function CalendarView() {
@@ -50,8 +52,10 @@ export function CalendarView() {
 
   const eventsOn = (day: string) => data.items.filter((e) => e.date === day).sort(byTime);
   const deadlinesOn = (day: string) => (data.deadlines ?? []).filter((j) => j.date === day);
+  const projectDatesOn = (day: string) => (data.project_dates ?? []).filter((p) => p.date === day);
   const agenda = eventsOn(selected);
   const agendaDeadlines = deadlinesOn(selected);
+  const agendaProjects = projectDatesOn(selected);
   const diff = daysBetween(today, selected);
   const comingUp = (upcoming?.items ?? [])
     .filter((e) => e.date > today || (!e.all_day && e.start_time && minutesOf(e.start_time) > now))
@@ -105,6 +109,7 @@ export function CalendarView() {
             {grid.map((day, i) => {
               const list = eventsOn(day);
               const due = deadlinesOn(day);
+              const projectDue = projectDatesOn(day);
               const inMonth = day.slice(0, 7) === month;
               const isSelected = day === selected;
               return (
@@ -113,13 +118,18 @@ export function CalendarView() {
                   type="button"
                   onClick={() => pick(day)}
                   aria-pressed={isSelected}
-                  aria-label={`${formatDate(day, "long")}${list.length ? `, ${list.length} events` : ""}${due.length ? `, ${due.length} job deadlines` : ""}`}
+                  aria-label={`${formatDate(day, "long")}${list.length ? `, ${list.length} events` : ""}${due.length ? `, ${due.length} job deadlines` : ""}${projectDue.length ? `, ${projectDue.length} project due` : ""}`}
                   className={`flex min-h-20 min-w-0 flex-col gap-1 border-slate-100 p-1.5 text-left transition hover:bg-slate-50 sm:min-h-28 sm:p-2 ${i % 7 === 6 ? "" : "border-r"} ${i < 35 ? "border-b" : ""} ${isSelected ? "bg-blue-50/70 ring-2 ring-inset ring-blue-200" : inMonth ? "" : "bg-slate-50/60"}`}
                 >
                   <span className={`grid size-7 shrink-0 place-items-center rounded-full text-sm font-medium ${day === today ? "bg-blue-600 text-white" : inMonth ? "text-slate-700" : "text-slate-300"}`}>{Number(day.slice(8))}</span>
                   {due.slice(0, 2).map((j) => (
                     <span key={`${j.id}-due`} className="hidden truncate rounded-md bg-rose-50 px-1.5 py-0.5 text-[11px] font-medium text-rose-700 sm:block" title={`Last day to apply: ${j.title}`}>
                       Apply: {j.title}
+                    </span>
+                  ))}
+                  {projectDue.slice(0, 2).map((p) => (
+                    <span key={p.id} className={`hidden truncate rounded-md px-1.5 py-0.5 text-[11px] font-medium sm:block ${colorOf(p.color).badge}`} title={`Project due: ${p.title}`}>
+                      Due: {p.title}
                     </span>
                   ))}
                   {list.slice(0, 3).map((e) => (
@@ -129,10 +139,13 @@ export function CalendarView() {
                     </span>
                   ))}
                   {list.length > 3 && <span className="hidden px-1.5 text-[11px] font-medium text-slate-500 sm:block">+{list.length - 3} more</span>}
-                  {(list.length > 0 || due.length > 0) && (
+                  {(list.length > 0 || due.length > 0 || projectDue.length > 0) && (
                     <span className="flex flex-wrap gap-0.5 sm:hidden">
                       {due.slice(0, 2).map((j) => (
                         <span key={`${j.id}-dot-due`} className="size-1.5 rounded-full bg-rose-500" />
+                      ))}
+                      {projectDue.slice(0, 2).map((p) => (
+                        <span key={`${p.id}-dot`} className={`size-1.5 rounded-full ${colorOf(p.color).dot}`} />
                       ))}
                       {list.slice(0, 4).map((e) => (
                         <span key={`${e.id}-dot`} className={`size-1.5 rounded-full ${color(e).dot}`} />
@@ -158,6 +171,18 @@ export function CalendarView() {
                 <Plus className="size-4" />
               </button>
             </div>
+            {agendaProjects.length > 0 && (
+              <ul className="mt-4 space-y-1.5">
+                {agendaProjects.map((p) => (
+                  <li key={`${p.id}-agenda-due`}>
+                    <Link href={`/projects/${p.project_id}`} className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition hover:brightness-95 ${colorOf(p.color).badge}`}>
+                      <FolderKanban className="size-4 shrink-0" />
+                      <span className="min-w-0 truncate"><b className="font-semibold">Project due:</b> {p.title}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
             {agendaDeadlines.length > 0 && (
               <ul className="mt-4 space-y-1.5">
                 {agendaDeadlines.map((j) => (
@@ -194,7 +219,7 @@ export function CalendarView() {
                   </li>
                 ))}
               </ol>
-            ) : agendaDeadlines.length ? null : (
+            ) : agendaDeadlines.length || agendaProjects.length ? null : (
               <p className="mt-4 rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">Nothing planned. Enjoy the free time!</p>
             )}
           </section>

@@ -22,6 +22,7 @@ npm run dev                  # http://localhost:3000 · API at /api
 | `components/shell/assistant.tsx`, `lib/quickadd.ts`, `lib/parse-date.ts` | Quick Add (Ctrl+J): typed commands (`task call bank tomorrow !high`, `spent 450 lunch bkash` …) read by rules, no AI needed |
 | `app/api/assistant`, `lib/server/assistant/` | Optional chat assistant (needs `ANTHROPIC_API_KEY`): Claude calls this app's own API (as you) through one `call_api` tool; `catalog.ts` lists the endpoints it may use |
 | `app/api/jobs`, `lib/server/jobs.ts`, `lib/job-extract.ts`, `lib/skills.ts`, `lib/jobs.ts` | Applications → Job Apply: read a job link (page job data + keyword rules; Claude when a key is set), find deadline/requirements/skills, compare with your skills |
+| `app/api/projects`, `app/(app)/projects`, `lib/projects.ts` | Projects: websites, social media, branding … with or without a due date (no due date = ongoing). Tasks link to a project; progress and "due in 5 days" / "running 34 days" are worked out, never stored |
 | `lib/api.ts` | The pages call the API through this, with the user's token (SWR keys are API paths) |
 | `lib/course.ts`, `lib/finance.ts` | Totals worked out in the browser, so numbers update while you type |
 | `components/ui/`, `components/shell/` | Shared building blocks; sidebar, top bar, notifications, Ctrl+K search |

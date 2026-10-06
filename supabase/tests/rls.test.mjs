@@ -69,9 +69,43 @@ await expectError('task end date without due date rejected', () => qa(`insert in
 const range = await qa(`insert into tasks (title, due_date, end_date) values ('Trip', '2026-10-06', '2026-10-09') returning end_date::text`);
 check('task with an end date saves', range[0]?.end_date === '2026-10-09');
 
+// Projects (20261007000000_projects.sql)
+const bakery = await qa(`insert into projects (name, due_date) values ('Bakery site', '2026-10-20') returning id, kind, status, color, start_date::text, due_date::text`);
+check('project saves with defaults', bakery[0]?.kind === 'other' && bakery[0].status === 'active' && bakery[0].color === 'blue' && bakery[0].start_date === null, JSON.stringify(bakery[0]));
+const ongoing = await qa(`insert into projects (name, kind) values ('Personal branding', 'brand') returning id, due_date`);
+check('a project with no dates (ongoing) is allowed', ongoing[0]?.due_date === null);
+const dated = await qa(`insert into projects (name, start_date, due_date) values ('Same day', '2026-10-10', '2026-10-10') returning id`);
+check('start and due on the same day is allowed', dated.length === 1);
+await expectError('due date before start date rejected', () => qa(`insert into projects (name, start_date, due_date) values ('x', '2026-10-10', '2026-10-01')`), 'check constraint');
+await expectError('unknown project type rejected', () => qa(`insert into projects (name, kind) values ('x', 'game')`), 'check constraint');
+await expectError('unknown project status rejected', () => qa(`insert into projects (name, status) values ('x', 'lost')`), 'check constraint');
+await expectError('empty project name rejected', () => qa(`insert into projects (name) values ('')`), 'check constraint');
+await expectError('bad colour on a project rejected', () => qa(`insert into projects (name, color) values ('x', 'purple')`), 'color_name');
+await expectError('links must be a list', () => qa(`insert into projects (name, links) values ('x', '{"a": 1}')`), 'check constraint');
+await expectError('more than 12 links rejected', () => qa(`insert into projects (name, links) values ('x', (select jsonb_agg(jsonb_build_object('label', 'l', 'url', 'https://a.com')) from generate_series(1, 13)))`), 'check constraint');
+const twelve = await qa(`insert into projects (name, links) values ('Twelve links', (select jsonb_agg(jsonb_build_object('label', 'l', 'url', 'https://a.com')) from generate_series(1, 12))) returning jsonb_array_length(links)::int n`);
+check('12 links are allowed', twelve[0]?.n === 12);
+const touched = await qa(`update projects set name = 'Bakery website' where id = $1 returning updated_at > created_at as moved`, [bakery[0].id]);
+check('project "last edited" time updates', touched[0]?.moved === true);
+
+check("user B sees none of A's projects", (await qb('select count(*)::int n from projects'))[0].n === 0);
+check("user B cannot update A's project", (await qb(`update projects set name = 'hacked' where id = $1 returning id`, [bakery[0].id])).length === 0);
+check("user B cannot delete A's project", (await qb('delete from projects where id = $1 returning id', [bakery[0].id])).length === 0);
+await expectError('user B cannot insert a project for A', () => qb(`insert into projects (user_id, name) values ($1, 'x')`, [A]), 'row-level security');
+await expectError('signed-out visitor cannot read projects', () => qanon('select * from projects'), 'permission denied');
+
+// Tasks can belong to a project; deleting the project deletes its tasks (and only those).
+const before = (await qa('select count(*)::int n from tasks'))[0].n;
+await qa(`insert into tasks (title, project_id) values ('Design home page', $1), ('Build menu page', $1)`, [bakery[0].id]);
+check('tasks can be linked to a project', (await qa('select count(*)::int n from tasks where project_id = $1', [bakery[0].id]))[0].n === 2);
+await qa('delete from projects where id = $1', [bakery[0].id]);
+check('deleting a project deletes its tasks', (await qa('select count(*)::int n from tasks where project_id = $1', [bakery[0].id]))[0].n === 0);
+check('other tasks are untouched by a project delete', (await qa('select count(*)::int n from tasks'))[0].n === before);
+
 await qa('select delete_my_data()');
 check('delete_my_data empties the account', (await qa('select count(*)::int n from tasks'))[0].n === 0 && (await qa('select count(*)::int n from transactions'))[0].n === 0);
 check('delete_my_data keeps profile and recreates defaults', (await qa('select count(*)::int n from profiles'))[0].n === 1 && (await qa('select count(*)::int n from categories'))[0].n === 6);
+check('delete_my_data leaves projects alone (the delete-all route removes them first)', (await qa('select count(*)::int n from projects'))[0].n >= 1);
 check("user B unaffected by A's delete", (await qb('select count(*)::int n from categories'))[0].n === 6);
 
 await db.exec(`delete from profiles where id = '${B}'; delete from categories where user_id = '${B}';`);
