@@ -8,8 +8,8 @@ const caveat = Caveat({ subsets: ["latin"], weight: ["500", "600"], variable: "-
 const bengali = Noto_Sans_Bengali({ subsets: ["bengali"], weight: ["400", "600", "700"], variable: "--font-bengali", display: "swap" });
 
 export const metadata: Metadata = {
-  title: { default: "Nurullah POS", template: "%s · Nurullah POS" },
-  description: "Personal life management system: tasks, habits, goals, learning, money and health in one place.",
+  title: { default: "Personal OS", template: "%s · POS" },
+  description: "life management system: tasks, habits, goals, learning, money and health in one place.",
   // A private app: keep it out of search engines.
   robots: { index: false, follow: false },
 };
