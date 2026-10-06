@@ -229,12 +229,11 @@ export function Assistant() {
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="fixed bottom-5 right-5 z-30 flex items-center gap-2 rounded-full bg-linear-to-br from-blue-600 to-indigo-600 py-3 pl-4 pr-5 text-sm font-semibold text-white shadow-lg shadow-blue-600/30 transition hover:shadow-xl hover:shadow-blue-600/40"
+          className="fixed bottom-4 right-4 z-30 grid size-13 place-items-center rounded-full bg-linear-to-br from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-600/30 transition hover:scale-105 hover:shadow-xl hover:shadow-blue-600/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 sm:bottom-5 sm:right-5 sm:size-14"
           aria-label={`Open ${title} (Ctrl+J)`}
           title={`${title} (Ctrl+J)`}
         >
-          <Sparkles className="size-5" />
-          {ai ? "Ask POS" : "Quick Add"}
+          <Sparkles className="size-6" />
         </button>
       )}
 
