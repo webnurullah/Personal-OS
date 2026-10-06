@@ -120,6 +120,28 @@ await db.exec(`delete from profiles where id = '${B}'; delete from categories wh
 const ensured = await qb('select id from ensure_profile()');
 check('ensure_profile repairs a missing profile', ensured[0].id === B && (await qb('select count(*)::int n from categories'))[0].n === 6);
 
+// Profile photo (20261008000000_profile_photo.sql)
+const file = (uid, ext = 'jpg') => `${uid}/aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee.${ext}`;
+const bucket = (await db.query(`select public, file_size_limit::int as max, allowed_mime_types from storage.buckets where id = 'avatars'`)).rows[0];
+check('avatars bucket is public, capped at 512 KB, images only', bucket?.public === true && bucket.max === 524288 && bucket.allowed_mime_types.join() === 'image/jpeg,image/png,image/webp', JSON.stringify(bucket));
+check('a profile starts without a photo', (await qa('select avatar_path from profiles'))[0].avatar_path === null);
+check('profile can remember its photo path', (await qa('update profiles set avatar_path = $1 returning avatar_path', [file(A)]))[0].avatar_path === file(A));
+for (const [name, bad] of [['no folder', 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee.jpg'], ['a path that climbs out', `${A}/../x.jpg`], ['another file type', file(A, 'gif')], ['a long name', `${A}/${'a'.repeat(300)}.jpg`], ['upper case', file(A).toUpperCase()]]) {
+  await expectError(`profile rejects a photo path with ${name}`, () => qa('update profiles set avatar_path = $1', [bad]), 'profiles_avatar_path_check');
+}
+check('profile can forget its photo', (await qa('update profiles set avatar_path = null returning avatar_path'))[0].avatar_path === null);
+
+check('you can add a picture to your own folder', (await qa(`insert into storage.objects (bucket_id, name, owner_id) values ('avatars', $1, $2) returning name`, [file(A), A])).length === 1);
+await expectError("you cannot add a picture to someone else's folder", () => qb(`insert into storage.objects (bucket_id, name, owner_id) values ('avatars', $1, $2)`, [file(A), B]), 'row-level security');
+await db.exec(`insert into storage.buckets (id, name) values ('uploads', 'uploads')`);
+await expectError('you cannot add files to other buckets', () => qa(`insert into storage.objects (bucket_id, name, owner_id) values ('uploads', $1, $2)`, [file(A), A]), 'violates');
+await expectError('a signed-out visitor cannot add a picture', () => qanon(`insert into storage.objects (bucket_id, name) values ('avatars', $1)`, [file(A)]), 'permission denied');
+check("you cannot look up someone else's pictures", (await qb(`select name from storage.objects where bucket_id = 'avatars'`)).length === 0);
+check('you can look up your own pictures', (await qa(`select name from storage.objects where bucket_id = 'avatars'`)).length === 1);
+check("you cannot remove someone else's picture", (await qb(`delete from storage.objects where name = $1 returning id`, [file(A)])).length === 0);
+check('you can remove your own picture', (await qa(`delete from storage.objects where name = $1 returning id`, [file(A)])).length === 1);
+check('nothing in the bucket can be changed in place (no update policy)', (await qa(`update storage.objects set name = name returning id`)).length === 0);
+
 // Security advisor fixes (20261006000100_security_hardening.sql)
 const fn = (await db.query(`select proconfig from pg_proc where oid = 'public.set_updated_at()'::regprocedure`)).rows[0];
 check('set_updated_at has a fixed search path', JSON.stringify(fn.proconfig).includes('search_path'), JSON.stringify(fn.proconfig));

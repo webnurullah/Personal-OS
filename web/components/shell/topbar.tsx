@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import useSWR from "swr";
@@ -15,15 +16,24 @@ import { Icon } from "../ui/icon";
 import { Dropdown } from "./dropdown";
 import { activeItem } from "./nav";
 
-export function Avatar({ className }: { className: string }) {
+/** Your profile photo, or a small drawing until you add one (also when the photo cannot be loaded). */
+export function Avatar({ className, src }: { className: string; src?: string | null }) {
+  const [broken, setBroken] = useState<string | null>(null);
+  const photo = src && broken !== src ? src : null;
   return (
     <span className={`${className} block shrink-0 overflow-hidden rounded-full shadow-sm ring-2 ring-white`}>
-      <svg viewBox="0 0 40 40" className="block size-full" aria-hidden>
-        <rect width="40" height="40" fill="#cfe3fb" />
-        <circle cx="28" cy="13" r="5" fill="#fde68a" />
-        <path d="M0 29 L11 18 L18 25 L26 16 L40 28 V40 H0Z" fill="#9fd9b0" />
-        <path d="M0 33 C8 29 16 31 22 33 S34 30 40 32 V40 H0Z" fill="#5fbf7f" />
-      </svg>
+      {photo ? (
+        // A plain <img>: the picture is already a small square, so the Next.js image optimizer would only add a hop.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={photo} alt="" className="block size-full object-cover" decoding="async" draggable={false} onError={() => setBroken(photo)} />
+      ) : (
+        <svg viewBox="0 0 40 40" className="block size-full" aria-hidden>
+          <rect width="40" height="40" fill="#cfe3fb" />
+          <circle cx="28" cy="13" r="5" fill="#fde68a" />
+          <path d="M0 29 L11 18 L18 25 L26 16 L40 28 V40 H0Z" fill="#9fd9b0" />
+          <path d="M0 33 C8 29 16 31 22 33 S34 30 40 32 V40 H0Z" fill="#5fbf7f" />
+        </svg>
+      )}
     </span>
   );
 }
@@ -89,7 +99,11 @@ function Notifications() {
   );
 }
 
-function ProfileMenu() {
+/**
+ * The profile button and its menu. On phones and tablets it is just the round photo at the left of the bar;
+ * on a wide screen it also shows your name and sits at the right.
+ */
+function ProfileMenu({ compact = false }: { compact?: boolean }) {
   const { profile } = useProfile();
   const router = useRouter();
   const item = "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50";
@@ -104,23 +118,28 @@ function ProfileMenu() {
   return (
     <Dropdown
       label="Account menu"
+      align={compact ? "left" : "right"}
       panelClassName="w-64 p-1.5"
-      buttonClassName="flex items-center gap-3 rounded-xl p-1 transition hover:bg-slate-100 sm:pr-2"
+      buttonClassName={compact ? "flex items-center rounded-full transition hover:opacity-85" : "flex items-center gap-3 rounded-xl p-1 transition hover:bg-slate-100 sm:pr-2"}
       button={
         <>
-          <Avatar className="size-10" />
-          <span className="hidden text-left leading-tight xl:block">
-            <span className="block text-sm font-semibold text-slate-800">{profile?.full_name || "A Better You"}</span>
-            <span className="block text-xs text-slate-500">{profile?.tagline || "Every Day"}</span>
-          </span>
-          <ChevronDown className="hidden size-4 text-slate-500 sm:block" />
+          <Avatar className="size-10" src={profile?.avatar_url} />
+          {!compact && (
+            <>
+              <span className="hidden text-left leading-tight xl:block">
+                <span className="block text-sm font-semibold text-slate-800">{profile?.full_name || "A Better You"}</span>
+                <span className="block text-xs text-slate-500">{profile?.tagline || "Every Day"}</span>
+              </span>
+              <ChevronDown className="hidden size-4 text-slate-500 sm:block" />
+            </>
+          )}
         </>
       }
     >
       {(close) => (
         <>
           <div className="flex items-center gap-3 px-3 py-2.5">
-            <Avatar className="size-9" />
+            <Avatar className="size-9" src={profile?.avatar_url} />
             <div className="min-w-0 leading-tight">
               <p className="truncate text-sm font-semibold text-slate-900">{profile?.full_name || "Your profile"}</p>
               <p className="truncate text-xs text-slate-500">{profile?.email}</p>
@@ -149,14 +168,16 @@ export function Topbar({ onMenu, onSearch }: { onMenu: () => void; onSearch: () 
   const pathname = usePathname();
   const label = activeItem(pathname)?.label ?? "POS";
 
+  // Below the lg breakpoint the page menu opens from the right, so the profile photo takes the left;
+  // from lg up the menu is the always-open sidebar and the profile stays at the right.
   return (
     <header className="sticky top-0 z-20 border-b border-slate-200/70 bg-white/90 backdrop-blur">
       <div className="flex h-16 items-center gap-2 px-4 sm:h-18 sm:gap-3 sm:px-6 xl:px-8">
-        <button type="button" className="btn btn-ghost btn-icon -ml-2 lg:hidden" onClick={onMenu} aria-label="Open menu">
-          <Menu className="size-5" />
-        </button>
+        <div className="shrink-0 lg:hidden">
+          <ProfileMenu compact />
+        </div>
         <Link href="/" className="flex min-w-0 items-center gap-3">
-          <Leaf className="hidden size-8 shrink-0 fill-emerald-100 text-emerald-600 sm:block" />
+          <Leaf className="hidden size-8 shrink-0 fill-emerald-100 text-emerald-600 lg:block" />
           <span className="min-w-0">
             <span className="block truncate text-lg font-bold tracking-tight text-slate-900 sm:hidden">{label}</span>
             <span className="hidden truncate text-xl font-bold tracking-tight text-slate-900 sm:block">Life Management System</span>
@@ -177,8 +198,13 @@ export function Topbar({ onMenu, onSearch }: { onMenu: () => void; onSearch: () 
             <Search className="size-5" />
           </button>
           <Notifications />
-          <span className="mx-1 hidden h-8 w-px bg-slate-200 sm:block" />
-          <ProfileMenu />
+          <span className="mx-1 hidden h-8 w-px bg-slate-200 lg:block" />
+          <div className="hidden lg:block">
+            <ProfileMenu />
+          </div>
+          <button type="button" className="btn btn-ghost btn-icon -mr-2 lg:hidden" onClick={onMenu} aria-label="Open menu">
+            <Menu className="size-5" />
+          </button>
         </div>
       </div>
     </header>

@@ -8,7 +8,7 @@ import { APPLICATIONS_NAV, NAV, SETTINGS_NAV, activeItem, type NavItem } from ".
 
 function Hills() {
   return (
-    <svg viewBox="0 0 240 120" className="block w-full shrink-0 [@media(max-height:700px)]:hidden" aria-hidden>
+    <svg viewBox="0 0 240 120" className="block w-full shrink-0 [@media(max-height:700px)]:hidden max-lg:[@media(max-height:900px)]:hidden" aria-hidden>
       <path d="M0 58 C28 44 52 42 80 52 S138 36 172 46 S222 40 240 44 V120 H0Z" fill="#dde9e1" />
       <path d="M0 76 C36 62 70 66 104 74 S172 58 240 70 V120 H0Z" fill="#c3dccb" />
       <path d="M0 94 C46 82 88 88 126 94 S198 82 240 88 V120 H0Z" fill="#a6cbb1" />
@@ -48,7 +48,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
   return (
     <>
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex w-60 flex-col overflow-hidden border-r border-slate-200/70 bg-[#f2f5f9] transition-transform duration-300 lg:translate-x-0 ${open ? "translate-x-0" : "-translate-x-full"}`}
+        className={`fixed inset-y-0 z-40 flex w-60 flex-col overflow-hidden border-slate-200/70 bg-[#f2f5f9] transition-transform duration-300 max-lg:right-0 max-lg:border-l lg:left-0 lg:translate-x-0 lg:border-r ${open ? "translate-x-0" : "max-lg:translate-x-full"}`}
         aria-label="Main menu"
       >
         <div className="flex h-18 shrink-0 items-center gap-3 px-5">
@@ -70,7 +70,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
           <div className="mx-3 my-3 border-t border-slate-200/80" />
           <ul>{link(SETTINGS_NAV)}</ul>
         </nav>
-        <div className="shrink-0 px-4 [@media(max-height:820px)]:hidden">
+        <div className="shrink-0 px-4 [@media(max-height:820px)]:hidden max-lg:[@media(max-height:1000px)]:hidden">
           <figure className="rounded-2xl bg-white/70 px-4 py-4 text-center ring-1 ring-slate-200/60">
             <Sprout className="mx-auto size-5 text-emerald-500" />
             <blockquote className="mt-2 text-[13px] leading-relaxed text-slate-600">“A better life is a series of small, intentional choices.”</blockquote>

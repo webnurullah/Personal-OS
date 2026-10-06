@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import useSWR from "swr";
-import { Bell, Database, Download, KeyRound, Pencil, Plus, ShieldCheck, SlidersHorizontal, Sparkles, Tag, Trash2, User, X, type LucideIcon } from "lucide-react";
+import { Bell, Camera, Database, Download, KeyRound, Pencil, Plus, ShieldCheck, SlidersHorizontal, Sparkles, Tag, Trash2, User, X, type LucideIcon } from "lucide-react";
 import { api, download, errorMessage, refresh, refreshAll } from "@/lib/api";
 import { colorOf } from "@/lib/colors";
 import { createClient } from "@/lib/supabase/client";
@@ -13,6 +13,7 @@ import { useFeedback } from "@/components/ui/feedback";
 import { Modal, ModalActions } from "@/components/ui/modal";
 import { LoadError, PageHeader, PageSkeleton } from "@/components/ui/states";
 import { Avatar } from "@/components/shell/topbar";
+import { AvatarEditor } from "./avatar-editor";
 
 const TABS: { id: string; label: string; icon: LucideIcon }[] = [
   { id: "profile", label: "Profile", icon: User },
@@ -133,14 +134,8 @@ function ProfileTab({ profile }: { profile: Profile }) {
   return (
     <div className="space-y-5">
       <Panel title="Profile" text="How you appear in the app.">
+        <PhotoRow profile={profile} />
         <form onSubmit={submit} className="mt-6 space-y-5">
-          <div className="flex items-center gap-4">
-            <Avatar className="size-18 ring-4" />
-            <div>
-              <p className="font-semibold text-slate-900">{profile.full_name || "Your name"}</p>
-              <p className="text-sm text-slate-500">{profile.tagline || "Add a tagline below"}</p>
-            </div>
-          </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Name" htmlFor="p-name">
               <input id="p-name" name="full_name" className="input" maxLength={80} defaultValue={profile.full_name} autoComplete="name" />
@@ -159,6 +154,68 @@ function ProfileTab({ profile }: { profile: Profile }) {
         </form>
       </Panel>
       <PasswordPanel />
+    </div>
+  );
+}
+
+/** The round photo with its Upload / Change / Remove buttons. Big phone photos are fine: they are resized before they are sent. */
+function PhotoRow({ profile }: { profile: Profile }) {
+  const { mutate } = useSWR<Profile>("/profile");
+  const { toast } = useFeedback();
+  const input = useRef<HTMLInputElement>(null);
+  const [picked, setPicked] = useState<File | null>(null);
+  const [removing, setRemoving] = useState(false);
+  const hasPhoto = Boolean(profile.avatar_url);
+
+  const choose = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // so choosing the same picture again still counts
+    if (file) setPicked(file);
+  };
+
+  // Throws when it fails, so the editor stays open and shows the message.
+  const upload = async (picture: Blob) => {
+    const updated = await api<Profile>("/profile/avatar", { method: "POST", file: picture });
+    await mutate(updated, { revalidate: false });
+    setPicked(null);
+    toast("Profile photo saved");
+  };
+
+  const remove = async () => {
+    setRemoving(true);
+    try {
+      const updated = await api<Profile>("/profile/avatar", { method: "DELETE" });
+      await mutate(updated, { revalidate: false });
+      toast("Profile photo removed");
+    } catch (e) {
+      toast(errorMessage(e), "error");
+    } finally {
+      setRemoving(false);
+    }
+  };
+
+  return (
+    <div className="mt-6">
+      <div className="flex items-center gap-4">
+        <Avatar className="size-20 shrink-0 ring-4" src={profile.avatar_url} />
+        <div className="min-w-0">
+          <p className="truncate font-semibold text-slate-900">{profile.full_name || "Your name"}</p>
+          <p className="truncate text-sm text-slate-500">{profile.tagline || "Add a tagline below"}</p>
+        </div>
+      </div>
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <input ref={input} type="file" accept="image/*" className="sr-only" tabIndex={-1} aria-label="Choose a profile photo" onChange={choose} />
+        <button type="button" className="btn btn-secondary btn-sm" onClick={() => input.current?.click()}>
+          <Camera className="size-4" />
+          {hasPhoto ? "Change photo" : "Upload photo"}
+        </button>
+        {hasPhoto && (
+          <button type="button" className="btn btn-ghost btn-sm text-rose-600 hover:bg-rose-50" onClick={remove} disabled={removing}>
+            {removing ? "Removing…" : "Remove"}
+          </button>
+        )}
+      </div>
+      <AvatarEditor file={picked} onClose={() => setPicked(null)} onUse={upload} />
     </div>
   );
 }

@@ -15,6 +15,8 @@ export type Profile = {
   full_name: string;
   tagline: string;
   city: string;
+  /** Link to your profile photo; null until you upload one (older cached answers may not have it). */
+  avatar_url?: string | null;
   timezone: string;
   currency: Currency;
   week_start: number;

@@ -10,16 +10,21 @@ export class ApiError extends Error {
   }
 }
 
-type Options = { method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"; body?: unknown };
+type Options = {
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+  body?: unknown;
+  /** A file sent as it is (for example a picture), instead of a JSON body. */
+  file?: Blob;
+};
 
 async function send(path: string, options: Options, token: string | undefined) {
   return fetch(`${API_URL}${path}`, {
     method: options.method ?? "GET",
     headers: {
-      ...(options.body !== undefined ? { "Content-Type": "application/json" } : {}),
+      ...(options.file ? { "Content-Type": options.file.type || "application/octet-stream" } : options.body !== undefined ? { "Content-Type": "application/json" } : {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+    body: options.file ?? (options.body !== undefined ? JSON.stringify(options.body) : undefined),
     cache: "no-store",
   });
 }

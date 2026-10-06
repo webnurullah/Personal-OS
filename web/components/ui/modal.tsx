@@ -62,8 +62,8 @@ export function Modal({
   );
 }
 
-/** Cancel + main button row for the bottom of a form in a modal; `left` holds e.g. a Delete button. */
-export function ModalActions({ onCancel, submitLabel, busy, danger, left }: { onCancel: () => void; submitLabel: string; busy?: boolean; danger?: boolean; left?: ReactNode }) {
+/** Cancel + main button row for the bottom of a form in a modal; `left` holds e.g. a Delete button; `disabled` greys out the main button without saying "Saving…". */
+export function ModalActions({ onCancel, submitLabel, busy, danger, left, disabled }: { onCancel: () => void; submitLabel: string; busy?: boolean; danger?: boolean; left?: ReactNode; disabled?: boolean }) {
   return (
     <div className="mt-6 flex items-center justify-between gap-2">
       <div>{left}</div>
@@ -71,7 +71,7 @@ export function ModalActions({ onCancel, submitLabel, busy, danger, left }: { on
         <button type="button" className="btn btn-secondary" onClick={onCancel}>
           Cancel
         </button>
-        <button type="submit" className={`btn ${danger ? "btn-danger" : "btn-primary"}`} disabled={busy}>
+        <button type="submit" className={`btn ${danger ? "btn-danger" : "btn-primary"}`} disabled={busy || disabled}>
           {busy ? "Saving…" : submitLabel}
         </button>
       </div>

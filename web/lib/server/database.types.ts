@@ -654,6 +654,7 @@ export type Database = {
           full_name: string;
           tagline: string;
           city: string;
+          avatar_path: string | null;
           timezone: string;
           currency: string;
           week_start: number;
@@ -674,6 +675,7 @@ export type Database = {
           full_name?: string;
           tagline?: string;
           city?: string;
+          avatar_path?: string | null;
           timezone?: string;
           currency?: string;
           week_start?: number;
@@ -694,6 +696,7 @@ export type Database = {
           full_name?: string;
           tagline?: string;
           city?: string;
+          avatar_path?: string | null;
           timezone?: string;
           currency?: string;
           week_start?: number;

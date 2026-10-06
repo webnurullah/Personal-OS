@@ -35,6 +35,7 @@ Frontend and backend are **one Vercel project**. Every push to GitHub `main` put
    6. `20261006000300_job_applications.sql` (Applications → Job Apply, your skills)
    7. `20261007000000_projects.sql` (Projects, and a project link on tasks)
    8. `20261007000100_projects_archive.sql` (Archive for projects)
+   9. `20261008000000_profile_photo.sql` (profile photo: the `avatars` Storage bucket and its rules)
 
    Already set up? Only run the files you have not run yet. Each new file is listed here when it is added.
 3. **Authentication → URL Configuration**
