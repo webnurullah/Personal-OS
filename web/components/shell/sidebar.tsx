@@ -8,7 +8,7 @@ import { ARCHIVE_NAV, NAV, SETTINGS_NAV, activeItem, type NavItem } from "./nav"
 
 function Hills() {
   return (
-    <svg viewBox="0 0 240 120" className="block w-full shrink-0 [@media(max-height:700px)]:hidden max-lg:[@media(max-height:900px)]:hidden" aria-hidden>
+    <svg viewBox="0 0 240 120" className="block w-full shrink-0 [@media(max-height:1040px)]:hidden" aria-hidden>
       <path d="M0 58 C28 44 52 42 80 52 S138 36 172 46 S222 40 240 44 V120 H0Z" fill="#dde9e1" />
       <path d="M0 76 C36 62 70 66 104 74 S172 58 240 70 V120 H0Z" fill="#c3dccb" />
       <path d="M0 94 C46 82 88 88 126 94 S198 82 240 88 V120 H0Z" fill="#a6cbb1" />
@@ -71,7 +71,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
             {link(ARCHIVE_NAV)}
           </ul>
         </nav>
-        <div className="shrink-0 px-4 [@media(max-height:820px)]:hidden max-lg:[@media(max-height:1000px)]:hidden">
+        <div className="shrink-0 px-4 [@media(max-height:960px)]:hidden">
           <figure className="rounded-2xl bg-white/70 px-4 py-4 text-center ring-1 ring-slate-200/60">
             <Sprout className="mx-auto size-5 text-emerald-500" />
             <blockquote className="mt-2 text-[13px] leading-relaxed text-slate-600">“A better life is a series of small, intentional choices.”</blockquote>
