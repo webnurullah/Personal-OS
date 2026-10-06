@@ -290,6 +290,9 @@ export type Project = {
   /** When it was moved to the Archive (null = not archived). */
   archived_at: string | null;
   created_at: string;
+  /** The same moments as calendar days in your time zone (older saved answers may not have them). */
+  created_on?: string;
+  archived_on?: string | null;
   timeframe: Timeframe;
   tasks_total: number;
   tasks_done: number;

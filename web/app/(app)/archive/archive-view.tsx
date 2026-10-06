@@ -9,7 +9,7 @@ import { plural } from "@/lib/format";
 import { kindLabel } from "@/lib/projects";
 import type { List, Project } from "@/lib/types";
 import { EmptyState, LoadError, PageHeader, PageSkeleton } from "@/components/ui/states";
-import { KindIcon, refreshProjects, useProjectActions } from "../projects/shared";
+import { forgetProject, KindIcon, refreshProjects, useProjectActions } from "../projects/shared";
 
 /** Projects you have archived. From here a project can be restored, or deleted for good. */
 export function ArchiveView() {
@@ -29,6 +29,7 @@ export function ArchiveView() {
 
   const deleteIt = async (project: Project) => {
     if (!(await deleteForever(project))) return;
+    forgetProject(project.id);
     await leave(project);
     await refreshProjects();
   };
@@ -56,7 +57,7 @@ export function ArchiveView() {
                   {project.client || "Your own project"} · {kindLabel(project.kind)}
                 </p>
                 <p className="mt-0.5 text-xs text-slate-400">
-                  Archived {project.archived_at ? formatDate(project.archived_at.slice(0, 10), "short") : ""} ·{" "}
+                  Archived {project.archived_at ? formatDate(project.archived_on ?? project.archived_at.slice(0, 10), "short") : ""} ·{" "}
                   {project.tasks_total ? `${plural(project.tasks_total, "task")} (${project.tasks_done} done)` : "no tasks"}
                 </p>
               </div>

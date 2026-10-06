@@ -5,7 +5,7 @@ import { compareProjects, isHttpUrl, summarise, timeframe } from "../lib/project
 import { ProjectCreate, ProjectFields, TaskCreate, TaskUpdate } from "../lib/server/schemas.ts";
 
 const today = "2026-10-06";
-const project = (over: Partial<{ id: string; status: string; start_date: string | null; due_date: string | null; created_at: string }> = {}) => ({
+const project = (over: Partial<{ id: string; status: string; start_date: string | null; due_date: string | null; created_at: string; created_on: string }> = {}) => ({
   id: "p1", status: "active", start_date: null, due_date: null, created_at: "2026-09-01T10:00:00Z", ...over,
 });
 
@@ -37,6 +37,17 @@ test("a project with no due date is ongoing and shows how long it has been runni
   assert.equal(timeframe(project({ start_date: "2026-10-09" }), today).label, "Starts in 3 days");
   // Ongoing projects are never late, however long they run.
   assert.equal(timeframe(project({ start_date: "2020-01-01" }), today).tone, "none");
+});
+
+test("the day it was added follows the profile time zone, not UTC", () => {
+  // Added at 02:30 on 7 Oct in Bangladesh (UTC+6) = 20:30 on 6 Oct UTC. The server sends the local day.
+  const added = { created_at: "2026-10-06T20:30:00Z", created_on: "2026-10-07" };
+  assert.equal(timeframe(project(added), "2026-10-07").label, "Ongoing · started today");
+  assert.equal(timeframe(project(added), "2026-10-09").label, "Ongoing · running 2 days");
+  // Without the local day (an old cached project) it falls back to the UTC date.
+  assert.equal(timeframe(project({ created_at: "2026-10-06T20:30:00Z" }), "2026-10-07").label, "Ongoing · running 1 day");
+  // A start date always wins.
+  assert.equal(timeframe(project({ ...added, start_date: "2026-10-01" }), "2026-10-07").label, "Ongoing · running 6 days");
 });
 
 test("a dated project that has not started yet says when it starts", () => {

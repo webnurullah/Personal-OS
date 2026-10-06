@@ -18,7 +18,7 @@ import { useFeedback } from "@/components/ui/feedback";
 import { Modal } from "@/components/ui/modal";
 import { EmptyState, LoadError, PageSkeleton } from "@/components/ui/states";
 import { ProjectForm } from "../project-form";
-import { KindIcon, refreshProjects, TimeBadge, useProjectActions } from "../shared";
+import { forgetProject, KindIcon, refreshProjects, TimeBadge, useProjectActions } from "../shared";
 
 /** The project's task counts after `done` more finished and `total` more tasks (the page updates before the server answers). */
 function recount(project: ProjectDetail["project"], done: number, total: number): ProjectDetail["project"] {
@@ -38,18 +38,17 @@ export function ProjectView({ id }: { id: string }) {
   const [gone, setGone] = useState(false);
 
   if (gone) return <PageSkeleton />;
-  if (error && !data) {
-    if (error instanceof ApiError && (error.status === 404 || error.status === 400)) {
-      return (
-        <div className="card mt-6">
-          <EmptyState icon={FolderKanban} title="Project not found" text="It may have been deleted.">
-            <Link href="/projects" className="btn btn-secondary">Back to Projects</Link>
-          </EmptyState>
-        </div>
-      );
-    }
-    return <LoadError error={error} retry={() => mutate()} />;
+  // Even with a saved copy on screen: if the server says it is gone, show that (not the old page with buttons that fail).
+  if (error instanceof ApiError && (error.status === 404 || error.status === 400)) {
+    return (
+      <div className="card mt-6">
+        <EmptyState icon={FolderKanban} title="Project not found" text="It may have been deleted.">
+          <Link href="/projects" className="btn btn-secondary">Back to Projects</Link>
+        </EmptyState>
+      </div>
+    );
   }
+  if (error && !data) return <LoadError error={error} retry={() => mutate()} />;
   if (!data) return <PageSkeleton />;
 
   const { project, tasks, today } = data;
@@ -126,6 +125,7 @@ export function ProjectView({ id }: { id: string }) {
 
   const deleteIt = async () => {
     if (!(await deleteForever(project))) return;
+    forgetProject(project.id);
     setGone(true);
     router.push("/archive");
     await refreshProjects();
@@ -151,7 +151,7 @@ export function ProjectView({ id }: { id: string }) {
       {archived && (
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-100">
           <span>
-            This project is in the Archive{project.archived_at ? ` (since ${formatDate(project.archived_at.slice(0, 10), "short")})` : ""}.
+            This project is in the Archive{project.archived_at ? ` (since ${formatDate(project.archived_on ?? project.archived_at.slice(0, 10), "short")})` : ""}.
           </span>
           <span className="flex gap-2">
             <button type="button" className="btn btn-secondary btn-sm" onClick={restoreIt}>
@@ -172,15 +172,15 @@ export function ProjectView({ id }: { id: string }) {
             <KindIcon kind={project.kind} className="size-7" />
           </span>
           <div className="min-w-0">
-            <h1 className="text-3xl font-bold tracking-tight text-slate-900">{project.name}</h1>
-            <p className="mt-1 text-slate-500">
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900 [overflow-wrap:anywhere] sm:text-3xl">{project.name}</h1>
+            <p className="mt-1 text-slate-500 [overflow-wrap:anywhere]">
               {project.client || "Your own project"} · {kindLabel(project.kind)}
             </p>
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
               <TimeBadge timeframe={project.timeframe} />
               {project.status === "paused" && <span className="badge bg-slate-100 text-slate-500">Paused</span>}
             </div>
-            {project.goal && <p className="mt-3 max-w-2xl text-slate-700">{project.goal}</p>}
+            {project.goal && <p className="mt-3 max-w-2xl text-slate-700 [overflow-wrap:anywhere]">{project.goal}</p>}
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -228,7 +228,7 @@ export function ProjectView({ id }: { id: string }) {
           <p className="text-xs font-medium text-slate-500">Timeframe</p>
           <p className="mt-0.5 text-2xl font-bold text-slate-900">{project.timeframe.label}</p>
           <p className="mt-2 text-sm text-slate-500">
-            {project.start_date ? `${project.start_date > today ? "Starts" : "Started"} ${formatDate(project.start_date, "short")}` : `Added ${formatDate(project.created_at.slice(0, 10), "short")}`}
+            {project.start_date ? `${project.start_date > today ? "Starts" : "Started"} ${formatDate(project.start_date, "short")}` : `Added ${formatDate(project.created_on ?? project.created_at.slice(0, 10), "short")}`}
             {project.due_date ? ` · Due ${formatDate(project.due_date, "short")}` : " · No due date"}
           </p>
         </section>
@@ -295,7 +295,7 @@ export function ProjectView({ id }: { id: string }) {
             <Field label="" htmlFor="project-notes" hint="Saved when you click away. Do not paste passwords here.">
               <textarea
                 id="project-notes"
-                key={`${project.id}-${project.notes.length}`}
+                key={`${project.id}:${project.notes}`}
                 className="input mt-2 min-h-32"
                 defaultValue={project.notes}
                 maxLength={10000}

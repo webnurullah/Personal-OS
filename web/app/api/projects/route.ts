@@ -1,6 +1,7 @@
 import { handle } from "@/lib/server/api";
 import { must } from "@/lib/server/http";
 import { summarise } from "@/lib/projects";
+import { withDays } from "@/lib/server/projects";
 import { checkProjectDates, ProjectCreate } from "@/lib/server/schemas";
 import { fetchAll } from "@/lib/server/paging";
 import { parse, z } from "@/lib/server/validate";
@@ -8,7 +9,7 @@ import { parse, z } from "@/lib/server/validate";
 // Your projects with task progress and how they stand in time (all worked out here, never stored).
 // ?archived=1 lists the archived ones instead (the Archive page).
 // ?lite=1 is the short list for pickers (the task form): id, name, colour, status and whether it is archived.
-export const GET = handle(async ({ db, query, today }) => {
+export const GET = handle(async ({ db, query, today, profile }) => {
   const { lite, archived } = parse(z.object({ lite: z.literal("1").optional(), archived: z.literal("1").optional() }), query);
   if (lite) return { items: must(await db.from("projects").select("id, name, color, status, archived_at").order("name")) };
 
@@ -19,7 +20,8 @@ export const GET = handle(async ({ db, query, today }) => {
     fetchAll(() => db.from("tasks").select("project_id, done_at").not("project_id", "is", null).order("id")),
   ]);
   const t = await today();
-  return { today: t, items: summarise(projects, tasks, t) };
+  const zone = (await profile()).timezone;
+  return { today: t, items: summarise(projects.map((p) => withDays(p, zone)), tasks, t) };
 });
 
 export const POST = handle(async ({ db, body }) => {

@@ -173,18 +173,24 @@ export function TasksView() {
                             <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setEditing(task)}>
                               <span className={`block truncate text-sm font-medium ${task.done_at ? "text-slate-400 line-through" : "text-slate-800"}`}>{task.title}</span>
                               <span className="mt-0.5 flex items-center gap-3 text-xs text-slate-500">
-                                <span className={`flex items-center gap-1 ${overdue ? "text-rose-500" : ""}`}>
-                                  <CalendarDays className="size-3.5" />
+                                <span className={`flex shrink-0 items-center gap-1 whitespace-nowrap ${overdue ? "text-rose-500" : ""}`}>
+                                  <CalendarDays className="size-3.5 shrink-0" />
                                   {taskDateLabel(task, today)}
                                 </span>
-                                <span className={`flex items-center gap-1 ${PRIORITY[task.priority].color}`}>
-                                  <Flag className="size-3.5" />
+                                <span className={`flex shrink-0 items-center gap-1 ${PRIORITY[task.priority].color}`}>
+                                  <Flag className="size-3.5 shrink-0" />
                                   {PRIORITY[task.priority].label}
                                 </span>
+                                {project && (
+                                  <span className="flex min-w-0 items-center gap-1 sm:hidden">
+                                    <span className={`size-2 shrink-0 rounded-full ${colorOf(project.color).dot}`} />
+                                    <span className="truncate">{project.name}</span>
+                                  </span>
+                                )}
                               </span>
                             </button>
                             {project && (
-                              <Link href={`/projects/${project.id}`} className={`badge max-w-32 truncate ${colorOf(project.color).badge}`} title={`Project: ${project.name}`}>
+                              <Link href={`/projects/${project.id}`} className={`badge hidden max-w-32 truncate sm:inline-flex ${colorOf(project.color).badge}`} title={`Project: ${project.name}`}>
                                 {project.name}
                               </Link>
                             )}

@@ -2,6 +2,7 @@
 
 import { Folder, Globe, Palette, Share2, type LucideProps } from "lucide-react";
 import { api, errorMessage, refresh } from "@/lib/api";
+import { cacheMutate } from "@/lib/cache";
 import { plural } from "@/lib/format";
 import type { Timeframe } from "@/lib/projects";
 import type { ProjectKind } from "@/lib/types";
@@ -67,6 +68,11 @@ export function useProjectActions() {
 
   return { archive: (project: Named) => setArchived(project, true), restore: (project: Named) => setArchived(project, false), deleteForever };
 }
+
+/** After a project is deleted for good: forget its saved copy, so Back or another tab cannot show it again. */
+export const forgetProject = (id: string) => {
+  cacheMutate(`/projects/${id}`, undefined, { revalidate: false }).catch(() => undefined);
+};
 
 /** Reload everything a project change can affect. */
 export const refreshProjects = () => refresh("/projects", "/tasks", "/events");

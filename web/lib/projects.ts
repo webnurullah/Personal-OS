@@ -28,7 +28,8 @@ export function isHttpUrl(text: string) {
   }
 }
 
-type ProjectFacts = { status: string; start_date: string | null; due_date: string | null; created_at: string };
+/** `created_on` is the day it was added in the user's time zone (the API sends it); older saved answers may not have it. */
+type ProjectFacts = { status: string; start_date: string | null; due_date: string | null; created_at: string; created_on?: string };
 
 /** How a project stands in time. `tone` is only "late" or "soon" for an ACTIVE dated project. */
 export type Timeframe = {
@@ -43,13 +44,13 @@ const days = (n: number, word = "day") => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 /**
  * A project with a due date is dated: "Due in 5 days", "Overdue by 2 days".
- * One without is ongoing: "Ongoing · running 34 days" (counted from the start date, or the day it was added).
+ * One without is ongoing: "Ongoing · running 34 days" (counted from the start date, or the day it was added in the user's time zone).
  * A finished project is just "Done", and a paused one is never flagged as late.
  */
 export function timeframe(project: ProjectFacts, today: string): Timeframe {
   if (project.status === "done") return { kind: "ended", label: "Done", days: null, tone: "none" };
   const active = project.status === "active";
-  const started = project.start_date ?? project.created_at.slice(0, 10);
+  const started = project.start_date ?? project.created_on ?? project.created_at.slice(0, 10);
 
   if (!project.due_date) {
     const running = daysBetween(started, today);

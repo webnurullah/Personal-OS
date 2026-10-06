@@ -1,11 +1,12 @@
 import { handle, ok } from "@/lib/server/api";
 import { HttpError, must } from "@/lib/server/http";
 import { progress, timeframe } from "@/lib/projects";
+import { withDays } from "@/lib/server/projects";
 import { checkProjectDates, ProjectFields } from "@/lib/server/schemas";
 import { nonEmpty, parse, s } from "@/lib/server/validate";
 
 // One project with its tasks: every open task, and the newest 100 finished ones (the count of all finished ones is exact).
-export const GET = handle<{ id: string }>(async ({ db, params, today }) => {
+export const GET = handle<{ id: string }>(async ({ db, params, today, profile }) => {
   const id = parse(s.id, params.id);
   const [project, open, done, doneCount] = await Promise.all([
     db.from("projects").select("*").eq("id", id).single().then(must),
@@ -16,9 +17,10 @@ export const GET = handle<{ id: string }>(async ({ db, params, today }) => {
   if (doneCount.error) must({ data: null, error: doneCount.error });
   const finished = doneCount.count ?? done.length;
   const t = await today();
+  const dated = withDays(project, (await profile()).timezone);
   return {
     today: t,
-    project: { ...project, timeframe: timeframe(project, t), tasks_total: open.length + finished, tasks_done: finished, tasks_open: open.length, percent: progress(finished, open.length + finished) },
+    project: { ...dated, timeframe: timeframe(dated, t), tasks_total: open.length + finished, tasks_done: finished, tasks_open: open.length, percent: progress(finished, open.length + finished) },
     tasks: [...open, ...done],
   };
 });
