@@ -3,15 +3,16 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
 import useSWR from "swr";
-import { ArrowRight, CalendarDays, ChartNoAxesColumn, ChartColumn, Clock, FileText, Footprints, GraduationCap, HeartPulse, Leaf, Moon, Pin, Plus, SquareCheck, Sun, Target, TrendingUp, Wallet } from "lucide-react";
+import { ArrowRight, BriefcaseBusiness, CalendarDays, ChartNoAxesColumn, ChartColumn, Clock, FileText, Footprints, GraduationCap, HeartPulse, Leaf, Moon, Pin, Plus, SquareCheck, Sun, Target, TrendingUp, Wallet } from "lucide-react";
 import { api, errorMessage, refresh } from "@/lib/api";
 import { colorOf } from "@/lib/colors";
-import { formatDate } from "@/lib/dates";
+import { daysBetween, formatDate } from "@/lib/dates";
 import { count, hm, minutesOf, pct } from "@/lib/format";
 import { useCategories, useNowMinutes } from "@/lib/hooks";
 import { useProfile } from "@/lib/profile";
 import { taskDateLabel } from "@/lib/tasks";
-import type { Dashboard, LearningWeek, List, Note, Task } from "@/lib/types";
+import { deadlineLabel, isOpen } from "@/lib/jobs";
+import type { Dashboard, JobApplication, LearningWeek, List, Note, Task } from "@/lib/types";
 import { Donut, Progress } from "../ui/charts";
 import { Segmented } from "../ui/controls";
 import { useFeedback } from "../ui/feedback";
@@ -455,6 +456,53 @@ export function LearningWidget() {
             </p>
           )}
         </>
+      )}
+    </Widget>
+  );
+}
+
+// ---------- Job deadlines ----------
+export function JobsWidget({ today }: { today: string }) {
+  const { data } = useSWR<List<JobApplication>>("/jobs");
+  const jobs = data?.items ?? [];
+  // The API sorts by last date to apply; jobs you have already applied to are not "closing soon".
+  const closing = jobs.filter((j) => j.status === "saved" && j.deadline && isOpen(j, today)).slice(0, 4);
+  const count = (status: string) => jobs.filter((j) => j.status === status).length;
+
+  return (
+    <Widget icon={<BriefcaseBusiness className="size-4.5" />} tile="bg-rose-50 text-rose-600" title="Job Deadlines" link={{ href: "/jobs", label: "View All" }}>
+      {!data ? (
+        <div className="mt-4 space-y-3" aria-busy="true">
+          {[0, 1, 2].map((i) => <div key={i} className="h-10 animate-pulse rounded-xl bg-slate-100" />)}
+        </div>
+      ) : closing.length ? (
+        <ul className="mt-3 divide-y divide-slate-100">
+          {closing.map((job) => {
+            const label = deadlineLabel(job.deadline, today);
+            const soon = daysBetween(today, job.deadline!) <= 3;
+            return (
+              <li key={job.id}>
+                <Link href="/jobs" className="flex items-center justify-between gap-3 py-2.5">
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-medium text-slate-800">{job.title}</span>
+                    <span className="block truncate text-xs text-slate-400">{job.company || "Not applied yet"}</span>
+                  </span>
+                  <span className={`badge shrink-0 ${soon ? "bg-rose-50 text-rose-700" : "bg-amber-50 text-amber-700"}`}>{label}</span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <p className="py-6 text-center text-sm text-slate-500">
+          {jobs.length ? "No jobs closing soon. " : "No jobs saved yet. "}
+          <Link href="/jobs" className="font-medium text-blue-600">{jobs.length ? "Open Job Apply" : "Add a job"}</Link>
+        </p>
+      )}
+      {jobs.length > 0 && (
+        <p className="mt-auto pt-3 text-xs text-slate-400">
+          {count("saved")} saved · {count("applied")} applied · {count("interview")} interview
+        </p>
       )}
     </Widget>
   );

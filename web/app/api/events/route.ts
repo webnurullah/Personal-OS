@@ -20,10 +20,14 @@ export const GET = handle(async ({ db, query, today }) => {
       .or(`repeat.neq.none,event_date.gte.${from}`) // skip old one-off events
       .order("event_date"),
   );
+  // Last dates to apply for jobs you have not applied to yet (shown on the calendar).
+  const deadlines = must(
+    await db.from("job_applications").select("id, title, company, deadline").eq("status", "saved").gte("deadline", from).lte("deadline", to).order("deadline"),
+  ).map((j) => ({ id: j.id, title: j.title, company: j.company, date: j.deadline! }));
   const items = events
     .flatMap((event) => occurrences(event, from, to).map((date) => ({ ...event, date })))
     .sort((a, b) => a.date.localeCompare(b.date) || byTime(a, b));
-  return { today: await today(), from, to, items };
+  return { today: await today(), from, to, items, deadlines };
 });
 
 export const POST = handle(async ({ db, body }) => {

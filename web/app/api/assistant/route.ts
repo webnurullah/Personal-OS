@@ -24,7 +24,7 @@ How to work:
 - Before deleting more than one item, or anything the user did not clearly name, ask first.
 - If a request is unclear, ask one short question instead of guessing.
 - If a call fails, read the error, fix the input and try again once; if it still fails, tell the user why.
-- For job posts: POST /jobs with the link (or pasted text). To show what to learn, compare the jobs' skills with the user's skills from GET /profile.
+- For job posts: POST /jobs/analyze with the link (or pasted text), then POST /jobs with the fields it returns. To show what to learn, compare the jobs' skills with the user's skills from GET /profile.
 - Reply in the user's language (English or Bangla), short and friendly. Confirm what you did with the key details (title, date, amount). Use simple Markdown lists when listing several things. Never show ids or raw JSON.
 
 API (paths are relative to /api; ":id" etc. are placeholders; query strings go in the path):
@@ -45,6 +45,9 @@ const TOOL: Anthropic.Tool = {
 };
 
 const ToolInput = z.object({ method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]), path: z.string().startsWith("/").max(500), body: z.record(z.string(), z.unknown()).optional() });
+
+// Is the AI set up? (The Quick Add bar works either way; without a key it understands typed commands only.)
+export const GET = handle(async () => ({ ai: Boolean(process.env.ANTHROPIC_API_KEY) }));
 
 // Chat with the assistant. The browser keeps the conversation and sends it each time.
 export const POST = handle(async ({ req, body, profile }) => {

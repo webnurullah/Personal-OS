@@ -28,6 +28,7 @@ import * as health from "@/app/api/health/route";
 import * as healthDay from "@/app/api/health/[date]/route";
 import * as jobs from "@/app/api/jobs/route";
 import * as job from "@/app/api/jobs/[id]/route";
+import * as jobAnalyze from "@/app/api/jobs/analyze/route";
 import * as blocks from "@/app/api/learning/blocks/route";
 import * as block from "@/app/api/learning/blocks/[id]/route";
 import * as week from "@/app/api/learning/week/route";
@@ -65,7 +66,7 @@ const ROUTES: [string, Module][] = [
   ["/finance/bills", bills], ["/finance/bills/:id", bill], ["/finance/bills/:id/pay", billPay],
   ["/health", health], ["/health/:date", healthDay],
   ["/notes", notes], ["/notes/:id", note], ["/reminders", reminders], ["/reminders/:id", reminder],
-  ["/jobs", jobs], ["/jobs/:id", job],
+  ["/jobs", jobs], ["/jobs/analyze", jobAnalyze], ["/jobs/:id", job],
 ];
 
 function match(pathname: string) {

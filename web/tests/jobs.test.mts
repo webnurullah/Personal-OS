@@ -26,6 +26,8 @@ test("closed, rejected and offered jobs are not open", () => {
   assert.equal(isOpen(job("a", [], "2026-10-05"), today), false);
   assert.equal(isOpen(job("a", [], null, "rejected"), today), false);
   assert.equal(isOpen(job("a", [], null, "applied"), today), true);
+  assert.equal(isOpen(job("a", [], "2026-10-01", "applied"), today), true); // applied: the last date no longer matters
+  assert.equal(isOpen(job("a", [], "2026-10-01", "interview"), today), true);
 });
 
 test("skills to learn: most-wanted first, open jobs only", () => {
@@ -36,6 +38,8 @@ test("skills to learn: most-wanted first, open jobs only", () => {
   ];
   const list = skillsToLearn(jobs, ["React"], today);
   assert.deepEqual(list.map((s) => [s.skill, s.jobs.length]), [["Docker", 2], ["AWS", 1], ["SQL", 1]]);
+  assert.equal(list[0].by, "2026-10-20"); // the earliest last date among the jobs that ask for it
+  assert.equal(list[2].by, null);
 });
 
 test("deadline labels", () => {

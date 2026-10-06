@@ -64,7 +64,7 @@ Frontend and backend are **one Vercel project**. Every push to GitHub `main` put
    |---|---|
    | `NEXT_PUBLIC_SUPABASE_URL` | your Project URL |
    | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | your publishable key |
-   | `ANTHROPIC_API_KEY` | a Claude API key from console.anthropic.com → API Keys (for the assistant and Job Apply; mark it **Sensitive**) |
+   | `ANTHROPIC_API_KEY` | **Optional.** A Claude API key from console.anthropic.com → API Keys. Without it, Quick Add and Job Apply still work by rules; with it, the chat assistant turns on and job posts are read by AI (mark it **Sensitive**) |
 
 4. **Deploy** (1–2 minutes). Open the address Vercel shows (`https://nurullah-pos….vercel.app`):
    - `…/api` should show `{"ok":true,"name":"Nurullah POS API",…}`

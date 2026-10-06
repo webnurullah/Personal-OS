@@ -252,3 +252,18 @@ export type JobApplication = {
   notes: string;
   created_at: string;
 };
+
+/** What reading a job post found (nothing is saved until the form is submitted). */
+export type JobAnalysis = {
+  title: string;
+  company: string;
+  location: string;
+  deadline: string | null;
+  summary: string;
+  requirements: string[];
+  skills: string[];
+  /** Who read it: Claude, or the keyword rules. */
+  by: "ai" | "rules";
+  /** Things it could not find, to show next to the form. */
+  hints: string[];
+};

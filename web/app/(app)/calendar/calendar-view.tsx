@@ -2,7 +2,8 @@
 
 import { useState, type FormEvent } from "react";
 import useSWR from "swr";
-import { ChevronLeft, ChevronRight, Plus, Repeat, Trash2 } from "lucide-react";
+import Link from "next/link";
+import { BriefcaseBusiness, ChevronLeft, ChevronRight, Plus, Repeat, Trash2 } from "lucide-react";
 import { api, errorMessage, refresh } from "@/lib/api";
 import { colorOf } from "@/lib/colors";
 import { addDays, addMonths, daysBetween, formatDate, monthGrid, relativeDay, weekdayNames } from "@/lib/dates";
@@ -16,7 +17,9 @@ import { useFeedback } from "@/components/ui/feedback";
 import { Modal, ModalActions } from "@/components/ui/modal";
 import { LoadError, PageHeader, PageSkeleton } from "@/components/ui/states";
 
-type EventsResponse = List<CalendarEvent> & { today: string; from: string; to: string };
+/** A job whose last day to apply is this date (saved jobs only). */
+type JobDeadline = { id: string; title: string; company: string; date: string };
+type EventsResponse = List<CalendarEvent> & { today: string; from: string; to: string; deadlines?: JobDeadline[] };
 const byTime = (a: CalendarEvent, b: CalendarEvent) => (a.all_day === b.all_day ? (a.start_time ?? "").localeCompare(b.start_time ?? "") : a.all_day ? -1 : 1);
 
 export function CalendarView() {
@@ -46,7 +49,9 @@ export function CalendarView() {
   if (!month || !selected || !today || !data) return <PageSkeleton />;
 
   const eventsOn = (day: string) => data.items.filter((e) => e.date === day).sort(byTime);
+  const deadlinesOn = (day: string) => (data.deadlines ?? []).filter((j) => j.date === day);
   const agenda = eventsOn(selected);
+  const agendaDeadlines = deadlinesOn(selected);
   const diff = daysBetween(today, selected);
   const comingUp = (upcoming?.items ?? [])
     .filter((e) => e.date > today || (!e.all_day && e.start_time && minutesOf(e.start_time) > now))
@@ -99,6 +104,7 @@ export function CalendarView() {
           <div className="grid grid-cols-7">
             {grid.map((day, i) => {
               const list = eventsOn(day);
+              const due = deadlinesOn(day);
               const inMonth = day.slice(0, 7) === month;
               const isSelected = day === selected;
               return (
@@ -107,10 +113,15 @@ export function CalendarView() {
                   type="button"
                   onClick={() => pick(day)}
                   aria-pressed={isSelected}
-                  aria-label={`${formatDate(day, "long")}${list.length ? `, ${list.length} events` : ""}`}
+                  aria-label={`${formatDate(day, "long")}${list.length ? `, ${list.length} events` : ""}${due.length ? `, ${due.length} job deadlines` : ""}`}
                   className={`flex min-h-20 min-w-0 flex-col gap-1 border-slate-100 p-1.5 text-left transition hover:bg-slate-50 sm:min-h-28 sm:p-2 ${i % 7 === 6 ? "" : "border-r"} ${i < 35 ? "border-b" : ""} ${isSelected ? "bg-blue-50/70 ring-2 ring-inset ring-blue-200" : inMonth ? "" : "bg-slate-50/60"}`}
                 >
                   <span className={`grid size-7 shrink-0 place-items-center rounded-full text-sm font-medium ${day === today ? "bg-blue-600 text-white" : inMonth ? "text-slate-700" : "text-slate-300"}`}>{Number(day.slice(8))}</span>
+                  {due.slice(0, 2).map((j) => (
+                    <span key={`${j.id}-due`} className="hidden truncate rounded-md bg-rose-50 px-1.5 py-0.5 text-[11px] font-medium text-rose-700 sm:block" title={`Last day to apply: ${j.title}`}>
+                      Apply: {j.title}
+                    </span>
+                  ))}
                   {list.slice(0, 3).map((e) => (
                     <span key={`${e.id}-${day}`} className={`hidden truncate rounded-md px-1.5 py-0.5 text-[11px] font-medium sm:block ${color(e).badge}`}>
                       {!e.all_day && e.start_time && <span className="opacity-70">{shortTime(e.start_time, profile?.time_format)} </span>}
@@ -118,8 +129,11 @@ export function CalendarView() {
                     </span>
                   ))}
                   {list.length > 3 && <span className="hidden px-1.5 text-[11px] font-medium text-slate-500 sm:block">+{list.length - 3} more</span>}
-                  {list.length > 0 && (
+                  {(list.length > 0 || due.length > 0) && (
                     <span className="flex flex-wrap gap-0.5 sm:hidden">
+                      {due.slice(0, 2).map((j) => (
+                        <span key={`${j.id}-dot-due`} className="size-1.5 rounded-full bg-rose-500" />
+                      ))}
                       {list.slice(0, 4).map((e) => (
                         <span key={`${e.id}-dot`} className={`size-1.5 rounded-full ${color(e).dot}`} />
                       ))}
@@ -144,6 +158,21 @@ export function CalendarView() {
                 <Plus className="size-4" />
               </button>
             </div>
+            {agendaDeadlines.length > 0 && (
+              <ul className="mt-4 space-y-1.5">
+                {agendaDeadlines.map((j) => (
+                  <li key={`${j.id}-agenda-due`}>
+                    <Link href="/jobs" className="flex items-center gap-3 rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-800 transition hover:bg-rose-100">
+                      <BriefcaseBusiness className="size-4 shrink-0" />
+                      <span className="min-w-0 truncate">
+                        <b className="font-semibold">Last day to apply:</b> {j.title}
+                        {j.company && <span className="text-rose-600"> · {j.company}</span>}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
             {agenda.length ? (
               <ol className="mt-4 space-y-1">
                 {agenda.map((e) => (
@@ -165,7 +194,7 @@ export function CalendarView() {
                   </li>
                 ))}
               </ol>
-            ) : (
+            ) : agendaDeadlines.length ? null : (
               <p className="mt-4 rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">Nothing planned. Enjoy the free time!</p>
             )}
           </section>

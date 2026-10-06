@@ -14,16 +14,27 @@ export function skillMatch(jobSkills: string[], mySkills: string[]) {
   return { have, missing, percent: jobSkills.length ? Math.round((have.length / jobSkills.length) * 100) : 0 };
 }
 
-/** Still worth applying to: not rejected or offered, and the last date has not passed. */
-export const isOpen = (job: JobFacts, today: string) => !["rejected", "offer"].includes(job.status) && (!job.deadline || job.deadline >= today);
+/**
+ * Still alive: applied or in interviews, or saved with a last date that has not passed.
+ * Rejected and offered jobs are finished, and a saved job past its last date is closed.
+ */
+export const isOpen = (job: JobFacts, today: string) => {
+  if (["rejected", "offer"].includes(job.status)) return false;
+  if (["applied", "interview"].includes(job.status)) return true;
+  return !job.deadline || job.deadline >= today;
+};
 
-/** Skills you are missing across your open jobs, the most-wanted first. */
+/** Match % of a job (for sorting and the CSV). */
+export const matchPercent = (jobSkills: string[], mySkills: string[]) => skillMatch(jobSkills, mySkills).percent;
+
+/** Skills you are missing across your open jobs, the most-wanted first (with the earliest last date, for a study deadline). */
 export function skillsToLearn(jobs: JobFacts[], mySkills: string[], today: string) {
-  const bySkill = new Map<string, { skill: string; jobs: string[] }>();
+  const bySkill = new Map<string, { skill: string; jobs: string[]; by: string | null }>();
   for (const job of jobs.filter((j) => isOpen(j, today))) {
     for (const skill of skillMatch(job.skills, mySkills).missing) {
       const key = skillKey(skill);
-      const entry = bySkill.get(key) ?? { skill, jobs: [] };
+      const entry = bySkill.get(key) ?? { skill, jobs: [], by: null };
+      if (job.deadline && job.deadline >= today && (!entry.by || job.deadline < entry.by)) entry.by = job.deadline;
       if (!entry.jobs.includes(job.title)) entry.jobs.push(job.title);
       bySkill.set(key, entry);
     }

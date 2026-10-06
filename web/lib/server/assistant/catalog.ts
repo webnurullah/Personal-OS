@@ -1,7 +1,7 @@
 // The API, described for the assistant. Body shapes come from the same schemas the API checks with.
 import {
   BillFields, BlockCreate, BudgetCategoryFields, CategoryCreate, CourseFields, EventFields, GoalCreate, HabitCreate, HabitUpdate,
-  HealthFields, JobAdd, JobFields, METHODS, MilestoneCreate, NoteFields, ProfileUpdate, ReminderFields, TaskCreate, TaskUpdate,
+  HealthFields, JobAdd, JobCreate, JobFields, METHODS, MilestoneCreate, NoteFields, ProfileUpdate, ReminderFields, TaskCreate, TaskUpdate,
   TopicFields, TxFields, UnitFields, WeekUpdate,
 } from "../schemas.ts";
 import { z } from "../validate.ts";
@@ -92,7 +92,8 @@ const ENDPOINTS: [string, string, string, z.ZodType?][] = [
   ["DELETE", "/reminders/:id", "Delete a reminder"],
 
   ["GET", "/jobs", "Saved job applications, nearest last date to apply first, with each job's required skills"],
-  ["POST", "/jobs", "Save a job from a link or pasted post: it is read and analysed (title, company, deadline, requirements, skills)", JobAdd],
+  ["POST", "/jobs/analyze", "Read a job link or pasted post and return title, company, deadline, requirements and skills. Does NOT save: pass the result to POST /jobs", JobAdd],
+  ["POST", "/jobs", "Save a job (title required; use the fields from /jobs/analyze)", JobCreate],
   ["PATCH", "/jobs/:id", "Change a job (status saved/applied/interview/offer/rejected, deadline, notes …)", JobFields],
   ["DELETE", "/jobs/:id", "Delete a saved job"],
 ];
