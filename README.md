@@ -25,7 +25,7 @@ Frontend and backend are **one Vercel project**. Every push to GitHub `main` put
 
 ## 1. Supabase (database + sign-in)
 
-1. Go to [supabase.com](https://supabase.com) → **New project**. Pick the region **Southeast Asia (Singapore)**, the closest to Bangladesh. Save the database password somewhere safe.
+1. Go to [supabase.com](https://supabase.com) → **New project**. Pick a region close to Bangladesh. This project uses **Northeast Asia (Tokyo)**; Singapore works too (then set `sin1` in `web/vercel.json`, see section 2). Save the database password somewhere safe.
 2. Open **SQL Editor** → **New query**. Run every file in `supabase/migrations/` **in name order**, one at a time (paste the whole file, click **Run**):
    1. `20261001000000_init.sql`
    2. `20261001000100_sample_data.sql`
@@ -75,7 +75,7 @@ Frontend and backend are **one Vercel project**. Every push to GitHub `main` put
 
    When Vercel's Domains page says **Valid Configuration** (minutes, sometimes a few hours), https is added automatically.
 
-The app runs in Singapore, next to the database (`web/vercel.json` sets the region `sin1`), so pages stay fast.
+The app runs in Tokyo, next to the database (`web/vercel.json` sets the region `hnd1`), so pages stay fast. If your Supabase project is in another region, use the matching Vercel region there (Singapore = `sin1`).
 
 ### Updating the app
 
