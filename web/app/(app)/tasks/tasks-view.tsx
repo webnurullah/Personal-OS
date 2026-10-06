@@ -312,7 +312,7 @@ function TaskModal({ task, today, onClose }: { task: Task | "new" | null; today:
   const [busy, setBusy] = useState(false);
   const editing = task && task !== "new" ? task : null;
   // Done projects are not offered for new work, but a task keeps showing the project it is already in.
-  const projectChoices = projects.filter((p) => p.status !== "done" || p.id === editing?.project_id);
+  const projectChoices = projects.filter((p) => (p.status !== "done" && !p.archived_at) || p.id === editing?.project_id);
 
   const submit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -370,7 +370,7 @@ function TaskModal({ task, today, onClose }: { task: Task | "new" | null; today:
             <select key={projects.length} id="task-project" name="project_id" className="select select-lg" defaultValue={editing?.project_id ?? ""}>
               <option value="">No project</option>
               {projectChoices.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
+                <option key={p.id} value={p.id}>{p.archived_at ? `${p.name} (archived)` : p.name}</option>
               ))}
             </select>
           </Field>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { Plus, X } from "lucide-react";
+import { Archive, Plus, X } from "lucide-react";
 import { api, errorMessage } from "@/lib/api";
 import { fixLink } from "@/lib/job-actions";
 import { isHttpUrl, PROJECT_KINDS, PROJECT_STATUSES } from "@/lib/projects";
@@ -14,13 +14,13 @@ import { refreshProjects } from "./shared";
 export type FullProject = Project & { links: ProjectLink[]; notes: string };
 
 /** Add or edit a project. The due date is optional: leave it empty for an ongoing project. */
-export function ProjectForm({ project, onClose, onSaved, onDelete }: {
+export function ProjectForm({ project, onClose, onSaved, onArchive }: {
   project: FullProject | null;
   onClose: () => void;
   /** Called with the saved project (new or changed). */
   onSaved?: (saved: { id: string }) => void;
-  /** Edit mode only: shows a Delete button. */
-  onDelete?: () => void;
+  /** Edit mode only: shows an Archive button. */
+  onArchive?: () => void;
 }) {
   const { toast } = useFeedback();
   const [busy, setBusy] = useState(false);
@@ -162,9 +162,10 @@ export function ProjectForm({ project, onClose, onSaved, onDelete }: {
         submitLabel={project ? "Save changes" : "Add project"}
         busy={busy}
         left={
-          onDelete && (
-            <button type="button" className="btn btn-danger" onClick={onDelete}>
-              Delete
+          onArchive && (
+            <button type="button" className="btn btn-secondary" onClick={onArchive}>
+              <Archive className="size-4" />
+              Archive
             </button>
           )
         }

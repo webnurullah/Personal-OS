@@ -26,7 +26,7 @@ export const GET = handle(async ({ db, query, today }) => {
   ).map((j) => ({ id: j.id, title: j.title, company: j.company, date: j.deadline! }));
   // Due dates of active projects that have one (ongoing projects have none), shown on the calendar.
   const project_dates = must(
-    await db.from("projects").select("id, name, color, due_date").eq("status", "active").gte("due_date", from).lte("due_date", to).order("due_date"),
+    await db.from("projects").select("id, name, color, due_date").eq("status", "active").is("archived_at", null).gte("due_date", from).lte("due_date", to).order("due_date"),
   ).map((p) => ({ id: `project-${p.id}`, project_id: p.id, title: p.name, kind: "deadline" as const, date: p.due_date!, color: p.color }));
   const items = events
     .flatMap((event) => occurrences(event, from, to).map((date) => ({ ...event, date })))

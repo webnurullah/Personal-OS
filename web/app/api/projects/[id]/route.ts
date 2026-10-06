@@ -1,5 +1,5 @@
 import { handle, ok } from "@/lib/server/api";
-import { must } from "@/lib/server/http";
+import { HttpError, must } from "@/lib/server/http";
 import { progress, timeframe } from "@/lib/projects";
 import { checkProjectDates, ProjectFields } from "@/lib/server/schemas";
 import { nonEmpty, parse, s } from "@/lib/server/validate";
@@ -25,13 +25,18 @@ export const GET = handle<{ id: string }>(async ({ db, params, today }) => {
 
 export const PATCH = handle<{ id: string }>(async ({ db, params, body }) => {
   const id = parse(s.id, params.id);
-  const changes = checkProjectDates(nonEmpty(parse(ProjectFields, await body())));
+  const { archived, ...fields } = checkProjectDates(nonEmpty(parse(ProjectFields, await body())));
+  // "archived" is a switch: true moves it to the Archive now, false brings it back.
+  const changes = archived === undefined ? fields : { ...fields, archived_at: archived ? new Date().toISOString() : null };
   return must(await db.from("projects").update(changes).eq("id", id).select().single());
 });
 
-// Deletes the project's tasks too.
+// Deletes the project for good, and its tasks too. Only an archived project can be deleted:
+// removing a project always goes through the Archive first.
 export const DELETE = handle<{ id: string }>(async ({ db, params }) => {
   const id = parse(s.id, params.id);
+  const found = must(await db.from("projects").select("archived_at").eq("id", id).single());
+  if (!found.archived_at) throw new HttpError(400, "Archive the project first, then delete it from the Archive.");
   must(await db.from("projects").delete().eq("id", id).select("id").single());
   return ok;
 });

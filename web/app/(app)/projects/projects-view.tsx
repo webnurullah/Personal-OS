@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
-import { FolderKanban, Plus, Trash2 } from "lucide-react";
+import { Archive, FolderKanban, Plus } from "lucide-react";
 import { colorOf } from "@/lib/colors";
 import { plural } from "@/lib/format";
 import { useNewAction } from "@/lib/new-action";
@@ -15,12 +15,12 @@ import { Segmented } from "@/components/ui/controls";
 import { Modal } from "@/components/ui/modal";
 import { EmptyState, LoadError, PageHeader, PageSkeleton } from "@/components/ui/states";
 import { ProjectForm } from "./project-form";
-import { KindIcon, refreshProjects, TimeBadge, useRemoveProject } from "./shared";
+import { KindIcon, refreshProjects, TimeBadge, useProjectActions } from "./shared";
 
 export function ProjectsView() {
   const router = useRouter();
   const { data, error, mutate } = useSWR<List<Project>>("/projects");
-  const removeProject = useRemoveProject();
+  const { archive } = useProjectActions();
   const [adding, setAdding] = useState(false);
   const [kind, setKind] = useState<"all" | ProjectKind>("all");
   const [status, setStatus] = useState<ProjectStatus>("active");
@@ -34,10 +34,10 @@ export function ProjectsView() {
   const dueSoon = active.filter((p) => p.timeframe.days !== null && p.timeframe.days >= 0 && p.timeframe.days <= 7).length;
   const visible = projects.filter((p) => p.status === status && (kind === "all" || p.kind === kind)).sort(compareProjects);
 
-  const remove = async (project: Project) => {
-    if (!(await removeProject(project))) return;
-    // Gone from the list at once, then everything that depended on it reloads.
+  const archiveIt = async (project: Project) => {
+    // Gone from the list at once (it is in the Archive now), then everything that depended on it reloads.
     await mutate((current) => current && { ...current, items: current.items.filter((p) => p.id !== project.id) }, { revalidate: false });
+    await archive(project);
     await refreshProjects();
   };
 
@@ -108,11 +108,12 @@ export function ProjectsView() {
                     </Link>
                     <button
                       type="button"
-                      className="btn btn-ghost btn-sm btn-icon absolute right-3 top-3 text-slate-400 hover:text-rose-600"
-                      onClick={() => remove(project)}
-                      aria-label={`Delete ${project.name}`}
+                      className="btn btn-ghost btn-sm btn-icon absolute right-3 top-3 text-slate-400 hover:text-slate-700"
+                      onClick={() => archiveIt(project)}
+                      aria-label={`Archive ${project.name}`}
+                      title="Move to the Archive"
                     >
-                      <Trash2 className="size-4" />
+                      <Archive className="size-4" />
                     </button>
                   </li>
                 );

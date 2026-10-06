@@ -4,7 +4,7 @@ import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
-import { ChevronDown, ChevronLeft, ExternalLink, FolderKanban, Link2, Pencil, Plus, RotateCcw, Trash2, CircleCheck } from "lucide-react";
+import { Archive, ChevronDown, ChevronLeft, CircleCheck, ExternalLink, FolderKanban, Link2, Pencil, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { api, ApiError, errorMessage, refresh } from "@/lib/api";
 import { colorOf } from "@/lib/colors";
 import { formatDate } from "@/lib/dates";
@@ -18,7 +18,7 @@ import { useFeedback } from "@/components/ui/feedback";
 import { Modal } from "@/components/ui/modal";
 import { EmptyState, LoadError, PageSkeleton } from "@/components/ui/states";
 import { ProjectForm } from "../project-form";
-import { KindIcon, refreshProjects, TimeBadge, useRemoveProject } from "../shared";
+import { KindIcon, refreshProjects, TimeBadge, useProjectActions } from "../shared";
 
 /** The project's task counts after `done` more finished and `total` more tasks (the page updates before the server answers). */
 function recount(project: ProjectDetail["project"], done: number, total: number): ProjectDetail["project"] {
@@ -31,7 +31,7 @@ export function ProjectView({ id }: { id: string }) {
   const router = useRouter();
   const { data, error, mutate } = useSWR<ProjectDetail>(`/projects/${id}`);
   const { toast } = useFeedback();
-  const removeProject = useRemoveProject();
+  const { archive, restore, deleteForever } = useProjectActions();
   const [editing, setEditing] = useState(false);
   const [showDone, setShowDone] = useState(false);
   const [title, setTitle] = useState("");
@@ -57,6 +57,7 @@ export function ProjectView({ id }: { id: string }) {
   const open = tasks.filter((t) => !t.done_at);
   const done = tasks.filter((t) => t.done_at);
   const ongoing = !project.due_date;
+  const archived = Boolean(project.archived_at);
 
   const toggle = async (task: Task) => {
     const becomingDone = !task.done_at;
@@ -107,12 +108,26 @@ export function ProjectView({ id }: { id: string }) {
     await refresh("/projects");
   };
 
-  const remove = async () => {
-    if (!(await removeProject(project))) return;
+  // Archive: reversible, so it needs no question. The page shows a placeholder while leaving, so it does not
+  // briefly reload a project that is no longer in the list.
+  const archiveIt = async () => {
     setEditing(false);
-    // Show a placeholder while leaving, so the page does not briefly reload a project that no longer exists.
+    if (!(await archive(project))) return;
     setGone(true);
     router.push("/projects");
+    await refreshProjects();
+  };
+
+  const restoreIt = async () => {
+    if (!(await restore(project))) return;
+    await mutate((cur) => cur && { ...cur, project: { ...cur.project, archived_at: null } }, { revalidate: false });
+    await refreshProjects();
+  };
+
+  const deleteIt = async () => {
+    if (!(await deleteForever(project))) return;
+    setGone(true);
+    router.push("/archive");
     await refreshProjects();
   };
 
@@ -133,6 +148,24 @@ export function ProjectView({ id }: { id: string }) {
         Projects
       </Link>
 
+      {archived && (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-100">
+          <span>
+            This project is in the Archive{project.archived_at ? ` (since ${formatDate(project.archived_at.slice(0, 10), "short")})` : ""}.
+          </span>
+          <span className="flex gap-2">
+            <button type="button" className="btn btn-secondary btn-sm" onClick={restoreIt}>
+              <RotateCcw className="size-4" />
+              Restore
+            </button>
+            <button type="button" className="btn btn-sm text-rose-600 hover:bg-rose-50" onClick={deleteIt}>
+              <Trash2 className="size-4" />
+              Delete for good
+            </button>
+          </span>
+        </div>
+      )}
+
       <header className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex min-w-0 items-start gap-4">
           <span className={`icon-tile size-14 shrink-0 ${color.tile}`}>
@@ -151,24 +184,28 @@ export function ProjectView({ id }: { id: string }) {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {project.status === "done" ? (
-            <button type="button" className="btn btn-secondary" onClick={() => setStatus("active")}>
-              <RotateCcw className="size-4" />
-              Reopen
-            </button>
-          ) : (
-            <button type="button" className="btn btn-primary" onClick={() => setStatus("done")}>
-              <CircleCheck className="size-4" />
-              Mark done
-            </button>
-          )}
+          {!archived &&
+            (project.status === "done" ? (
+              <button type="button" className="btn btn-secondary" onClick={() => setStatus("active")}>
+                <RotateCcw className="size-4" />
+                Reopen
+              </button>
+            ) : (
+              <button type="button" className="btn btn-primary" onClick={() => setStatus("done")}>
+                <CircleCheck className="size-4" />
+                Mark done
+              </button>
+            ))}
           <button type="button" className="btn btn-secondary" onClick={() => setEditing(true)}>
             <Pencil className="size-4" />
             Edit
           </button>
-          <button type="button" className="btn btn-ghost btn-icon text-slate-400 hover:text-rose-600" onClick={remove} aria-label="Delete project" title="Delete project">
-            <Trash2 className="size-4" />
-          </button>
+          {!archived && (
+            <button type="button" className="btn btn-secondary" onClick={archiveIt} title="Move to the Archive">
+              <Archive className="size-4" />
+              Archive
+            </button>
+          )}
         </div>
       </header>
 
@@ -271,7 +308,7 @@ export function ProjectView({ id }: { id: string }) {
       </div>
 
       <Modal open={editing} onClose={() => setEditing(false)} title="Edit project" size="lg">
-        {editing && <ProjectForm project={project} onClose={() => setEditing(false)} onSaved={() => mutate()} onDelete={remove} />}
+        {editing && <ProjectForm project={project} onClose={() => setEditing(false)} onSaved={() => mutate()} onArchive={archived ? undefined : archiveIt} />}
       </Modal>
     </>
   );

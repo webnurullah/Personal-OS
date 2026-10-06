@@ -26,15 +26,33 @@ export function TimeBadge({ timeframe }: { timeframe: Timeframe }) {
   return <span className={`badge ${style}`}>{timeframe.label}</span>;
 }
 
-/** Deleting a project asks first, and says how many tasks go with it. Returns true when it was deleted. */
-export function useRemoveProject() {
+type Named = { id: string; name: string };
+
+/**
+ * Removing a project is two steps: Archive it (reversible, no questions asked), then delete it for good from the
+ * Archive. Each function returns true when it worked.
+ */
+export function useProjectActions() {
   const { toast, confirm } = useFeedback();
-  return async (project: { id: string; name: string; tasks_total: number }) => {
+
+  const setArchived = async (project: Named, archived: boolean) => {
+    try {
+      await api(`/projects/${project.id}`, { method: "PATCH", body: { archived } });
+      toast(archived ? `“${project.name}” moved to the Archive. You can restore or delete it there.` : `“${project.name}” is back in Projects.`);
+      return true;
+    } catch (e) {
+      toast(errorMessage(e), "error");
+      return false;
+    }
+  };
+
+  /** Only for archived projects; says how many tasks go with it. */
+  const deleteForever = async (project: Named & { tasks_total: number }) => {
     const withTasks = project.tasks_total ? ` and its ${plural(project.tasks_total, "task")}` : "";
     const ok = await confirm({
-      title: "Delete this project?",
-      message: `“${project.name}”${withTasks} will be deleted for good. If you only want to finish it, use Mark done instead.`,
-      action: "Delete project",
+      title: "Delete for good?",
+      message: `“${project.name}”${withTasks} will be deleted forever. This cannot be undone.`,
+      action: "Delete for good",
     });
     if (!ok) return false;
     try {
@@ -46,6 +64,8 @@ export function useRemoveProject() {
       return false;
     }
   };
+
+  return { archive: (project: Named) => setArchived(project, true), restore: (project: Named) => setArchived(project, false), deleteForever };
 }
 
 /** Reload everything a project change can affect. */

@@ -94,6 +94,14 @@ check("user B cannot delete A's project", (await qb('delete from projects where 
 await expectError('user B cannot insert a project for A', () => qb(`insert into projects (user_id, name) values ($1, 'x')`, [A]), 'row-level security');
 await expectError('signed-out visitor cannot read projects', () => qanon('select * from projects'), 'permission denied');
 
+// Archive (20261007000100_projects_archive.sql): archived_at is empty until a project is archived, and can be cleared again.
+check('a new project is not archived', (await qa('select archived_at from projects where id = $1', [ongoing[0].id]))[0].archived_at === null);
+const archivedRow = await qa('update projects set archived_at = now() where id = $1 returning archived_at is not null as archived', [ongoing[0].id]);
+check('a project can be archived', archivedRow[0]?.archived === true);
+check("user B cannot archive A's project", (await qb('update projects set archived_at = now() where id = $1 returning id', [dated[0].id])).length === 0);
+const restored = await qa('update projects set archived_at = null where id = $1 returning archived_at', [ongoing[0].id]);
+check('an archived project can be restored', restored[0]?.archived_at === null);
+
 // Tasks can belong to a project; deleting the project deletes its tasks (and only those).
 const before = (await qa('select count(*)::int n from tasks'))[0].n;
 await qa(`insert into tasks (title, project_id) values ('Design home page', $1), ('Build menu page', $1)`, [bakery[0].id]);

@@ -34,7 +34,7 @@ export const GET = handle(async ({ db, profile: getProfile }) => {
     // Saved jobs (not applied yet) whose last date to apply is within 3 days.
     db.from("job_applications").select("id, title, company, deadline").eq("status", "saved").gte("deadline", today).lte("deadline", addDays(today, 3)).order("deadline").then(must),
     // Active projects with a due date (ongoing projects have none) that is within 3 days or already past.
-    db.from("projects").select("id, name, due_date").eq("status", "active").not("due_date", "is", null).lte("due_date", addDays(today, 3)).order("due_date").then(must),
+    db.from("projects").select("id, name, due_date").eq("status", "active").is("archived_at", null).not("due_date", "is", null).lte("due_date", addDays(today, 3)).order("due_date").then(must),
   ]);
 
   const items: Item[] = [];

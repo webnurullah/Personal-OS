@@ -727,6 +727,7 @@ export type Database = {
           due_date: string | null;
           links: Json;
           notes: string;
+          archived_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -743,6 +744,7 @@ export type Database = {
           due_date?: string | null;
           links?: Json;
           notes?: string;
+          archived_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -759,6 +761,7 @@ export type Database = {
           due_date?: string | null;
           links?: Json;
           notes?: string;
+          archived_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };

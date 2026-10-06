@@ -34,6 +34,7 @@ Frontend and backend are **one Vercel project**. Every push to GitHub `main` put
    5. `20261006000200_foreign_key_indexes.sql` (speed)
    6. `20261006000300_job_applications.sql` (Applications → Job Apply, your skills)
    7. `20261007000000_projects.sql` (Projects, and a project link on tasks)
+   8. `20261007000100_projects_archive.sql` (Archive for projects)
 
    Already set up? Only run the files you have not run yet. Each new file is listed here when it is added.
 3. **Authentication → URL Configuration**

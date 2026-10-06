@@ -98,6 +98,14 @@ test("project requests: strict, validated, dates optional", () => {
   assert.equal(ProjectCreate.safeParse({ name: "x", links: Array.from({ length: 13 }, () => ({ label: "a", url: "https://a.com" })) }).success, false);
 });
 
+test("archiving is a switch on an existing project, never part of creating one", () => {
+  assert.equal(ProjectFields.safeParse({ archived: true }).success, true);
+  assert.equal(ProjectFields.safeParse({ archived: false }).success, true); // restore
+  assert.equal(ProjectFields.safeParse({ archived: "yes" }).success, false);
+  assert.equal(ProjectCreate.safeParse({ name: "x", archived: true }).success, false);
+  assert.equal(ProjectFields.safeParse({ archived_at: "2026-10-06T00:00:00Z" }).success, false); // the API sets the time itself
+});
+
 test("a task can be linked to a project, or unlinked", () => {
   const id = "11111111-1111-4111-8111-111111111111";
   assert.equal(TaskCreate.safeParse({ title: "Design home page", project_id: id }).success, true);

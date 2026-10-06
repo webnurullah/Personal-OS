@@ -287,6 +287,8 @@ export type Project = {
   start_date: string | null;
   /** No due date = an ongoing project. */
   due_date: string | null;
+  /** When it was moved to the Archive (null = not archived). */
+  archived_at: string | null;
   created_at: string;
   timeframe: Timeframe;
   tasks_total: number;
@@ -296,5 +298,5 @@ export type Project = {
 };
 export type ProjectDetail = { today: string; project: Project & { links: ProjectLink[]; notes: string }; tasks: Task[] };
 /** The short list for pickers (GET /projects?lite=1). */
-export type ProjectChoice = { id: string; name: string; color: ColorName; status: ProjectStatus };
+export type ProjectChoice = { id: string; name: string; color: ColorName; status: ProjectStatus; archived_at: string | null };
 

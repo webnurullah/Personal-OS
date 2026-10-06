@@ -268,10 +268,12 @@ export const ProjectFields = z.object({
   due_date: s.date.nullable(),
   links: z.array(ProjectLink).max(12),
   notes: s.optionalText(10000),
+  /** true = move to the Archive, false = restore (the API sets or clears archived_at). */
+  archived: z.boolean(),
 }).partial().strict();
 
 /** A new project: the name is the only thing that must be there. */
-export const ProjectCreate = ProjectFields.required({ name: true });
+export const ProjectCreate = ProjectFields.omit({ archived: true }).required({ name: true });
 
 /** The due date cannot come before the start date. */
 export function checkProjectDates<T extends { start_date?: string | null; due_date?: string | null }>(p: T): T {

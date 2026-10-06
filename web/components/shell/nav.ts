@@ -1,4 +1,4 @@
-import { BriefcaseBusiness, CalendarDays, ChartColumn, FileText, FolderKanban, GraduationCap, Heart, House, Settings, SquareCheck, Target, Wallet, type LucideIcon } from "lucide-react";
+import { Archive, BriefcaseBusiness, CalendarDays, ChartColumn, FileText, FolderKanban, GraduationCap, Heart, House, Settings, SquareCheck, Target, Wallet, type LucideIcon } from "lucide-react";
 
 export type NavItem = { href: string; label: string; icon: LucideIcon };
 
@@ -6,6 +6,7 @@ export const NAV: NavItem[] = [
   { href: "/", label: "Dashboard", icon: House },
   { href: "/tasks", label: "Tasks", icon: SquareCheck },
   { href: "/projects", label: "Projects", icon: FolderKanban },
+  { href: "/archive", label: "Archive", icon: Archive },
   { href: "/learning", label: "Learning", icon: GraduationCap },
   { href: "/calendar", label: "Calendar", icon: CalendarDays },
   { href: "/goals", label: "Goals", icon: Target },

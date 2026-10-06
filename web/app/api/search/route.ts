@@ -19,7 +19,7 @@ export const GET = handle(async ({ db, query }) => {
     db.from("habits").select("id, name").ilike("name", like).is("archived_at", null).limit(5).then(must),
     db.from("courses").select("id, title").ilike("title", like).limit(5).then(must),
     db.from("transactions").select("id, description, amount, tx_date").ilike("description", like).order("tx_date", { ascending: false }).limit(5).then(must),
-    db.from("projects").select("id, name, kind, client").or(`name.ilike.${like},client.ilike.${like}`).order("created_at", { ascending: false }).limit(5).then(must),
+    db.from("projects").select("id, name, kind, client").is("archived_at", null).or(`name.ilike.${like},client.ilike.${like}`).order("created_at", { ascending: false }).limit(5).then(must),
   ]);
 
   return {
