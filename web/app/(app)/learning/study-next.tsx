@@ -70,7 +70,7 @@ export function StudyNext({ data, onLog, onFinish }: { data: LearningWeek; onLog
                 </p>
                 <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
                   <Link href={`/learning/${item.course_id}`} className="min-w-0 max-w-full truncate font-medium text-blue-700 hover:underline">{item.course_title}</Link>
-                  <span className="whitespace-nowrap">{hm(item.hours_left)} left</span>
+                  <span className="whitespace-nowrap">{item.hours_left > 0 ? `${hm(item.hours_left)} left` : "all hours logged"}</span>
                   <span className={`badge shrink-0 whitespace-nowrap px-2 py-0.5 font-medium ${REASON_STYLE[item.reason]}`}>{reasonText({ reason: item.reason, weeksLate: item.weeks_late })}</span>
                 </p>
               </div>

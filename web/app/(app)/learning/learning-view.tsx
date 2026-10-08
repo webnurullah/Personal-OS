@@ -31,10 +31,12 @@ export function LearningView() {
   const saveLater = useSaveLater(500);
   const [logging, setLogging] = useState(false);
   const [logChoice, setLogChoice] = useState(""); // what the session form starts on: "t:<topic id>", "r:<library item id>" or nothing
+  const [logNow, setLogNow] = useState(false); // from "Study next" (always about today): this week, even when another week is on screen
   const [newCourse, setNewCourse] = useState(false);
   const [editingTopic, setEditingTopic] = useState(false);
-  const openLog = (choice = "") => {
+  const openLog = (choice = "", now = false) => {
     setLogChoice(choice);
+    setLogNow(now);
     setLogging(true);
   };
   useNewAction(() => openLog());
@@ -98,7 +100,7 @@ export function LearningView() {
       </PageHeader>
       <LearningTabs current="courses" />
 
-      <StudyNext data={data} onLog={(topicId) => openLog(`t:${topicId}`)} onFinish={finishTopic} />
+      <StudyNext data={data} onLog={(topicId) => openLog(`t:${topicId}`, true)} onFinish={finishTopic} />
 
       <div className="mt-5 flex flex-wrap items-center gap-2">
         <button type="button" className="btn btn-ghost btn-sm btn-icon" onClick={() => setWeek(addDays(week ?? thisWeek, -7))} aria-label="Previous week">
@@ -284,10 +286,10 @@ export function LearningView() {
         open={logging}
         onClose={() => setLogging(false)}
         title="Log a study session"
-        description={isThisWeek ? "It is added as a block for this week." : `It is added to the week of ${formatDate(data.week_start, "short")}.`}
+        description={isThisWeek || logNow ? "It is added as a block for this week." : `It is added to the week of ${formatDate(data.week_start, "short")}.`}
         size="md"
       >
-        <SessionForm data={data} choice={logChoice} onClose={() => setLogging(false)} />
+        <SessionForm data={data} weekStart={logNow ? thisWeek : data.week_start} choice={logChoice} onClose={() => setLogging(false)} />
       </Modal>
       <Modal open={newCourse} onClose={() => setNewCourse(false)} title="New course" description="Then add its units and topics on the course page.">
         <CourseForm today={data.today} onClose={() => setNewCourse(false)} />
@@ -296,9 +298,9 @@ export function LearningView() {
   );
 }
 
-function SessionForm({ data, choice: firstChoice, onClose }: { data: LearningWeek; choice: string; onClose: () => void }) {
+function SessionForm({ data, weekStart, choice: firstChoice, onClose }: { data: LearningWeek; weekStart: string; choice: string; onClose: () => void }) {
   const { toast } = useFeedback();
-  const { week_start: weekStart, today } = data;
+  const { today } = data;
   // (A copy of this page saved before topics and the library were listed has neither; the fresh answer replaces it a moment later.)
   const openTopics = data.open_topics ?? [];
   const library = data.library ?? [];
@@ -315,15 +317,18 @@ function SessionForm({ data, choice: firstChoice, onClose }: { data: LearningWee
   const topic = choice.startsWith("t:") ? openTopics.find((t) => t.id === choice.slice(2)) : undefined;
   const item = choice.startsWith("r:") ? library.find((r) => r.id === choice.slice(2)) : undefined;
   const [activity, setActivity] = useState(topic?.label ?? item?.title ?? "");
-  const [typed, setTyped] = useState(false); // words typed by hand are kept when another topic is picked
+  const [auto, setAuto] = useState(topic?.label ?? item?.title ?? ""); // the words filled in from the pick
   const [finish, setFinish] = useState(false);
   const pick = (value: string) => {
     setChoice(value);
     setFinish(false);
-    if (typed) return;
+    // Words you wrote yourself stay. Words that are still the old pick's (even with something added) follow the new pick.
+    if (activity.trim() && !(auto && activity.startsWith(auto))) return;
     const t = value.startsWith("t:") ? openTopics.find((o) => o.id === value.slice(2)) : undefined;
     const r = value.startsWith("r:") ? library.find((o) => o.id === value.slice(2)) : undefined;
-    setActivity(t?.label ?? r?.title ?? "");
+    const label = t?.label ?? r?.title ?? "";
+    setAuto(label);
+    setActivity(label);
   };
 
   const submit = async (e: FormEvent<HTMLFormElement>) => {
@@ -401,10 +406,7 @@ function SessionForm({ data, choice: firstChoice, onClose }: { data: LearningWee
           autoComplete="off"
           autoFocus={!topic && !item}
           value={activity}
-          onChange={(e) => {
-            setActivity(e.target.value);
-            setTyped(true);
-          }}
+          onChange={(e) => setActivity(e.target.value)}
         />
       </Field>
       <label className="flex items-center gap-3 text-sm text-slate-700">

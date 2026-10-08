@@ -446,12 +446,28 @@ check('deleting the practice project keeps the item', (await one('select practic
   check('re-opening a topic clears it', (await topic(t2)).stamped === false);
   const born = await one(`insert into course_topics (course_id, unit_id, code, title, est_hours, status) values ($1, $2, '1.3', 'Born done', 1, 'done') returning completed_at is not null as stamped`, [sc, su]);
   check('a topic created as done is stamped', born.stamped === true);
+  // An old topic (here: made long ago, finished without a time) comes back from the Archive as it was, not stamped with today.
+  const old = (await one(`insert into course_topics (course_id, unit_id, code, title, est_hours, status, created_at) values ($1, $2, '1.4', 'Old and done', 1, 'done', '2026-01-01') returning id, completed_at is not null as stamped`, [sc, su]));
+  check('an old topic added as done is not stamped with today', old.stamped === false);
+  const archivedOld = await arch('topic', old.id);
+  await restore(archivedOld);
+  check('and stays that way after the Archive', (await topic(old.id)).stamped === false);
+  await qa(`update course_topics set status = 'in-progress' where id = $1`, [old.id]);
+  await qa(`update course_topics set status = 'done' where id = $1`, [old.id]);
+  check('finishing it now stamps it', (await topic(old.id)).stamped === true);
 
   // A session can name a library item; deleting the item only unlinks it.
   const item = (await one(`insert into learning_resources (title, kind) values ('SQL playlist', 'playlist') returning id`)).id;
   const viaItem = await one(`insert into study_blocks (week_start, weekday, hours, activity, resource_id) values ('2026-10-05', 2, 1, 'Watched 3 videos', $1) returning id`, [item]);
   await qa('delete from learning_resources where id = $1', [item]);
   check('deleting a library item only unlinks its sessions', (await one('select resource_id from study_blocks where id = $1', [viaItem.id])).resource_id === null);
+  // Through the Archive the sessions come back to the item with it.
+  const item2 = (await one(`insert into learning_resources (title, kind) values ('Another playlist', 'playlist') returning id`)).id;
+  const viaItem2 = await one(`insert into study_blocks (week_start, weekday, hours, activity, resource_id) values ('2026-10-05', 3, 1, 'Watched 2 videos', $1) returning id`, [item2]);
+  const archivedItem = await arch('resource', item2);
+  check('an item deleted to the Archive unlinks its sessions', (await one('select resource_id from study_blocks where id = $1', [viaItem2.id])).resource_id === null);
+  await restore(archivedItem);
+  check('an item brought back gets its sessions again', (await one('select resource_id from study_blocks where id = $1', [viaItem2.id])).resource_id === item2);
 
   // Nobody else's topic can be changed through a session.
   const before = await topic(t2);

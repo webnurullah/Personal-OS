@@ -2,15 +2,17 @@
 import { forecastFinish, hoursByWeek, pickNext, rankTopics, recentWeeks, sessionLabel, weekStreak, weeklyPace, hoursLeft, type StudyTopic } from "../study.ts";
 import type { OpenTopic, StudyNextItem } from "../types.ts";
 import { addDays, mondayOf } from "./dates.ts";
-import { HttpError, must } from "./http.ts";
+import { dbError, HttpError, must } from "./http.ts";
 import { fetchAll } from "./paging.ts";
 import { loadCourseFacts, summariseCourses } from "./queries.ts";
 import type { Db } from "./supabase.ts";
 
 /** How many unfinished topics the "Log a study session" picker is given (a very big course list is cut, best first). */
 const MAX_OPEN_TOPICS = 300;
-/** How far back the finished sessions are read: 11 weeks, enough for the last 8 weeks and a streak a bit longer than that. */
+/** How far back the finished sessions are read every time: 11 weeks before this one (the last 8 weeks, and the pace). */
 const LOOK_BACK_DAYS = 77;
+/** A streak that reaches the start of that window is followed further back, up to 3 years. */
+const STREAK_LIMIT_WEEKS = 156;
 
 /**
  * The Learning page's numbers beyond the week itself: every course (behind or not, and when it would finish at your pace),
@@ -39,7 +41,14 @@ export async function studyOverview(db: Db, today: string) {
     position: t.position,
   }));
   const ranked = rankTopics(facts.courses, topics, today);
-  const byWeek = hoursByWeek(blocks);
+  let byWeek = hoursByWeek(blocks);
+  if (weekStreak(byWeek, thisWeek) >= LOOK_BACK_DAYS / 7) {
+    // Every week in the window had study: the streak may go on beyond it, so read the older sessions too.
+    const older = await fetchAll(() =>
+      db.from("study_blocks").select("id, week_start, hours").eq("done", true).lt("week_start", addDays(thisWeek, -LOOK_BACK_DAYS)).gte("week_start", addDays(thisWeek, -7 * STREAK_LIMIT_WEEKS)).order("id"),
+    );
+    byWeek = hoursByWeek([...blocks, ...older]);
+  }
 
   const courses = summariseCourses(facts, today).map((course) => {
     const mine = new Set(topics.filter((t) => t.course_id === course.id).map((t) => t.id));
@@ -82,11 +91,13 @@ export async function studyOverview(db: Db, today: string) {
 /** A session may only name a topic or a library item of yours: anything else is a 400 (the database would accept another account's id). */
 export async function checkBlockLinks(db: Db, links: { topic_id?: string | null; resource_id?: string | null }) {
   if (links.topic_id) {
-    const { data } = await db.from("course_topics").select("id").eq("id", links.topic_id).maybeSingle();
+    const { data, error } = await db.from("course_topics").select("id").eq("id", links.topic_id).maybeSingle();
+    if (error) throw dbError(error); // a database problem is not "that topic is not yours"
     if (!data) throw new HttpError(400, "That topic is not in your courses.");
   }
   if (links.resource_id) {
-    const { data } = await db.from("learning_resources").select("id").eq("id", links.resource_id).maybeSingle();
+    const { data, error } = await db.from("learning_resources").select("id").eq("id", links.resource_id).maybeSingle();
+    if (error) throw dbError(error);
     if (!data) throw new HttpError(400, "That item is not in your library.");
   }
 }

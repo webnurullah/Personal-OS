@@ -86,7 +86,13 @@ for (const width of [390, 320]) {
     await what.fill("My own words");
     await pick.selectOption("t:t2");
     check("words typed by hand are kept", (await what.inputValue()) === "My own words");
-    check("a library item has no 'finished' tick, a topic has", (await dialog.getByLabel("I finished this topic").count()) === 1);
+    check("a topic offers the 'finished' tick", (await dialog.getByLabel("I finished this topic").count()) === 1);
+    // Words that are still the old pick's (with something added) follow the new pick; the user's own words stay.
+    await what.fill("");
+    await pick.selectOption("t:t3");
+    await what.fill(`${await what.inputValue()} practice`);
+    await pick.selectOption("t:t2");
+    check("words that began as the old pick's follow the new pick", (await what.inputValue()) === `2.2 ${LONG}`, await what.inputValue());
 
     // Save: the session names the topic and the topic is marked finished.
     await pick.selectOption("t:t1");
@@ -145,6 +151,41 @@ for (const width of [390, 320]) {
   const post = calls.find((c) => c.method === "POST");
   check("+1h saves a finished session for today that names the topic", post?.body?.topic_id === "a" && post.body.hours === 1 && post.body.done === true && post.body.week_start === "2026-10-05" && post.body.weekday === 1 && post.body.activity === "1.1 Topic 1.1", JSON.stringify(post?.body));
   check("the Spent box shows the new total at once", (await page.getByLabel("Actual hours for topic 1.1").inputValue()) === "2.25", await page.getByLabel("Actual hours for topic 1.1").inputValue());
+  await ctx.close();
+}
+
+// ---------- +1h that fails: the numbers go back to what was saved ----------
+{
+  const ctx = await newPhone(browser, 390);
+  await apiMock(ctx, { "/courses/c1": detail });
+  await ctx.route(/\/api\/learning\/blocks$/, (route) => route.fulfill({ status: 500, json: { error: { message: "The database is down" } } }));
+  const page = await ctx.newPage();
+  await page.goto(`${BASE}/learning/c1`);
+  await page.getByText("Topic 1.1").first().waitFor();
+  await page.getByRole("button", { name: "Add 1h to topic 1.1" }).click();
+  await page.waitForTimeout(800);
+  check("a failed +1h shows the saved hours again", (await page.getByLabel("Actual hours for topic 1.1").inputValue()) === "1.25", await page.getByLabel("Actual hours for topic 1.1").inputValue());
+  await ctx.close();
+}
+
+// ---------- Study next while another week is on screen ----------
+{
+  const ctx = await newPhone(browser, 390);
+  const calls = [];
+  await apiMock(ctx, { "/learning/week": week, "/learning/week?start=2026-09-28": { ...week, week_start: "2026-09-28" } });
+  await ctx.route(/\/api\/learning\/blocks$/, (route) => {
+    calls.push(route.request().postDataJSON());
+    return route.fulfill({ json: { ok: true } });
+  });
+  const page = await ctx.newPage();
+  await page.goto(`${BASE}/learning`);
+  await page.getByRole("heading", { name: "Study next" }).waitFor();
+  await page.getByRole("button", { name: "Previous week" }).click();
+  await page.getByText(/Week of · Sep 28/).waitFor();
+  await page.locator("section[aria-labelledby='next-title']").getByRole("button", { name: "Log time" }).first().click();
+  await page.getByRole("dialog").getByRole("button", { name: "Add block" }).click();
+  await page.waitForTimeout(600);
+  check("Log time on Study next goes into today's week, not the week on screen", calls[0]?.week_start === "2026-10-05" && calls[0].weekday === 1 && calls[0].done === true, JSON.stringify(calls[0]));
   await ctx.close();
 }
 

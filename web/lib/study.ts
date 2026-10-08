@@ -26,14 +26,23 @@ export type NextTopic = { topic: StudyTopic; course: StudyCourse; reason: StudyR
 
 const REASON_ORDER: Record<StudyReason, number> = { overdue: 0, "this-week": 1, "in-progress": 2, next: 3 };
 const round2 = (n: number) => Math.round(n * 100) / 100;
-const facts = (c: StudyCourse) => ({ start_date: c.start_date, target_date: c.target_date, weekly_plan: [] as number[] });
 
 /** Hours of a topic still to do. */
 export const hoursLeft = (t: Pick<StudyTopic, "status" | "est_hours" | "actual_hours">) => Math.max(0, round2(Number(t.est_hours) - doneHours({ ...t, planned_week: null })));
 
-/** Why an unfinished topic is worth studying now (null for a finished one). `week` is the course's current week. */
-export function topicReason(t: Pick<StudyTopic, "status" | "planned_week">, week: number): StudyReason | null {
+/**
+ * Which week of the course today is in: 1 on its first week, and it keeps counting after the target date
+ * (week 17 of a 12-week course), so a topic planned for the last week is late once that week is over.
+ */
+export const weekNumber = (course: Pick<StudyCourse, "start_date">, today: string) => Math.max(1, Math.floor(daysBetween(course.start_date, today) / 7) + 1);
+
+/**
+ * Why an unfinished topic is worth studying now (null for a finished one). `week` is the course's current week.
+ * A topic whose hours are all logged is not behind, whatever week it was planned for: it only needs to be marked finished.
+ */
+export function topicReason(t: Pick<StudyTopic, "status" | "planned_week" | "est_hours" | "actual_hours">, week: number): StudyReason | null {
   if (t.status === "done") return null;
+  if (hoursLeft(t) <= 0) return "in-progress";
   if (t.planned_week != null && t.planned_week < week) return "overdue";
   if (t.planned_week === week) return "this-week";
   return t.status === "in-progress" ? "in-progress" : "next";
@@ -42,14 +51,14 @@ export function topicReason(t: Pick<StudyTopic, "status" | "planned_week">, week
 const byOrder = (a: StudyTopic, b: StudyTopic) => a.unit_position - b.unit_position || a.position - b.position || a.code.localeCompare(b.code, undefined, { numeric: true });
 
 /**
- * Every unfinished topic of the courses that have started, best first: what is behind comes first (the oldest week first),
+ * Every unfinished topic of the courses that have started, best first: what is behind comes first (the most weeks late first),
  * then this week's plan (what you already started before the rest), then what you started, then the rest in course order.
  */
 export function rankTopics(courses: StudyCourse[], topics: StudyTopic[], today: string): NextTopic[] {
   const list: NextTopic[] = [];
   for (const course of courses) {
     if (today < course.start_date) continue; // not started yet
-    const week = currentWeek(facts(course), today);
+    const week = weekNumber(course, today);
     for (const topic of topics) {
       if (topic.course_id !== course.id) continue;
       const reason = topicReason(topic, week);
@@ -59,7 +68,8 @@ export function rankTopics(courses: StudyCourse[], topics: StudyTopic[], today: 
   }
   return list.sort((a, b) => {
     if (a.reason !== b.reason) return REASON_ORDER[a.reason] - REASON_ORDER[b.reason];
-    if (a.reason === "overdue" && a.topic.planned_week !== b.topic.planned_week) return (a.topic.planned_week ?? 0) - (b.topic.planned_week ?? 0);
+    // Week numbers belong to each course, so how late they are is what can be compared.
+    if (a.reason === "overdue" && a.weeksLate !== b.weeksLate) return b.weeksLate - a.weeksLate;
     if (a.reason === "this-week" && a.topic.status !== b.topic.status) return a.topic.status === "in-progress" ? -1 : 1;
     // Between courses, the one due first goes first.
     return a.course.target_date.localeCompare(b.course.target_date) || a.course.id.localeCompare(b.course.id) || byOrder(a.topic, b.topic);
@@ -113,7 +123,7 @@ export function courseHealth(
   if (today > course.target_date) return { state: "overdue", behindHours: round2(left), weeksBehind: 0 };
 
   const week = currentWeek({ ...course, weekly_plan: [] }, today);
-  const late = topics.filter((t) => t.status !== "done" && t.planned_week != null && t.planned_week < week);
+  const late = topics.filter((t) => t.status !== "done" && t.planned_week != null && t.planned_week < week && hoursLeft(t) > 0);
   if (late.length) {
     return {
       state: "behind",

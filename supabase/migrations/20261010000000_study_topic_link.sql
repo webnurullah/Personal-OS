@@ -9,7 +9,8 @@ alter table public.study_blocks
 create index if not exists study_blocks_topic_idx on public.study_blocks (topic_id) where topic_id is not null;
 create index if not exists study_blocks_resource_idx on public.study_blocks (resource_id) where resource_id is not null;
 
--- When a topic was finished (kept for the weekly review and revision). Topics finished before this existed stay empty.
+-- When a topic was finished (kept for the weekly review and revision). Topics finished before this existed stay empty,
+-- also when one of them is brought back from the Archive (an older copy has no time: it is not stamped with today).
 alter table public.course_topics add column if not exists completed_at timestamptz;
 
 create or replace function public.course_topic_completed_at() returns trigger
@@ -17,7 +18,11 @@ language plpgsql set search_path = '' as $$
 begin
   if new.status = 'done' then
     if tg_op = 'INSERT' or old.status is distinct from 'done' then
-      new.completed_at := coalesce(new.completed_at, now());
+      -- Finishing a topic stamps it; so does adding one that is new right now. A topic that is old (brought back
+      -- from the Archive) keeps the time it had, which may be none.
+      if tg_op = 'UPDATE' or new.created_at > now() - interval '1 minute' then
+        new.completed_at := coalesce(new.completed_at, now());
+      end if;
     end if;
   else
     new.completed_at := null;
@@ -80,6 +85,8 @@ create trigger study_blocks_hours
   for each row execute function public.study_block_hours();
 
 -- The Archive: a session brought back keeps its topic or library item when they still exist, and loses the link when they do not.
+-- A library item brought back gets its sessions again. A topic (or its unit or course) brought back does not: its hours
+-- are already in the copy that comes back, and linking its sessions again would add them a second time.
 create or replace function public.archive_config(p_kind text) returns jsonb
 language sql immutable set search_path = '' as $$
   select ('{
@@ -99,6 +106,6 @@ language sql immutable set search_path = '' as $$
     "category": {"table": "categories", "title": "name", "detail": [], "relinks": [["tasks", "category_id"], ["events", "category_id"], ["goals", "category_id"]]},
     "reminder": {"table": "reminders", "title": "text", "detail": ["due_date"]},
     "job": {"table": "job_applications", "title": "title", "detail": ["company"]},
-    "resource": {"table": "learning_resources", "title": "title", "detail": ["platform"], "fks": [["course_id", "courses", false, "course"], ["unit_id", "course_units", false, "unit"], ["practice_project_id", "projects", false, "project"]]}
+    "resource": {"table": "learning_resources", "title": "title", "detail": ["platform"], "fks": [["course_id", "courses", false, "course"], ["unit_id", "course_units", false, "unit"], ["practice_project_id", "projects", false, "project"]], "relinks": [["study_blocks", "resource_id"]]}
   }'::jsonb) -> p_kind
 $$;

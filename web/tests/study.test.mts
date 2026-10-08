@@ -1,8 +1,8 @@
 // Learning "Study next": what to study, behind or on track, pace and forecast, and the weekly streak. Run with: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
-import { formatDate } from "../lib/dates.ts";
-import { blockDate, courseHealth, forecastFinish, forecastText, hoursByWeek, hoursLeft, pickNext, rankTopics, reasonText, recentWeeks, sessionLabel, topicReason, weekStreak, weeklyPace, type DoneBlock, type StudyCourse, type StudyTopic } from "../lib/study.ts";
+import { addDays as addDaysIso, formatDate } from "../lib/dates.ts";
+import { blockDate, courseHealth, forecastFinish, forecastText, weekNumber, hoursByWeek, hoursLeft, pickNext, rankTopics, reasonText, recentWeeks, sessionLabel, topicReason, weekStreak, weeklyPace, type DoneBlock, type StudyCourse, type StudyTopic } from "../lib/study.ts";
 
 const TODAY = "2026-10-08"; // a Thursday
 const A: StudyCourse = { id: "A", title: "Digital Marketing", start_date: "2026-09-14", target_date: "2026-12-06" }; // 12 weeks; today is in week 4
@@ -15,14 +15,18 @@ const topic = (course: string, o: Partial<StudyTopic> = {}): StudyTopic => ({
 });
 
 test("why a topic is worth studying", () => {
-  assert.equal(topicReason({ status: "done", planned_week: 1 }, 4), null);
-  assert.equal(topicReason({ status: "not-started", planned_week: 3 }, 4), "overdue");
-  assert.equal(topicReason({ status: "in-progress", planned_week: 3 }, 4), "overdue");
-  assert.equal(topicReason({ status: "not-started", planned_week: 4 }, 4), "this-week");
-  assert.equal(topicReason({ status: "in-progress", planned_week: null }, 4), "in-progress");
-  assert.equal(topicReason({ status: "in-progress", planned_week: 6 }, 4), "in-progress");
-  assert.equal(topicReason({ status: "not-started", planned_week: 6 }, 4), "next");
-  assert.equal(topicReason({ status: "not-started", planned_week: null }, 4), "next");
+  const t = (status: string, planned_week: number | null, actual_hours = 0) => ({ status, planned_week, est_hours: 2, actual_hours });
+  assert.equal(topicReason(t("done", 1), 4), null);
+  assert.equal(topicReason(t("not-started", 3), 4), "overdue");
+  assert.equal(topicReason(t("in-progress", 3, 1), 4), "overdue");
+  assert.equal(topicReason(t("not-started", 4), 4), "this-week");
+  assert.equal(topicReason(t("in-progress", null, 1), 4), "in-progress");
+  assert.equal(topicReason(t("in-progress", 6, 1), 4), "in-progress");
+  assert.equal(topicReason(t("not-started", 6), 4), "next");
+  assert.equal(topicReason(t("not-started", null), 4), "next");
+  // All its hours are logged but it is not marked finished: not behind, just waiting to be ticked off.
+  assert.equal(topicReason(t("in-progress", 1, 2), 4), "in-progress");
+  assert.equal(topicReason(t("in-progress", 4, 3), 4), "in-progress");
 });
 
 test("hours left on a topic never go below zero", () => {
@@ -73,6 +77,37 @@ test("the few to show: not more than two from one course, three in all, between 
   assert.deepEqual(pickNext(ranked).map((i) => i.topic.id), [a[0].id, a[1].id, b[0].id]);
   assert.deepEqual(pickNext(ranked, 5, 1).map((i) => i.topic.id), [a[0].id, b[0].id]);
   assert.deepEqual(pickNext([]), []);
+});
+
+test("between courses, the topic that is most weeks late comes first (week numbers belong to each course)", () => {
+  const far: StudyCourse = { id: "F", title: "Far along", start_date: "2026-08-03", target_date: "2026-12-27" }; // today is in week 10
+  const near: StudyCourse = { id: "N", title: "Just begun", start_date: "2026-09-21", target_date: "2026-12-27" }; // today is in week 3
+  const fiveLate = topic("F", { planned_week: 5 });
+  const twoLate = topic("N", { planned_week: 1 });
+  const list = rankTopics([near, far], [twoLate, fiveLate], TODAY);
+  assert.deepEqual(list.map((i) => [i.topic.id, i.weeksLate]), [[fiveLate.id, 5], [twoLate.id, 2]]);
+});
+
+test("a course that is over keeps counting weeks: its last week's topics are late too", () => {
+  const over: StudyCourse = { id: "O", title: "Over", start_date: "2026-06-01", target_date: "2026-08-23" }; // 12 weeks; today is in week 19
+  const last = topic("O", { planned_week: 12 });
+  const before = topic("O", { planned_week: 11 });
+  const list = rankTopics([over], [before, last], TODAY);
+  assert.deepEqual(list.map((i) => [i.topic.id, i.reason, i.weeksLate]), [[before.id, "overdue", 8], [last.id, "overdue", 7]]);
+  assert.equal(weekNumber(over, TODAY), 19);
+  assert.equal(weekNumber(over, "2026-06-01"), 1);
+  assert.equal(weekNumber(over, "2026-06-07"), 1);
+  assert.equal(weekNumber(over, "2026-06-08"), 2);
+});
+
+test("a topic with all its hours logged is neither listed as late nor makes the course behind", () => {
+  const full = topic("A", { status: "in-progress", est_hours: 2, actual_hours: 2, planned_week: 1 });
+  const [item] = rankTopics([A], [full], TODAY);
+  assert.deepEqual([item.reason, item.hoursLeft, item.weeksLate], ["in-progress", 0, 0]);
+  const h = courseHealth(A, [full, { status: "not-started", est_hours: 2, actual_hours: 0, planned_week: 9 }], TODAY);
+  assert.equal(h.state, "on-track");
+  // …but a topic that is late and still has hours does.
+  assert.equal(courseHealth(A, [full, { status: "in-progress", est_hours: 2, actual_hours: 0.5, planned_week: 2 }], TODAY).behindHours, 1.5);
 });
 
 test("how a reason reads", () => {
@@ -192,7 +227,7 @@ import type { Db } from "../lib/server/supabase.ts";
 
 type Row = Record<string, unknown>;
 /** Just enough of the database client for these reads: select, eq, gte, order, limit, range, maybeSingle. */
-function fakeDb(tables: Record<string, Row[]>) {
+function fakeDb(tables: Record<string, Row[]>, failing: string[] = []) {
   return {
     from(name: string) {
       let rows = [...(tables[name] ?? [])];
@@ -202,10 +237,11 @@ function fakeDb(tables: Record<string, Row[]>) {
         select: (list = "*") => { columns = list === "*" ? null : list.split(",").map((c) => c.trim()); return q; },
         eq: (column: string, value: unknown) => { rows = rows.filter((r) => r[column] === value); return q; },
         gte: (column: string, value: string) => { rows = rows.filter((r) => String(r[column]) >= value); return q; },
+        lt: (column: string, value: string) => { rows = rows.filter((r) => String(r[column]) < value); return q; },
         order: () => q,
         limit: (count: number) => { rows = rows.slice(0, count); return q; },
         range: (from: number, to: number) => Promise.resolve({ data: shown().slice(from, to + 1), error: null }),
-        maybeSingle: () => Promise.resolve({ data: shown()[0] ?? null, error: null }),
+        maybeSingle: () => Promise.resolve(failing.includes(name) ? { data: null, error: { code: "08006", message: "connection lost" } } : { data: shown()[0] ?? null, error: null }),
         then: (resolve: (v: unknown) => unknown, reject: (e: unknown) => unknown) => Promise.resolve({ data: shown(), error: null }).then(resolve, reject),
       };
       return q;
@@ -282,4 +318,22 @@ test("a session's request: topic and library item are optional ids (or null to u
   assert.equal(BlockCreate.safeParse({ ...base, topic_id: "not-an-id" }).success, false);
   assert.equal(BlockCreate.safeParse({ ...base, course_id: id }).success, false, "no other fields");
   assert.equal(BlockCreate.omit({ week_start: true }).partial().strict().safeParse({ topic_id: null }).success, true);
+});
+
+test("a streak longer than the 11 weeks read every time is followed further back", async () => {
+  // Study in each of the last 20 weeks (one session on the Monday), nothing before that.
+  const blocks = Array.from({ length: 20 }, (_, i) => ({ id: `b${i}`, week_start: addDaysIso("2026-10-05", -7 * i), weekday: 0, hours: 1, topic_id: null, done: true }));
+  blocks.push({ id: "old", week_start: addDaysIso("2026-10-05", -7 * 22), weekday: 0, hours: 1, topic_id: null, done: true }); // one week missing before it
+  const o = await studyOverview(fakeDb({ courses: [], course_topics: [], course_units: [], study_blocks: blocks, learning_resources: [] }), TODAY);
+  assert.equal(o.stats.streak, 20);
+  assert.equal(o.stats.weeks.length, 8);
+  assert.deepEqual(o.stats.weeks.map((w) => w.hours), [1, 1, 1, 1, 1, 1, 1, 1]);
+  // A short streak does not need the older sessions.
+  const short = await studyOverview(fakeDb({ courses: [], course_topics: [], course_units: [], study_blocks: blocks.slice(0, 3), learning_resources: [] }), TODAY);
+  assert.equal(short.stats.streak, 3);
+});
+
+test("a database failure while checking a session's links is a server error, not 'not yours'", async () => {
+  const db = fakeDb({ course_topics: [{ id: "T1" }] }, ["course_topics"]);
+  await assert.rejects(checkBlockLinks(db, { topic_id: "T1" }), (e: unknown) => e instanceof HttpError && e.status === 500);
 });

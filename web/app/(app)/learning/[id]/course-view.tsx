@@ -95,10 +95,11 @@ export function CourseView({ id }: { id: string }) {
   const started = today >= course.start_date;
   const ended = today > course.target_date;
 
-  const failed = (e: unknown) => {
+  const failed = async (e: unknown) => {
     toast(errorMessage(e), "error");
+    // Show the saved values again; the number boxes are made new only once those are back.
+    await mutate().catch(() => undefined);
     setSyncKey((k) => k + 1);
-    mutate();
   };
 
   /** Shows the change at once, then saves it (straight away, or once typing stops). */
@@ -149,7 +150,8 @@ export function CourseView({ id }: { id: string }) {
       toast(`${hm(hours)} added to ${topic.code}`);
       await refresh("/learning", "/courses");
     } catch (e) {
-      failed(e);
+      await mutate(data, { revalidate: false }); // back to what it was before the tap (also when there is no connection to ask again)
+      await failed(e);
     }
   };
 
