@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import useSWR from "swr";
 import { Award, Check, Copy, ExternalLink, GraduationCap, ListChecks, Plus, Search, Sparkles } from "lucide-react";
 import { formatDate } from "@/lib/dates";
-import { formatMoney, hm } from "@/lib/format";
+import { hm } from "@/lib/format";
 import { certificateExpiry, compareUpNext, expiryLabel, hasCertificate, kindLabel, KINDS, LEVELS, libraryStats, needsPractice, resumeLine, skillLadder, upNext, WIP_LIMIT } from "@/lib/library";
 import { skillKey } from "@/lib/jobs";
 import { isHttpUrl } from "@/lib/projects";
@@ -35,7 +35,7 @@ const newest = (r: LearningResource) => r.completed_on ?? r.created_at.slice(0, 
 export function LibraryView() {
   const { data, error, mutate } = useResources();
   const { data: courses } = useSWR<{ items: CourseSummary[] }>("/courses");
-  const { profile } = useProfile();
+  const { profile, money } = useProfile();
   const copy = useCopy();
   const practiceProjects = usePracticeProjects();
   const [view, setView] = useState<View>("todo");
@@ -118,7 +118,7 @@ export function LibraryView() {
             <Stat label="Completed" value={stats.completed} tone="text-emerald-600" />
             <Stat label="Certificates" value={stats.certificates} tone="text-amber-600" />
             <Stat label="Hours learned" value={hm(stats.hours)} tone="text-violet-600" />
-            <Stat label="Spent" value={stats.spent ? formatMoney(stats.spent, profile?.currency) : "Free"} tone="text-slate-700" />
+            <Stat label="Spent" value={stats.spent ? money(stats.spent) : "Free"} tone="text-slate-700" />
           </div>
 
           <div className="mt-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">

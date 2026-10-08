@@ -28,8 +28,8 @@ async function send(path: string, options: Options, token: string | undefined) {
     body,
     cache: "no-store",
     // A small change keeps going even if the page is closed right after (the last edit before leaving is not lost).
-    // Browsers allow about 64 KB of such requests at a time, so big bodies and files are sent the normal way.
-    keepalive: typeof body === "string" && options.method !== undefined && options.method !== "GET" && body.length < 30_000,
+    // Browsers allow about 64 KB (bytes, not characters: Bangla letters are 3 bytes each) of such requests at a time, so big bodies and files are sent the normal way.
+    keepalive: typeof body === "string" && options.method !== undefined && options.method !== "GET" && body.length < 30_000 && new TextEncoder().encode(body).length < 30_000,
   });
 }
 

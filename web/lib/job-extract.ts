@@ -127,20 +127,55 @@ function firstSentences(text: string, max = 280) {
   return cutAt > 80 ? paragraph.slice(0, cutAt + 1) : `${paragraph.slice(0, max - 1).trimEnd()}…`;
 }
 
+// A page's title and share tags are at the top. Only that much is read, and only by plain scanning (indexOf): a hostile page
+// made of thousands of unclosed "<meta " or "<title " openers would freeze the server with a pattern that rescans to the end each time.
+const MAX_HEAD = 300_000;
+const MAX_TAG = 4_000;
+
+/** The top of a page, and a lower-case copy of the same length to search in (non-ASCII letters become spaces so lengths always agree). */
+function pageHead(html: string) {
+  const head = html.slice(0, MAX_HEAD);
+  return { head, lower: head.replace(/[^\x00-\x7f]/g, " ").toLowerCase() };
+}
+
+/** Positions of "<name" openers that really are that tag ("<meta " and "<meta>", not "<metadata"), each with the position of its ">". */
+function openTags(head: string, lower: string, name: string, limit: number) {
+  const found: { at: number; end: number }[] = [];
+  let at = lower.indexOf(`<${name}`);
+  while (at >= 0 && found.length < limit) {
+    const end = head.indexOf(">", at);
+    if (end < 0) break;
+    if (/[\s/>]/.test(lower[at + name.length + 1] ?? "")) found.push({ at, end });
+    at = lower.indexOf(`<${name}`, end + 1); // always moves forward past this tag, so the whole scan is one pass
+  }
+  return found;
+}
+
 /** The value of a <meta> tag (any attribute order, either kind of quote, apostrophes allowed inside): `property="og:title" content="Google's Ads"`. */
 function metaContent(html: string, property: string) {
-  for (const tag of html.match(/<meta\b[^>]*>/gi) ?? []) {
+  const { head, lower } = pageHead(html);
+  for (const { at, end } of openTags(head, lower, "meta", 300)) {
+    if (end - at > MAX_TAG) continue;
+    const tag = head.slice(at, end + 1);
     if (!new RegExp(`(?:property|name)\\s*=\\s*(["'])${property}\\1`, "i").test(tag)) continue;
-    const content = tag.match(/\bcontent\s*=\s*(["'])([\s\S]*?)\1/i)?.[2];
-    if (content !== undefined) return content;
+    const content = tag.match(/\bcontent\s*=\s*(["'])([\s\S]*?)\1/i)?.[2]?.trim();
+    if (content) return content; // an empty value is as good as none: the next source is tried
   }
   return undefined;
 }
 
+/** The text of the first <title> tag. */
+function titleTag(html: string) {
+  const { head, lower } = pageHead(html);
+  const [open] = openTags(head, lower, "title", 1);
+  if (!open) return undefined;
+  const close = lower.indexOf("</title", open.end);
+  return close < 0 ? undefined : head.slice(open.end + 1, Math.min(close, open.end + 1 + 1_000));
+}
+
 /** The title of a web page: its social-share title, else the <title> tag. */
 export function titleFromPage(html: string) {
-  const raw = decodeEntities(metaContent(html, "og:title") ?? html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? "").replace(/\s+/g, " ").trim();
-  return raw;
+  return decodeEntities(metaContent(html, "og:title") || titleTag(html) || "").replace(/\s+/g, " ").trim();
 }
 
 /** The name of the website a page belongs to (og:site_name), or "". */

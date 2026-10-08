@@ -7,6 +7,7 @@ import { api, errorMessage, refresh } from "@/lib/api";
 import { fixLink, KINDS, PRIORITIES, STATUSES, readLink } from "@/lib/library";
 import type { CourseDetail, CourseSummary, LearningResource, ResourceKind, ResourcePriority, ResourceRead, ResourceStatus } from "@/lib/types";
 import { Field } from "@/components/ui/controls";
+import { useProfile } from "@/lib/profile";
 import { useFeedback } from "@/components/ui/feedback";
 import { ModalActions } from "@/components/ui/modal";
 import { useResourceActions } from "./shared";
@@ -19,6 +20,7 @@ const noCourse = "";
 /** Add or edit one item. Pasting a link fills in the title, platform and channel; every field can be typed or corrected by hand. */
 export function ResourceForm({ item, courseId, onClose, onSaved }: { item: LearningResource | null; courseId?: string | null; onClose: () => void; onSaved?: (saved: LearningResource) => void }) {
   const { toast } = useFeedback();
+  const { profile } = useProfile();
   const { remove } = useResourceActions();
   const [busy, setBusy] = useState(false);
   const [reading, setReading] = useState(false);
@@ -54,7 +56,8 @@ export function ResourceForm({ item, courseId, onClose, onSaved }: { item: Learn
 
   const { data: courses } = useSWR<{ items: CourseSummary[] }>("/courses");
   const { data: detail } = useSWR<CourseDetail>(f.course ? `/courses/${f.course}` : null);
-  const units = f.course ? (detail?.units ?? []) : [];
+  // Only the units of the course chosen now: while its page loads, SWR may still hold the previous course's.
+  const units = f.course && detail?.course.id === f.course ? detail.units : [];
 
   const read = async (link: string) => {
     const url = fixLink(link);
@@ -236,7 +239,7 @@ export function ResourceForm({ item, courseId, onClose, onSaved }: { item: Learn
         <Field label="What it teaches" htmlFor="res-skills" hint="Separate with commas. They can be added to your skills when you finish.">
           <input id="res-skills" className="input" value={f.skills} onChange={set("skills")} placeholder="SEO, Google Analytics" autoComplete="off" />
         </Field>
-        <Field label="Cost (৳)" htmlFor="res-cost" hint="0 if it is free.">
+        <Field label={`Cost (${profile?.currency === "USD" ? "$" : "৳"})`} htmlFor="res-cost" hint="0 if it is free.">
           <input id="res-cost" className="input" type="number" min={0} step={1} value={f.cost} onChange={set("cost")} />
         </Field>
       </div>

@@ -58,7 +58,7 @@ export function LearningView() {
     const goal_hours = Math.min(100, Math.max(0.5, hours));
     const weekStart = data.week_start;
     mutate({ ...data, goal_hours }, { revalidate: false });
-    saveLater("goal", () => {
+    saveLater(`goal-${weekStart}`, () => {
       run(() => api(`/learning/week/${weekStart}`, { method: "PUT", body: { goal_hours } }));
     });
   };

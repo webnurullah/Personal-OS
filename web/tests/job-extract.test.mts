@@ -90,3 +90,32 @@ test("page titles keep apostrophes, quotes and entities, whatever the quote styl
   assert.equal(siteNameFromPage(`<meta property="og:site_name" content="Brian's Academy">`), "Brian's Academy");
   assert.equal(siteNameFromPage(`<meta property="og:title" content="x">`), "");
 });
+
+test("an empty share title falls back to the <title> tag, as before", () => {
+  assert.equal(titleFromPage(`<meta property="og:title" content=""><title>Senior Accountant - Acme Ltd | BDJobs</title>`), "Senior Accountant - Acme Ltd | BDJobs");
+  assert.equal(titleFromPage(`<meta property="og:title" content="   "><title>Real title</title>`), "Real title");
+  assert.equal(extractJob({ html: `<meta property="og:title" content=""><title>Senior Accountant - Acme Ltd | BDJobs</title>` }, today).title, "Senior Accountant");
+});
+
+test("a hostile page cannot freeze the title reader (the scan is one pass)", () => {
+  const hostile = [
+    "<meta ".repeat(500_000), // 3 MB of unclosed openers
+    "<title ".repeat(430_000),
+    "<meta property=\"og:title\" content=\"" + "<meta ".repeat(300_000),
+    "<META " + "x".repeat(2_000_000),
+  ];
+  for (const html of hostile) {
+    const started = performance.now();
+    titleFromPage(html);
+    siteNameFromPage(html);
+    assert.ok(performance.now() - started < 1_000, `took ${Math.round(performance.now() - started)} ms`);
+  }
+});
+
+test("titles are found in upper-case tags, after non-English letters, and not inside look-alike tags", () => {
+  assert.equal(titleFromPage(`<TITLE>Loud Title</TITLE>`), "Loud Title");
+  assert.equal(titleFromPage(`<p>বাংলা İstanbul</p><title>After letters</title>`), "After letters");
+  assert.equal(titleFromPage(`<titlebar>x</titlebar><title>Real</title>`), "Real");
+  assert.equal(siteNameFromPage(`<metadata property="og:site_name" content="No"><meta property="og:site_name" content="Yes">`), "Yes");
+  assert.equal(siteNameFromPage(`<meta property="og:site_name" content="` + "a".repeat(5_000) + `">`), ""); // a absurdly long tag is ignored
+});
