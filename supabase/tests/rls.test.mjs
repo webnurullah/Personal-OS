@@ -282,6 +282,63 @@ const note2 = (await one(`insert into notes (title) values ('Gone for good') ret
 const an2 = await arch('note', note2);
 check('deleting from the Archive removes the entry for good', (await qa('delete from archive_items where id = $1 returning id', [an2])).length === 1 && (await count('notes', note2)) === 0 && (await count('archive_items', an2)) === 0);
 await expectError('an entry deleted for good cannot be restored', () => restore(an2), 'Not found');
+
+// Learning library (20261009000000_learning_resources.sql)
+const lc = (await one(`insert into courses (title, start_date, target_date) values ('Digital Marketing', '2026-10-05', '2026-12-28') returning id`)).id;
+const lu = (await one(`insert into course_units (course_id, code, title) values ($1, '1', 'SEO') returning id`, [lc])).id;
+const res = await one(`insert into learning_resources (title, course_id, unit_id, url) values ('SEO Basics', $1, $2, 'https://www.coursera.org/learn/seo') returning id, kind, status, priority, est_hours::float h, items_total, items_done, skills, rating, cost::float c`, [lc, lu]);
+check('a library item saves with defaults', res.kind === 'certificate' && res.status === 'todo' && res.priority === 'medium' && res.h === 0 && res.items_total === 0 && res.items_done === 0 && res.skills.length === 0 && res.rating === null && res.c === 0, JSON.stringify(res));
+const quarter = await one(`insert into learning_resources (title, est_hours, cost) values ('Quarter', 7.75, 1200.5) returning est_hours::float h, cost::float c`);
+check('quarter hours and prices are kept', quarter.h === 7.75 && quarter.c === 1200.5);
+await expectError('empty title rejected', () => qa(`insert into learning_resources (title) values ('')`), 'check constraint');
+await expectError('unknown kind rejected', () => qa(`insert into learning_resources (title, kind) values ('x', 'movie')`), 'check constraint');
+await expectError('unknown status rejected', () => qa(`insert into learning_resources (title, status) values ('x', 'lost')`), 'check constraint');
+await expectError('unknown priority rejected', () => qa(`insert into learning_resources (title, priority) values ('x', 'urgent')`), 'check constraint');
+await expectError('rating must be 1 to 5', () => qa(`insert into learning_resources (title, rating) values ('x', 6)`), 'check constraint');
+await expectError('watched cannot be more than the total', () => qa(`insert into learning_resources (title, items_total, items_done) values ('x', 5, 6)`), 'check constraint');
+await expectError('watched without a total rejected', () => qa(`insert into learning_resources (title, items_done) values ('x', 1)`), 'check constraint');
+await expectError('a certificate cannot expire before it was issued', () => qa(`insert into learning_resources (title, issued_on, expires_on) values ('x', '2026-10-01', '2026-09-01')`), 'check constraint');
+const listed = await one(`insert into learning_resources (title, status, items_total, items_done, certificate_id, issued_on, expires_on, skills) values ('Done one', 'completed', 10, 10, 'ABC123', '2026-10-01', '2027-10-01', '{SEO,GA4}') returning id, skills`);
+check('a completed item with a certificate and skills saves', listed.skills.join() === 'SEO,GA4');
+const stamped2 = await one(`update learning_resources set title = 'SEO Basics 2' where id = $1 returning updated_at > created_at as moved`, [res.id]);
+check('library "last edited" time updates', stamped2.moved === true);
+
+check("user B sees none of A's library", (await qb('select count(*)::int n from learning_resources'))[0].n === 0);
+check("user B cannot update A's item", (await qb(`update learning_resources set title = 'hacked' where id = $1 returning id`, [res.id])).length === 0);
+check("user B cannot delete A's item", (await qb('delete from learning_resources where id = $1 returning id', [res.id])).length === 0);
+await expectError('user B cannot insert an item for A', () => qb(`insert into learning_resources (user_id, title) values ($1, 'x')`, [A]), 'row-level security');
+await expectError('signed-out visitor cannot read the library', () => qanon('select * from learning_resources'), 'permission denied');
+
+// Deleting a course (to the Archive) keeps the items, without the link; restoring the course links them again.
+const arcCourse = await arch('course', lc);
+const kept = await one('select course_id, unit_id from learning_resources where id = $1', [res.id]);
+check('deleting a course keeps its library items, unlinked', (await count('courses', lc)) === 0 && kept.course_id === null && kept.unit_id === null, JSON.stringify(kept));
+await restore(arcCourse);
+const linked = await one('select course_id, unit_id from learning_resources where id = $1', [res.id]);
+// (A course's units are deleted with it, so the items lose the unit as well; only the course link comes back.)
+check('restoring the course links its items to it again', linked.course_id === lc && linked.unit_id === null, JSON.stringify(linked));
+await qa('update learning_resources set unit_id = $1 where id = $2', [lu, res.id]);
+
+// A deleted unit only clears the unit link.
+const arcUnit = await arch('unit', lu);
+const afterUnit = await one('select course_id, unit_id from learning_resources where id = $1', [res.id]);
+check('deleting a unit keeps the item in its course', afterUnit.course_id === lc && afterUnit.unit_id === null, JSON.stringify(afterUnit));
+await restore(arcUnit);
+check('restoring the unit links the item to it again', (await one('select unit_id from learning_resources where id = $1', [res.id])).unit_id === lu);
+
+// An item goes to the Archive and comes back with everything (certificate, skills, dates, links).
+const arcItem = await arch('resource', listed.id);
+const eItem = await entry(arcItem);
+check('deleting an item moves it to the Archive', (await count('learning_resources', listed.id)) === 0 && eItem.kind === 'resource' && eItem.title === 'Done one', JSON.stringify(eItem));
+await restore(arcItem);
+const backItem = await one(`select status, items_done, certificate_id, issued_on::text i, expires_on::text e, skills from learning_resources where id = $1`, [listed.id]);
+check('a restored item has its certificate, dates and skills', backItem.status === 'completed' && backItem.items_done === 10 && backItem.certificate_id === 'ABC123' && backItem.i === '2026-10-01' && backItem.e === '2027-10-01' && backItem.skills.join() === 'SEO,GA4', JSON.stringify(backItem));
+
+// A practice project is only a link: deleting the project keeps the item.
+const practice = (await one(`insert into projects (name) values ('Practice: SEO') returning id`)).id;
+await qa('update learning_resources set practice_project_id = $1 where id = $2', [practice, res.id]);
+await qa('delete from projects where id = $1', [practice]);
+check('deleting the practice project keeps the item', (await one('select practice_project_id from learning_resources where id = $1', [res.id])).practice_project_id === null);
 }
 
 // Security advisor fixes (20261006000100_security_hardening.sql)

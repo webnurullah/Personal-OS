@@ -3,6 +3,7 @@ import { addDays, daysBetween, minutesNowIn, mondayOf, startOfDayUtc, todayIn, w
 import { habitBoard } from "@/lib/server/habits";
 import { must } from "@/lib/server/http";
 import { loadHabits } from "@/lib/server/queries";
+import { EXPIRY_WARNING_DAYS } from "@/lib/library";
 import { byTime, occurrences } from "@/lib/server/recurrence";
 import { isOnDay, isOverdue } from "@/lib/tasks";
 
@@ -25,7 +26,7 @@ export const GET = handle(async ({ db, profile: getProfile }) => {
   const notify = (profile.notify || {}) as Record<string, boolean>;
   const nowMinutes = minutesNowIn(zone);
 
-  const [openTasks, bills, events, blocks, habitData, jobs, projects] = await Promise.all([
+  const [openTasks, bills, events, blocks, habitData, jobs, projects, libraryDue, libraryCerts] = await Promise.all([
     db.from("tasks").select("due_date, end_date").is("done_at", null).lte("due_date", today).then(must),
     db.from("bills").select("*").is("paid_at", null).lte("due_date", addDays(today, 3)).order("due_date").then(must),
     db.from("events").select("*").lte("event_date", today).or(`repeat.neq.none,event_date.eq.${today}`).then(must),
@@ -35,6 +36,10 @@ export const GET = handle(async ({ db, profile: getProfile }) => {
     db.from("job_applications").select("id, title, company, deadline").eq("status", "saved").gte("deadline", today).lte("deadline", addDays(today, 3)).order("deadline").then(must),
     // Active projects with a due date (ongoing projects have none) that is within 3 days or already past.
     db.from("projects").select("id, name, due_date").eq("status", "active").is("archived_at", null).not("due_date", "is", null).lte("due_date", addDays(today, 3)).order("due_date").then(must),
+    // Library items still to do or in progress whose deadline is within 3 days.
+    db.from("learning_resources").select("id, title, status, due_date, expires_on").in("status", ["todo", "learning"]).gte("due_date", today).lte("due_date", addDays(today, 3)).then(must),
+    // Certificates that expire within a month, or did in the last 2 weeks.
+    db.from("learning_resources").select("id, title, status, due_date, expires_on").eq("status", "completed").gte("expires_on", addDays(today, -14)).lte("expires_on", addDays(today, EXPIRY_WARNING_DAYS)).then(must),
   ]);
 
   const items: Item[] = [];
@@ -66,6 +71,18 @@ export const GET = handle(async ({ db, profile: getProfile }) => {
     const days = daysBetween(today, project.due_date!);
     const when = days < 0 ? `overdue by ${plural(-days, "day")}` : days === 0 ? "due today" : `due in ${plural(days, "day")}`;
     items.push({ id: `project-${project.id}`, icon: "briefcase", tone: days < 0 ? "rose" : "amber", title: `${project.name} is ${when}`, meta: "Projects", href: `/projects/${project.id}` });
+  }
+
+  for (const r of [...libraryDue, ...libraryCerts]) {
+    if (r.status === "completed" && r.expires_on) {
+      const days = daysBetween(today, r.expires_on);
+      const when = days < 0 ? `expired ${plural(-days, "day")} ago` : days === 0 ? "expires today" : `expires in ${plural(days, "day")}`;
+      items.push({ id: `cert-${r.id}`, icon: "award", tone: days <= 7 ? "rose" : "amber", title: `${r.title} certificate ${when}`, meta: "Learning", href: "/learning/library" });
+    } else if (r.due_date) {
+      const days = daysBetween(today, r.due_date);
+      const when = days === 0 ? "due today" : days === 1 ? "due tomorrow" : `due in ${plural(days, "day")}`;
+      items.push({ id: `library-${r.id}`, icon: "graduation-cap", tone: days <= 1 ? "rose" : "amber", title: `${r.title} is ${when}`, meta: "Learning", href: "/learning/library" });
+    }
   }
 
   // The next event still to come today.

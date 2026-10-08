@@ -1,11 +1,20 @@
 // The Archive: names, what goes with an item, and the confirmation texts. Run with: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { ARCHIVE_KINDS, foreverMessage, kindName, relatedText, toArchive } from "../lib/archive.ts";
 
-// Every kind the database function knows (supabase/migrations/20261008000100_archive_items.sql) has a name and a home page.
-const DATABASE_KINDS = ["task", "note", "event", "goal", "milestone", "habit", "course", "unit", "topic", "study_block", "transaction", "bill", "budget_category", "category", "reminder", "job"];
+// Every kind the database function knows (supabase/migrations: archive_items.sql, and later migrations that add kinds) has a name and a home page.
+const DATABASE_KINDS = ["task", "note", "event", "goal", "milestone", "habit", "course", "unit", "topic", "study_block", "transaction", "bill", "budget_category", "category", "reminder", "job", "resource"];
+
+// The newest migration that (re)defines something is the one in force.
+const migrations = new URL("../../supabase/migrations/", import.meta.url);
+const files = readdirSync(migrations).filter((f) => f.endsWith(".sql")).sort();
+const newest = (what: RegExp) => {
+  const hits = files.map((f) => readFileSync(new URL(f, migrations), "utf8")).filter((sql) => what.test(sql));
+  assert.ok(hits.length > 0, `no migration matches ${what}`);
+  return hits[hits.length - 1];
+};
 
 test("every kind of item that can be archived has a name and a page to find it on", () => {
   for (const kind of [...DATABASE_KINDS, "project"]) {
@@ -19,9 +28,12 @@ test("every kind of item that can be archived has a name and a page to find it o
 });
 
 test("the app and the database agree on what can be archived", () => {
-  const sql = readFileSync(new URL("../../supabase/migrations/20261008000100_archive_items.sql", import.meta.url), "utf8");
-  const inCheck = sql.match(/kind in \(([^)]*)\)/)?.[1].match(/'([a-z_]+)'/g)?.map((k) => k.replaceAll("'", "")) ?? [];
+  const sql = newest(/kind in \(\s*'task'/);
+  const inCheck = sql.match(/kind in \(\s*('task'[^)]*)\)/)?.[1].match(/'([a-z_]+)'/g)?.map((k) => k.replaceAll("'", "")) ?? [];
   assert.deepEqual([...inCheck].sort(), [...DATABASE_KINDS].sort());
+  // …and so does archive_config, which says where each kind lives.
+  const config = JSON.parse(newest(/function public\.archive_config/).match(/select \('(\{[\s\S]*?\})'::jsonb\)/)?.[1] ?? "{}") as Record<string, { table: string }>;
+  assert.deepEqual(Object.keys(config).sort(), [...DATABASE_KINDS].sort());
   // …and the server's list of kinds (lib/server/archive.ts) names exactly those too.
   const ts = readFileSync(new URL("../lib/server/archive.ts", import.meta.url), "utf8");
   const typed = [...ts.slice(ts.indexOf("export type ArchiveKind"), ts.indexOf("/** Moves")).matchAll(/"([a-z_]+)"/g)].map((m) => m[1]);

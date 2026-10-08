@@ -127,10 +127,16 @@ function firstSentences(text: string, max = 280) {
   return cutAt > 80 ? paragraph.slice(0, cutAt + 1) : `${paragraph.slice(0, max - 1).trimEnd()}…`;
 }
 
-function titleFromPage(html: string) {
+/** The title of a web page: its social-share title, else the <title> tag. */
+export function titleFromPage(html: string) {
   const og = html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i)?.[1] ?? html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:title["']/i)?.[1];
   const raw = decodeEntities(og ?? html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? "").replace(/\s+/g, " ").trim();
   return raw;
+}
+
+/** The name of the website a page belongs to (og:site_name), or "". */
+export function siteNameFromPage(html: string) {
+  return decodeEntities(html.match(/<meta[^>]+property=["']og:site_name["'][^>]+content=["']([^"']+)["']/i)?.[1] ?? "").trim();
 }
 
 /** Cuts "Frontend Developer - Acme | BDJobs" down to the job title (and the company if it is there). */
@@ -179,7 +185,7 @@ export function extractJob(source: { html?: string; text?: string }, today: stri
     title = split.title;
     company ||= split.company;
   }
-  if (!company && html) company = decodeEntities(html.match(/<meta[^>]+property=["']og:site_name["'][^>]+content=["']([^"']+)["']/i)?.[1] ?? "").trim();
+  if (!company && html) company = siteNameFromPage(html);
   if (!title && source.text) {
     title = lines.map((l) => l.match(/^(?:job\s*title|position|vacancy|post)\s*[:\-–]\s*(.{3,150})$/i)?.[1]).find(Boolean) ?? (lines[0] && lines[0].length <= 120 ? lines[0] : "");
   }

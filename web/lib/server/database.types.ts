@@ -645,6 +645,107 @@ export type Database = {
 
         ];
       };
+      learning_resources: {
+        Row: {
+          id: string;
+          user_id: string;
+          course_id: string | null;
+          unit_id: string | null;
+          practice_project_id: string | null;
+          kind: string;
+          title: string;
+          url: string;
+          platform: string;
+          provider: string;
+          status: string;
+          priority: string;
+          est_hours: number;
+          items_total: number;
+          items_done: number;
+          due_date: string | null;
+          started_on: string | null;
+          completed_on: string | null;
+          cost: number;
+          skills: string[];
+          rating: number | null;
+          takeaway: string;
+          dropped_reason: string;
+          notes: string;
+          certificate_url: string;
+          certificate_id: string;
+          issued_on: string | null;
+          expires_on: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string;
+          course_id?: string | null;
+          unit_id?: string | null;
+          practice_project_id?: string | null;
+          kind?: string;
+          title: string;
+          url?: string;
+          platform?: string;
+          provider?: string;
+          status?: string;
+          priority?: string;
+          est_hours?: number;
+          items_total?: number;
+          items_done?: number;
+          due_date?: string | null;
+          started_on?: string | null;
+          completed_on?: string | null;
+          cost?: number;
+          skills?: string[];
+          rating?: number | null;
+          takeaway?: string;
+          dropped_reason?: string;
+          notes?: string;
+          certificate_url?: string;
+          certificate_id?: string;
+          issued_on?: string | null;
+          expires_on?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          course_id?: string | null;
+          unit_id?: string | null;
+          practice_project_id?: string | null;
+          kind?: string;
+          title?: string;
+          url?: string;
+          platform?: string;
+          provider?: string;
+          status?: string;
+          priority?: string;
+          est_hours?: number;
+          items_total?: number;
+          items_done?: number;
+          due_date?: string | null;
+          started_on?: string | null;
+          completed_on?: string | null;
+          cost?: number;
+          skills?: string[];
+          rating?: number | null;
+          takeaway?: string;
+          dropped_reason?: string;
+          notes?: string;
+          certificate_url?: string;
+          certificate_id?: string;
+          issued_on?: string | null;
+          expires_on?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+
+        ];
+      };
       notes: {
         Row: {
           id: string;

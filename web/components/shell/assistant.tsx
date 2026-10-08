@@ -6,7 +6,7 @@ import { Bot, Eraser, SendHorizontal, Sparkles, X } from "lucide-react";
 import { api, errorMessage, refresh, refreshAll } from "@/lib/api";
 import { formatDate } from "@/lib/dates";
 import { saveJobFromLink } from "@/lib/job-actions";
-import { skillKey } from "@/lib/jobs";
+import { mergeSkills } from "@/lib/jobs";
 import { formatTime } from "@/lib/format";
 import { useProfile } from "@/lib/profile";
 import { EXAMPLES, parseQuickAdd, type Command } from "@/lib/quickadd";
@@ -175,10 +175,9 @@ export function Assistant() {
       }
 
       case "skills": {
-        const have = profile?.skills ?? [];
-        const fresh = c.skills.filter((s) => !have.some((k) => skillKey(k) === skillKey(s)));
+        const { skills, added: fresh } = mergeSkills(profile?.skills ?? [], c.skills);
         if (!fresh.length) return "You already have those skills listed.";
-        await api("/profile", { method: "PATCH", body: { skills: [...have, ...fresh] } });
+        await api("/profile", { method: "PATCH", body: { skills } });
         await refresh("/profile");
         return `Added skills: ${fresh.map((s) => `**${s}**`).join(", ")}.`;
       }

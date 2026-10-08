@@ -7,9 +7,9 @@ import { BriefcaseBusiness, CalendarClock, Check, ChevronDown, Download, Externa
 import { api, errorMessage, refresh } from "@/lib/api";
 import { daysBetween, formatDate } from "@/lib/dates";
 import { fixLink } from "@/lib/job-actions";
-import { deadlineLabel, isOpen, matchPercent, skillKey, skillMatch, skillsToLearn } from "@/lib/jobs";
+import { deadlineLabel, isOpen, matchPercent, mergeSkills, skillKey, skillMatch, skillsToLearn } from "@/lib/jobs";
 import { useNewAction } from "@/lib/new-action";
-import type { JobAnalysis, JobApplication, JobStatus, List, Profile } from "@/lib/types";
+import type { JobAnalysis, JobApplication, JobStatus, LearningResource, List, Profile } from "@/lib/types";
 import { Progress } from "@/components/ui/charts";
 import { Field, Segmented } from "@/components/ui/controls";
 import { useFeedback } from "@/components/ui/feedback";
@@ -41,10 +41,12 @@ function downloadCsv(jobs: JobApplication[], mySkills: string[], today: string) 
 export function JobsView() {
   const { data, error, mutate } = useSWR<List<JobApplication>>("/jobs");
   const { data: profile, mutate: mutateProfile } = useSWR<Profile>("/profile");
+  const { data: library } = useSWR<{ items: LearningResource[] }>("/resources");
   const { toast, confirm } = useFeedback();
   const [editing, setEditing] = useState<JobApplication | "new" | null>(null);
   const [view, setView] = useState<"list" | "board">("list");
   const [learning, setLearning] = useState<Set<string>>(new Set());
+  const [librarying, setLibrarying] = useState<Set<string>>(new Set());
   useNewAction(() => setEditing("new"));
 
   if (error && !data) return <LoadError error={error} retry={() => mutate()} />;
@@ -90,6 +92,29 @@ export function JobsView() {
       toast(errorMessage(e), "error");
     }
     await refresh("/jobs", "/events");
+  };
+
+  // Courses and playlists in your Learning library that teach a skill you still lack: "you already planned this".
+  const planned = new Map<string, string>();
+  for (const r of library?.items ?? []) {
+    if (r.status === "todo" || r.status === "learning") for (const skill of r.skills) if (!planned.has(skillKey(skill))) planned.set(skillKey(skill), r.title);
+  }
+
+  // Adds the skill to the Learning library (a certificate course or playlist to find and complete), due by the nearest last date.
+  const addToLibrary = async (item: { skill: string; jobs: string[]; by: string | null }) => {
+    setLibrarying((set) => new Set(set).add(item.skill));
+    try {
+      await api("/resources", { method: "POST", body: { title: `Learn ${item.skill}`, kind: "certificate", skills: [item.skill], ...(item.by ? { due_date: item.by } : {}), notes: `Needed for: ${item.jobs.join(", ")}`.slice(0, 2000), priority: "high" } });
+      await refresh("/resources");
+      toast(`Added “Learn ${item.skill}” to your Learning library. Open it there to add a course link.`);
+    } catch (e) {
+      setLibrarying((set) => {
+        const next = new Set(set);
+        next.delete(item.skill);
+        return next;
+      });
+      toast(errorMessage(e), "error");
+    }
   };
 
   // One click turns a missing skill into a task, due by the earliest last date among the jobs that ask for it.
@@ -192,15 +217,24 @@ export function JobsView() {
                       </p>
                       <p className="truncate text-xs text-slate-400" title={s.jobs.join(", ")}>{s.jobs.join(", ")}</p>
                     </div>
-                    <button
-                      type="button"
-                      className="btn btn-secondary btn-sm shrink-0"
-                      disabled={learning.has(s.skill)}
-                      onClick={() => learnSkill(s)}
-                      title={s.by ? `Adds a task due ${formatDate(s.by, "short")}, the nearest last date` : "Adds a task"}
-                    >
-                      {learning.has(s.skill) ? <><Check className="size-3.5" />Added</> : <><Plus className="size-3.5" />Learn</>}
-                    </button>
+                    <div className="flex shrink-0 flex-col items-stretch gap-1.5">
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        disabled={learning.has(s.skill)}
+                        onClick={() => learnSkill(s)}
+                        title={s.by ? `Adds a task due ${formatDate(s.by, "short")}, the nearest last date` : "Adds a task"}
+                      >
+                        {learning.has(s.skill) ? <><Check className="size-3.5" />Added</> : <><Plus className="size-3.5" />Task</>}
+                      </button>
+                      {planned.has(skillKey(s.skill)) ? (
+                        <span className="text-center text-[11px] font-medium text-emerald-700" title={planned.get(skillKey(s.skill))}>In your library</span>
+                      ) : (
+                        <button type="button" className="btn btn-ghost btn-sm" disabled={librarying.has(s.skill)} onClick={() => addToLibrary(s)} title="Adds a course to find and complete in Learning → Certificates & playlists">
+                          {librarying.has(s.skill) ? <><Check className="size-3.5" />Added</> : <><GraduationCap className="size-3.5" />Library</>}
+                        </button>
+                      )}
+                    </div>
                   </li>
                 ))}
               </ol>
@@ -410,9 +444,9 @@ function SkillsCard({ skills, onSave }: { skills: string[]; onSave: (skills: str
   const add = (e: FormEvent) => {
     e.preventDefault();
     // "React, SQL, Docker" adds three at once.
-    const fresh = words(text).filter((s) => !skills.some((k) => skillKey(k) === skillKey(s)));
+    const { skills: all, added } = mergeSkills(skills, words(text));
     setText("");
-    if (fresh.length) onSave([...skills, ...fresh]);
+    if (added.length) onSave(all);
   };
   return (
     <section className="card p-5">

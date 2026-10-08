@@ -12,6 +12,7 @@ const PAGE_DATA: Record<string, string[]> = {
   "/goals": ["/goals"],
   "/habits": ["/habits?days=7"],
   "/learning": ["/learning/week"],
+  "/learning/library": ["/resources", "/courses"],
   "/finance": ["/finance"],
   "/health": ["/health?days=30"],
   "/notes": ["/notes", "/reminders"],

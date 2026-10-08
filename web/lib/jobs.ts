@@ -6,6 +6,23 @@ type JobFacts = { id: string; title: string; status: string; deadline: string | 
 /** "React.js", "react js" and "ReactJS" are the same skill. */
 export const skillKey = (skill: string) => skill.toLowerCase().replace(/\.?js\b/g, "").replace(/[^a-z0-9+#]/g, "");
 
+/**
+ * Your skills plus new ones, without doubles ("React.js" is not added next to "React"). `added` is what was really new.
+ * Used by Job Apply, Quick Add and a finished course in the Learning library.
+ */
+export function mergeSkills(have: string[], fresh: string[]) {
+  const seen = new Set(have.map(skillKey));
+  const added: string[] = [];
+  for (const raw of fresh) {
+    const skill = raw.trim();
+    const key = skillKey(skill);
+    if (!skill || !key || seen.has(key)) continue;
+    seen.add(key);
+    added.push(skill);
+  }
+  return { skills: [...have, ...added], added };
+}
+
 /** The job's skills split into the ones you have and the ones you don't, with a match percentage. */
 export function skillMatch(jobSkills: string[], mySkills: string[]) {
   const mine = new Set(mySkills.map(skillKey));

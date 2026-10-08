@@ -13,7 +13,8 @@ import { useCategories, useNowMinutes } from "@/lib/hooks";
 import { useProfile } from "@/lib/profile";
 import { taskDateLabel } from "@/lib/tasks";
 import { deadlineLabel, isOpen } from "@/lib/jobs";
-import type { Dashboard, JobApplication, LearningWeek, List, Note, Task } from "@/lib/types";
+import { compareUpNext, stepWord } from "@/lib/library";
+import type { Dashboard, JobApplication, LearningResource, LearningWeek, List, Note, Task } from "@/lib/types";
 import { Donut, Progress } from "../ui/charts";
 import { Segmented } from "../ui/controls";
 import { useFeedback } from "../ui/feedback";
@@ -408,6 +409,9 @@ export function RemindersWidget({ data }: Props) {
 // ---------- Learning: courses and this week's study plan ----------
 export function LearningWidget() {
   const { data } = useSWR<LearningWeek>("/learning/week");
+  // The playlist or course in the library you are working on right now (the one started first).
+  const { data: library } = useSWR<{ items: LearningResource[] }>("/resources");
+  const learningNow = (library?.items ?? []).filter((r) => r.status === "learning").sort(compareUpNext)[0];
   const planned = data?.blocks.reduce((sum, b) => sum + Number(b.hours), 0) ?? 0;
   const studied = data?.blocks.filter((b) => b.done).reduce((sum, b) => sum + Number(b.hours), 0) ?? 0;
   const goal = data?.goal_hours ?? 0;
@@ -430,6 +434,14 @@ export function LearningWidget() {
             <Progress value={pct(studied, goal || planned)} fill="bg-violet-500" track="bg-violet-100" className="mt-2 h-2" />
             {data.topic && <p className="mt-2 truncate text-xs text-slate-500">Focus: {data.topic}</p>}
           </div>
+          {learningNow && (
+            <Link href="/learning/library" className="mt-3 block rounded-xl bg-slate-50 px-3 py-2 text-sm ring-1 ring-slate-100 hover:bg-white">
+              <p className="truncate font-medium text-slate-800">{learningNow.title}</p>
+              <p className="text-xs text-slate-500">
+                Learning now{learningNow.items_total > 0 ? ` · ${learningNow.items_done} of ${learningNow.items_total} ${stepWord(learningNow.kind)}s` : ""}
+              </p>
+            </Link>
+          )}
           {data.courses.length ? (
             <ul className="mt-3 divide-y divide-slate-100">
               {data.courses.slice(0, 4).map((course) => {

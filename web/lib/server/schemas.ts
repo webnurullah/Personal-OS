@@ -1,5 +1,6 @@
 // What each endpoint accepts. Anything else is refused with a 400 and the field errors.
 import { courseWeeks, MAX_COURSE_WEEKS } from "../course.ts";
+import { isHttpUrl } from "../projects.ts";
 import { daysBetween, mondayOf, weekdayIndex } from "./dates.ts";
 import { HttpError } from "./http.ts";
 import { s, z } from "./validate.ts";
@@ -178,6 +179,58 @@ export function checkPlannedWeek(week: number | null | undefined, course: { star
   const weeks = courseWeeks({ ...course, weekly_plan: [] });
   if (week > weeks) throw new HttpError(400, `Week ${week} is after the end of the course. The course has ${weeks} ${weeks === 1 ? "week" : "weeks"}.`);
 }
+
+// ---------- Learning library (certificates & playlists) ----------
+const link = z.string().trim().max(2000).refine((v) => v === "" || isHttpUrl(v), "Use a link starting with https://");
+
+export const ResourceFields = z.object({
+  course_id: s.id.nullable(),
+  unit_id: s.id.nullable(),
+  kind: z.enum(["certificate", "playlist", "video", "reading", "other"]),
+  title: s.text(300),
+  url: link,
+  platform: s.optionalText(60),
+  provider: s.optionalText(120),
+  status: z.enum(["todo", "learning", "completed", "dropped"]),
+  priority: z.enum(["low", "medium", "high"]),
+  est_hours: z.number().min(0).max(1000),
+  items_total: z.number().int().min(0).max(5000),
+  items_done: z.number().int().min(0).max(5000),
+  due_date: s.date.nullable(),
+  started_on: s.date.nullable(),
+  completed_on: s.date.nullable(),
+  cost: z.number().min(0).max(10_000_000),
+  skills: z.array(z.string().trim().min(1).max(60)).max(30),
+  rating: z.number().int().min(1).max(5).nullable(),
+  takeaway: s.optionalText(300),
+  dropped_reason: s.optionalText(300),
+  notes: s.optionalText(2000),
+  certificate_url: link,
+  certificate_id: s.optionalText(120),
+  issued_on: s.date.nullable(),
+  expires_on: s.date.nullable(),
+}).partial().strict();
+
+/** A new item: the title is the only thing that must be there. */
+export const ResourceCreate = ResourceFields.required({ title: true });
+
+/** Many items at once (pasted list): a title or a link each, up to 50. */
+export const ResourceBulk = z.object({
+  course_id: s.id.nullable().optional(),
+  kind: z.enum(["certificate", "playlist", "video", "reading", "other"]).optional(),
+  items: z.array(z.object({
+    title: s.optionalText(300),
+    url: link,
+    // From the starter ideas (each knows its kind, platform, length and skills).
+    kind: z.enum(["certificate", "playlist", "video", "reading", "other"]).optional(),
+    platform: s.optionalText(60).optional(),
+    est_hours: z.number().min(0).max(1000).optional(),
+    skills: z.array(z.string().trim().min(1).max(60)).max(30).optional(),
+  }).strict().refine((i) => i.title || i.url, "Each item needs a title or a link")).min(1).max(50),
+}).strict();
+
+/** Reading a link to fill the form. */
+export const ResourceReadInput = z.object({ url: z.string().trim().min(1).max(2000) }).strict();
 
 // ---------- Finance ----------
 export const METHODS = ["bKash", "Nagad", "Card", "Cash", "Bank", "Other"] as const;

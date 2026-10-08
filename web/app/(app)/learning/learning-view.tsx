@@ -18,6 +18,7 @@ import { Field } from "@/components/ui/controls";
 import { useFeedback } from "@/components/ui/feedback";
 import { Modal, ModalActions } from "@/components/ui/modal";
 import { LoadError, PageHeader, PageSkeleton } from "@/components/ui/states";
+import { LearningTabs } from "./learning-tabs";
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
@@ -84,6 +85,7 @@ export function LearningView() {
           Log Study Session
         </button>
       </PageHeader>
+      <LearningTabs current="courses" />
 
       <div className="mt-5 flex flex-wrap items-center gap-2">
         <button type="button" className="btn btn-ghost btn-sm btn-icon" onClick={() => setWeek(addDays(week ?? thisWeek, -7))} aria-label="Previous week">

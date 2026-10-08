@@ -20,6 +20,7 @@ import { ColorPicker, Field } from "@/components/ui/controls";
 import { useFeedback } from "@/components/ui/feedback";
 import { Modal, ModalActions } from "@/components/ui/modal";
 import { EmptyState, LoadError, PageSkeleton } from "@/components/ui/states";
+import { CourseLibrary } from "../library/course-library";
 import { CourseForm } from "../learning-view";
 
 const STATUSES: { value: TopicStatus; label: string }[] = [
@@ -473,6 +474,9 @@ export function CourseView({ id }: { id: string }) {
           </EmptyState>
         )}
       </section>
+
+      {/* Certificate courses and playlists collected for this subject */}
+      <CourseLibrary course={course} />
 
       {/* Weekly plan + overall progress */}
       <div className="mt-5 grid grid-cols-1 gap-5 2xl:grid-cols-[minmax(0,1fr)_24rem]">

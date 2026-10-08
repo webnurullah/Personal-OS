@@ -12,3 +12,4 @@ lines to your own Playwright/Chromium install before running. Not part of `npm t
   `next dev -p 3124` pointed at it). The test pictures it needs are generated with a few lines of Python/PIL (see the script).
 - `audit-lib.mjs`, `overflow-pages.mjs`: phone-layout checks. `measure()` reports whether a page makes the phone zoom out
   (`window.innerWidth` bigger than the device width) or has sideways overflow.
+- `learning-e2e.mjs`, `library-e2e.mjs`: the Learning course page (numbers, dialogs, saves) and the Certificates & playlists library (add by link, paste a list, ideas, +1 video, Make it count). Same setup as the phone-layout checks (built app on port 3123, a stand-in API); `library-e2e.mjs` imports `applyChange` from `web/lib/library.ts` so the stand-in follows the real status rules.

@@ -1,7 +1,7 @@
 // The API, described for the assistant. Body shapes come from the same schemas the API checks with.
 import {
   BillFields, BlockCreate, BudgetCategoryFields, CategoryCreate, CourseFields, EventFields, GoalCreate, HabitCreate, HabitUpdate,
-  HealthFields, JobAdd, JobCreate, JobFields, METHODS, MilestoneCreate, NoteFields, ProfileUpdate, ReminderFields, TaskCreate, TaskUpdate,
+  HealthFields, JobAdd, JobCreate, JobFields, METHODS, MilestoneCreate, NoteFields, ProfileUpdate, ReminderFields, ResourceCreate, ResourceFields, TaskCreate, TaskUpdate,
   TopicFields, TxFields, UnitFields, WeekUpdate,
 } from "../schemas.ts";
 import { z } from "../validate.ts";
@@ -96,6 +96,11 @@ const ENDPOINTS: [string, string, string, z.ZodType?][] = [
   ["POST", "/jobs", "Save a job (title required; use the fields from /jobs/analyze)", JobCreate],
   ["PATCH", "/jobs/:id", "Change a job (status saved/applied/interview/offer/rejected, deadline, notes …)", JobFields],
   ["DELETE", "/jobs/:id", "Delete a saved job (it goes to the Archive)"],
+
+  ["GET", "/resources", "The Learning library: certificate courses, YouTube playlists, videos and books to complete (status todo/learning/completed/dropped, progress items_done of items_total, certificate details)"],
+  ["POST", "/resources", "Add a course, playlist or video to the library (title required; platform is found from the url)", ResourceCreate],
+  ["PATCH", "/resources/:id", "Change an item; {status:\"completed\"} completes it, {items_done:n} sets the videos watched (the status and dates follow)", ResourceFields],
+  ["DELETE", "/resources/:id", "Delete a library item (it goes to the Archive)"],
 ];
 
 /** The endpoint list for the system prompt (built once). */

@@ -273,6 +273,45 @@ export type JobAnalysis = {
   hints: string[];
 };
 
+export type ResourceKind = "certificate" | "playlist" | "video" | "reading" | "other";
+export type ResourceStatus = "todo" | "learning" | "completed" | "dropped";
+export type ResourcePriority = "low" | "medium" | "high";
+
+/** A course, playlist, video or book in the Learning library (Learning → Certificates & playlists). */
+export type LearningResource = {
+  id: string;
+  course_id: string | null;
+  unit_id: string | null;
+  practice_project_id: string | null;
+  kind: ResourceKind;
+  title: string;
+  url: string;
+  platform: string;
+  provider: string;
+  status: ResourceStatus;
+  priority: ResourcePriority;
+  est_hours: number;
+  items_total: number;
+  items_done: number;
+  due_date: string | null;
+  started_on: string | null;
+  completed_on: string | null;
+  cost: number;
+  skills: string[];
+  rating: number | null;
+  takeaway: string;
+  dropped_reason: string;
+  notes: string;
+  certificate_url: string;
+  certificate_id: string;
+  issued_on: string | null;
+  expires_on: string | null;
+  created_at: string;
+};
+
+/** What reading a link found (nothing is saved until the form is submitted). */
+export type ResourceRead = { url: string; title: string; platform: string; provider: string; kind: ResourceKind; found: boolean; note: string };
+
 export type ProjectKind = "website" | "social" | "brand" | "other";
 export type ProjectStatus = "active" | "paused" | "done";
 export type ProjectLink = { label: string; url: string };

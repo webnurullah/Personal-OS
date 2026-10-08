@@ -7,6 +7,8 @@ export const POST = handle(async ({ db, body, user }) => {
   parse(z.object({ confirm: z.literal("DELETE", { message: "Type DELETE to confirm" }) }).strict(), await body());
   // Saved jobs first (Row Level Security limits this to your own rows), then everything else.
   must(await db.from("job_applications").delete().not("id", "is", null));
+  // The Learning library (certificates, playlists …); deleting courses only unlinks it, so it is removed here.
+  must(await db.from("learning_resources").delete().not("id", "is", null));
   // Projects too (their tasks go with them).
   must(await db.from("projects").delete().not("id", "is", null));
   // The Archive too: "delete all" means all.
