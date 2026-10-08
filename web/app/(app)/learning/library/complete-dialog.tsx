@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import useSWR from "swr";
-import { Award, Check, Copy, Sparkles } from "lucide-react";
+import { Award, Check, Copy, Hammer, Sparkles } from "lucide-react";
 import { api, errorMessage, refresh } from "@/lib/api";
 import { formatDate } from "@/lib/dates";
 import { mergeSkills } from "@/lib/jobs";
@@ -12,7 +12,7 @@ import { Field } from "@/components/ui/controls";
 import { useFeedback } from "@/components/ui/feedback";
 import { ModalActions } from "@/components/ui/modal";
 import { splitWords } from "./resource-form";
-import { useCopy } from "./shared";
+import { useCopy, useMakePractice } from "./shared";
 
 /**
  * "Make it count": what happens when you finish something. Add the certificate, keep the skills (they go to your
@@ -21,6 +21,8 @@ import { useCopy } from "./shared";
 export function CompleteDialog({ item, today, onClose }: { item: LearningResource; today: string; onClose: () => void }) {
   const { toast } = useFeedback();
   const copy = useCopy();
+  const makePractice = useMakePractice();
+  const [making, setMaking] = useState(false);
   const { data: profile, mutate: mutateProfile } = useSWR<Profile>("/profile");
   const offered = suggestSkills(item);
   const [skills, setSkills] = useState(offered.join(", "));
@@ -103,8 +105,26 @@ export function CompleteDialog({ item, today, onClose }: { item: LearningResourc
             <Copy className="size-4" /> Copy line
           </button>
         </div>
+        <div className="rounded-xl bg-violet-50 p-4 ring-1 ring-violet-100">
+          <p className="flex items-center gap-2 font-semibold text-violet-900"><Hammer className="size-4" /> Put it to work</p>
+          <p className="mt-1 text-sm text-violet-900/80">
+            Watching is not yet experience. Make a small practice project: redo it, apply it to something real, publish proof, teach it back and get feedback. It becomes a project with a few tasks and dates.
+          </p>
+          <button
+            type="button"
+            className="btn btn-primary mt-3"
+            disabled={making}
+            onClick={async () => {
+              setMaking(true);
+              if (await makePractice(done.item)) onClose();
+              else setMaking(false);
+            }}
+          >
+            <Hammer className="size-4" /> Make a practice project
+          </button>
+        </div>
         <div className="flex justify-end">
-          <button type="button" className="btn btn-primary" onClick={onClose}>Done</button>
+          <button type="button" className="btn btn-ghost" onClick={onClose}>Not now</button>
         </div>
       </div>
     );

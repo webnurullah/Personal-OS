@@ -331,6 +331,8 @@ export type Project = {
   /** When it was moved to the Archive (null = not archived). */
   archived_at: string | null;
   created_at: string;
+  /** Proof links (the Learning library reads them; older saved answers may not have them). */
+  links?: ProjectLink[];
   /** The same moments as calendar days in your time zone (older saved answers may not have them). */
   created_on?: string;
   archived_on?: string | null;

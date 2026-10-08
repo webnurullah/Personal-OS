@@ -1,6 +1,7 @@
 // Learning → Certificates & playlists: what is worked out from the items (never stored).
 // Plain functions with no React, so both the pages and the tests use them.
 import { daysBetween, formatDate } from "./dates.ts";
+import { skillKey } from "./jobs.ts";
 import { findSkills } from "./skills.ts";
 import type { LearningResource, ResourceKind, ResourcePriority, ResourceStatus } from "./types.ts";
 
@@ -270,3 +271,49 @@ export function parseList(text: string) {
     })
     .filter((item) => item.title || item.url);
 }
+
+// ---------- From watching to doing ----------
+
+export type SkillLevel = "learned" | "practised" | "proven";
+/** What the library needs to know about a practice project (the Projects list has all of it). */
+export type PracticeFacts = { status: string; tasks_total: number; tasks_done: number; archived_at?: string | null; links?: { url: string }[] };
+
+export const LEVELS: { value: SkillLevel; label: string; hint: string }[] = [
+  { value: "learned", label: "Learned", hint: "You finished a course on it." },
+  { value: "practised", label: "Practised", hint: "You did at least half of the practice project." },
+  { value: "proven", label: "Proven", hint: "The practice project is finished and there is proof (a link or a certificate)." },
+];
+const RANK: Record<SkillLevel, number> = { learned: 0, practised: 1, proven: 2 };
+
+/** How far a finished item has gone beyond watching: learned, practised (half of its project done) or proven (all done, with proof). */
+export function practiceLevel(item: Pick<LearningResource, "status" | "certificate_url" | "certificate_id">, project?: PracticeFacts | null): SkillLevel {
+  if (!project || project.archived_at || project.tasks_total === 0) return "learned";
+  const finished = project.status === "done" || project.tasks_done >= project.tasks_total;
+  const proof = (project.links?.length ?? 0) > 0 || hasCertificate(item);
+  if (finished && proof) return "proven";
+  return project.tasks_done * 2 >= project.tasks_total ? "practised" : "learned";
+}
+
+/** Every skill from your completed items with the highest level reached, proven first. */
+export function skillLadder(items: LearningResource[], projects: Map<string, PracticeFacts>) {
+  const found = new Map<string, { skill: string; level: SkillLevel; items: number }>();
+  for (const item of items) {
+    if (item.status !== "completed") continue;
+    const level = practiceLevel(item, item.practice_project_id ? projects.get(item.practice_project_id) : null);
+    for (const skill of item.skills) {
+      const key = skillKey(skill);
+      if (!key) continue;
+      const known = found.get(key);
+      if (!known) found.set(key, { skill, level, items: 1 });
+      else {
+        known.items += 1;
+        if (RANK[level] > RANK[known.level]) known.level = level;
+      }
+    }
+  }
+  return [...found.values()].sort((a, b) => RANK[b.level] - RANK[a.level] || b.items - a.items || a.skill.localeCompare(b.skill));
+}
+
+/** A finished item waiting for practice: completed more than 2 days ago with no practice project yet. */
+export const needsPractice = (r: Pick<LearningResource, "status" | "practice_project_id" | "completed_on">, today: string) =>
+  r.status === "completed" && !r.practice_project_id && Boolean(r.completed_on) && daysBetween(r.completed_on!, today) >= 3;

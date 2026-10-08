@@ -1,15 +1,17 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import useSWR from "swr";
-import { Award, BookOpen, Check, Copy, ExternalLink, Link2, ListVideo, Pencil, Play, Plus, RotateCcw, Star, Video, type LucideIcon } from "lucide-react";
+import { Award, BookOpen, Check, Copy, ExternalLink, Hammer, Link2, ListVideo, Pencil, Play, Plus, RotateCcw, Star, Video, type LucideIcon } from "lucide-react";
 import { toArchive } from "@/lib/archive";
 import { api, errorMessage, refresh } from "@/lib/api";
 import { formatDate, daysBetween } from "@/lib/dates";
 import { num } from "@/lib/format";
 import { isHttpUrl } from "@/lib/projects";
 import { applyChange, certificateExpiry, expiryLabel, hasCertificate, kindLabel, progressOf, resumeLine, statusLabel, stepWord, type ResourceChange } from "@/lib/library";
-import type { LearningResource, ResourceKind } from "@/lib/types";
+import type { LearningResource, Project, ResourceKind } from "@/lib/types";
 import { Progress } from "@/components/ui/charts";
 import { useFeedback } from "@/components/ui/feedback";
 
@@ -47,6 +49,30 @@ export function Stars({ value }: { value: number | null }) {
       ))}
     </span>
   );
+}
+
+/** The practice projects (your Projects list), by id: the library shows how far each practice has come. */
+export function usePracticeProjects() {
+  const { data } = useSWR<{ items: Project[] }>("/projects");
+  return new Map((data?.items ?? []).map((p) => [p.id, p]));
+}
+
+/** "Make a practice project": one project with a few tasks, then opens it (asking again opens the same one). */
+export function useMakePractice() {
+  const { toast } = useFeedback();
+  const router = useRouter();
+  return async (item: LearningResource) => {
+    try {
+      const made = await api<{ project_id: string; created: boolean }>(`/resources/${item.id}/practice`, { method: "POST" });
+      await refresh("/resources", "/projects", "/tasks", "/events");
+      toast(made.created ? "Practice project made. Do the first task this week." : "Opening your practice project");
+      router.push(`/projects/${made.project_id}`);
+      return true;
+    } catch (e) {
+      toast(errorMessage(e), "error");
+      return false;
+    }
+  };
 }
 
 /** Copies text and says so. */
@@ -107,7 +133,10 @@ function Chip({ children, tone = "bg-slate-100 text-slate-600" }: { children: Re
 export function ResourceRow({ item, today, courseName, onEdit, onComplete }: { item: LearningResource; today: string; courseName?: string; onEdit: () => void; onComplete: () => void }) {
   const { change } = useResourceActions();
   const copy = useCopy();
+  const practiceProjects = usePracticeProjects();
+  const makePractice = useMakePractice();
   const [busy, setBusy] = useState(false);
+  const practice = item.practice_project_id ? practiceProjects.get(item.practice_project_id) : undefined;
   const style = KIND_STYLE[item.kind] ?? KIND_STYLE.other;
   const Icon = style.icon;
   const counted = item.items_total > 0;
@@ -157,6 +186,12 @@ export function ResourceRow({ item, today, courseName, onEdit, onComplete }: { i
               </Chip>
             )}
             {item.status === "completed" && hasCertificate(item) && <Chip tone="bg-amber-50 text-amber-700"><Award className="size-3" /> Certificate</Chip>}
+            {item.status === "completed" && practice && (
+              <Chip tone={practice.percent >= 100 ? "bg-emerald-50 text-emerald-700" : "bg-violet-50 text-violet-700"}>
+                <Hammer className="size-3" /> Practised {practice.tasks_done}/{practice.tasks_total}
+                {practice.percent >= 100 && (practice.links?.length ?? 0) > 0 ? " · proof" : ""}
+              </Chip>
+            )}
             {item.status === "completed" && expiry.state !== "none" && expiry.state !== "valid" && (
               <Chip tone={expiry.state === "expired" ? "bg-rose-50 text-rose-700" : "bg-amber-50 text-amber-700"}>{expiryLabel(item, today)}</Chip>
             )}
@@ -192,6 +227,16 @@ export function ResourceRow({ item, today, courseName, onEdit, onComplete }: { i
             {(item.status === "todo" || item.status === "learning") && (
               <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={onComplete}>
                 <Check className="size-3.5" /> Complete
+              </button>
+            )}
+            {item.status === "completed" && practice && (
+              <Link href={`/projects/${practice.id}`} className="btn btn-secondary btn-sm">
+                <Hammer className="size-3.5" /> Open practice
+              </Link>
+            )}
+            {item.status === "completed" && !practice && (
+              <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={async () => { setBusy(true); await makePractice(item); setBusy(false); }}>
+                <Hammer className="size-3.5" /> Practise it
               </button>
             )}
             {item.status === "completed" && (

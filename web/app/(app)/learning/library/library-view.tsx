@@ -5,7 +5,7 @@ import useSWR from "swr";
 import { Award, Check, Copy, ExternalLink, GraduationCap, ListChecks, Plus, Search, Sparkles } from "lucide-react";
 import { formatDate } from "@/lib/dates";
 import { formatMoney, hm } from "@/lib/format";
-import { compareUpNext, expiryLabel, hasCertificate, kindLabel, KINDS, libraryStats, resumeLine, upNext, WIP_LIMIT, certificateExpiry } from "@/lib/library";
+import { certificateExpiry, compareUpNext, expiryLabel, hasCertificate, kindLabel, KINDS, LEVELS, libraryStats, needsPractice, resumeLine, skillLadder, upNext, WIP_LIMIT } from "@/lib/library";
 import { skillKey } from "@/lib/jobs";
 import { isHttpUrl } from "@/lib/projects";
 import { useProfile } from "@/lib/profile";
@@ -17,7 +17,7 @@ import { LearningTabs } from "../learning-tabs";
 import { PasteList, StarterIdeas } from "./add-many";
 import { CompleteDialog } from "./complete-dialog";
 import { ResourceForm } from "./resource-form";
-import { ResourceRow, Stars, useCopy, useResources } from "./shared";
+import { ResourceRow, Stars, useCopy, usePracticeProjects, useResources } from "./shared";
 
 type View = "todo" | "completed" | "certificates";
 
@@ -37,6 +37,7 @@ export function LibraryView() {
   const { data: courses } = useSWR<{ items: CourseSummary[] }>("/courses");
   const { profile } = useProfile();
   const copy = useCopy();
+  const practiceProjects = usePracticeProjects();
   const [view, setView] = useState<View>("todo");
   const [subject, setSubject] = useState("all"); // "all", "none" (no subject) or a course id
   const [kind, setKind] = useState<"all" | ResourceKind>("all");
@@ -70,9 +71,9 @@ export function LibraryView() {
   const completed = visible.filter((r) => r.status === "completed").sort((a, b) => newest(b).localeCompare(newest(a)));
   const certificates = visible.filter(hasCertificate).sort((a, b) => (b.issued_on ?? newest(b)).localeCompare(a.issued_on ?? newest(a)));
   const next = upNext(visible);
+  const waiting = completed.filter((r) => needsPractice(r, today)).length;
   const mySkills = new Set((profile?.skills ?? []).map(skillKey));
-  const gained = new Map<string, number>();
-  for (const r of items.filter((x) => x.status === "completed")) for (const s of r.skills) gained.set(s, (gained.get(s) ?? 0) + 1);
+  const ladder = skillLadder(items, practiceProjects);
 
   const row = (r: LearningResource) => (
     <ResourceRow key={r.id} item={r} today={today} courseName={r.course_id ? courseName.get(r.course_id) : undefined} onEdit={() => setEditing(r)} onComplete={() => setCompleting(r)} />
@@ -202,7 +203,14 @@ export function LibraryView() {
 
               {view === "completed" &&
                 (completed.length ? (
-                  <ul className="space-y-3">{completed.map(row)}</ul>
+                  <>
+                    {waiting > 0 && (
+                      <p className="rounded-xl bg-violet-50 px-4 py-3 text-sm text-violet-900 ring-1 ring-violet-100">
+                        {waiting === 1 ? "1 finished item has" : `${waiting} finished items have`} no practice project yet. Press <b className="font-semibold">Practise it</b> to turn what you watched into something you did.
+                      </p>
+                    )}
+                    <ul className="space-y-3">{completed.map(row)}</ul>
+                  </>
                 ) : (
                   <div className="card">
                     <EmptyState icon={Check} title={filtering ? "Nothing matches" : "Nothing completed yet"} text="When you finish a course or playlist, mark it complete here to keep its certificate and add the skills to your profile." />
@@ -263,19 +271,33 @@ export function LibraryView() {
               <section className="card p-5" aria-labelledby="skills-title">
                 <h2 id="skills-title" className="card-title flex items-center gap-2.5">
                   <span className="icon-tile size-8 bg-emerald-50 text-emerald-600"><Sparkles className="size-4.5" /></span>
-                  Skills you gained
+                  From watching to doing
                 </h2>
-                {gained.size ? (
-                  <ul className="mt-3 flex flex-wrap gap-2">
-                    {[...gained].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([skill, n]) => (
-                      <li key={skill} className="badge max-w-full whitespace-nowrap bg-emerald-50 px-2.5 py-1 text-emerald-800">
-                        {skill}{n > 1 ? ` ×${n}` : ""}
-                        {mySkills.has(skillKey(skill)) && <Check className="size-3" aria-label="in your skills" />}
-                      </li>
-                    ))}
-                  </ul>
+                {ladder.length ? (
+                  <>
+                    <p className="mt-2 text-sm text-slate-600">
+                      {LEVELS.map((l) => `${ladder.filter((x) => x.level === l.value).length} ${l.label.toLowerCase()}`).join(" · ")}
+                    </p>
+                    <ul className="mt-3 flex flex-wrap gap-2">
+                      {ladder.map((x) => (
+                        <li
+                          key={x.skill}
+                          className={`badge max-w-full whitespace-nowrap px-2.5 py-1 ${x.level === "proven" ? "bg-emerald-100 text-emerald-800" : x.level === "practised" ? "bg-violet-100 text-violet-800" : "bg-slate-100 text-slate-600"}`}
+                          title={LEVELS.find((l) => l.value === x.level)?.hint}
+                        >
+                          {x.skill} · {x.level}
+                          {mySkills.has(skillKey(x.skill)) && <Check className="size-3" aria-label="in your skills" />}
+                        </li>
+                      ))}
+                    </ul>
+                    <dl className="mt-3 space-y-1 text-xs text-slate-500">
+                      {LEVELS.map((l) => (
+                        <div key={l.value}><dt className="inline font-semibold">{l.label}:</dt> <dd className="inline">{l.hint}</dd></div>
+                      ))}
+                    </dl>
+                  </>
                 ) : (
-                  <p className="mt-2 text-sm text-slate-500">Skills of the courses you complete appear here, and can be added to the skills Job Apply uses.</p>
+                  <p className="mt-2 text-sm text-slate-500">Skills of the courses you complete appear here. Practise each one in a small project to move it from learned to practised to proven.</p>
                 )}
               </section>
             </aside>

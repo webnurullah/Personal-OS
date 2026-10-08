@@ -101,6 +101,7 @@ const ENDPOINTS: [string, string, string, z.ZodType?][] = [
   ["POST", "/resources", "Add a course, playlist or video to the library (title required; platform is found from the url)", ResourceCreate],
   ["PATCH", "/resources/:id", "Change an item; {status:\"completed\"} completes it, {items_done:n} sets the videos watched (the status and dates follow)", ResourceFields],
   ["DELETE", "/resources/:id", "Delete a library item (it goes to the Archive)"],
+  ["POST", "/resources/:id/practice", "Make a practice project (6-8 tasks: redo it, apply it, publish proof, teach it back, get feedback, add to CV) for a library item; opens the existing one if there is one"],
 ];
 
 /** The endpoint list for the system prompt (built once). */

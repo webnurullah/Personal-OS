@@ -13,7 +13,7 @@ export const GET = handle(async ({ db, query, today, profile }) => {
   const { lite, archived } = parse(z.object({ lite: z.literal("1").optional(), archived: z.literal("1").optional() }), query);
   if (lite) return { items: must(await db.from("projects").select("id, name, color, status, archived_at").order("name")) };
 
-  const base = db.from("projects").select("id, name, kind, status, color, client, goal, start_date, due_date, archived_at, created_at");
+  const base = db.from("projects").select("id, name, kind, status, color, client, goal, start_date, due_date, archived_at, created_at, links");
   const [projects, tasks] = await Promise.all([
     (archived ? base.not("archived_at", "is", null).order("archived_at", { ascending: false }) : base.is("archived_at", null).order("created_at", { ascending: false })).then(must),
     // Past 1,000 linked tasks Supabase would cut the list short, so it is read page by page.

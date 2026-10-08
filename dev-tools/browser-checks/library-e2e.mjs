@@ -90,7 +90,7 @@ check("completing sends status, skills, takeaway and certificate", patch && patc
 const prof = calls.find((c) => c.path === "/profile");
 check("new skills are merged into the profile (React already... Git kept)", prof && prof.body.skills.join() === "Git,Google Ads,React", JSON.stringify(prof?.body));
 check("a CV line is offered", (await page.getByText(/Completed Google Ads Search certification \(Google, Oct 2026\) — skills: Google Ads, React — certificate ID GADS-77/).count()) === 1);
-await page.getByRole("button", { name: "Done" }).click();
+await page.getByRole("button", { name: "Not now" }).click();
 
 // ----- tabs: completed and certificates -----
 await page.getByRole("tab", { name: /Completed \(2\)/ }).click();
