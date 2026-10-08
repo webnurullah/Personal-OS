@@ -14,6 +14,7 @@ import { useProfile } from "@/lib/profile";
 import { taskDateLabel } from "@/lib/tasks";
 import { deadlineLabel, isOpen } from "@/lib/jobs";
 import { compareUpNext, stepWord } from "@/lib/library";
+import { reasonText } from "@/lib/study";
 import type { Dashboard, JobApplication, LearningResource, LearningWeek, List, Note, Task } from "@/lib/types";
 import { Donut, Progress } from "../ui/charts";
 import { Segmented } from "../ui/controls";
@@ -434,6 +435,16 @@ export function LearningWidget() {
             <Progress value={pct(studied, goal || planned)} fill="bg-violet-500" track="bg-violet-100" className="mt-2 h-2" />
             {data.topic && <p className="mt-2 truncate text-xs text-slate-500">Focus: {data.topic}</p>}
           </div>
+          {data.study_next?.[0] && (
+            <Link href={`/learning/${data.study_next[0].course_id}`} className="mt-3 block rounded-xl bg-indigo-50/60 px-3 py-2 text-sm ring-1 ring-indigo-100 hover:bg-white">
+              <p className="truncate font-medium text-slate-800">
+                <span className="text-slate-500">{data.study_next[0].code}</span> {data.study_next[0].title}
+              </p>
+              <p className="text-xs text-slate-500">
+                Study next · {data.study_next[0].course_title} · {reasonText({ reason: data.study_next[0].reason, weeksLate: data.study_next[0].weeks_late })}
+              </p>
+            </Link>
+          )}
           {learningNow && (
             <Link href="/learning/library" className="mt-3 block rounded-xl bg-slate-50 px-3 py-2 text-sm ring-1 ring-slate-100 hover:bg-white">
               <p className="truncate font-medium text-slate-800">{learningNow.title}</p>
@@ -456,6 +467,7 @@ export function LearningWidget() {
                       <Progress value={course.percent} fill={color.bar} track="bg-slate-100" className="mt-1.5 h-1.5" />
                       <p className="mt-1 text-xs text-slate-400">
                         {hm(course.done_hours)} of {hm(course.est_hours)} · {timeLeft(course.days_left)}
+                        {course.state === "behind" && <span className="font-medium text-amber-600"> · behind</span>}
                       </p>
                     </Link>
                   </li>

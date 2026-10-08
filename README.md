@@ -38,6 +38,8 @@ Frontend and backend are **one Vercel project**. Every push to GitHub `main` put
    9. `20261008000000_profile_photo.sql` (profile photo: the `avatars` Storage bucket and its rules)
    10. `20261008000100_archive_items.sql` (the Archive for everything you delete: the table and the functions that move items in and out)
    11. `20261009000000_learning_resources.sql` (Learning → Certificates & playlists: the library table, and the Archive knows it)
+   12. `20261009000100_archive_fixes.sql` (fixes to the Archive: a restored transaction re-links its bill; a library item's unit always belongs to its course)
+   13. `20261010000000_study_topic_link.sql` (Learning: a study session can name a topic or a library item, and its hours add to the topic by themselves; when a topic was finished)
 
    Already set up? Only run the files you have not run yet. Each new file is listed here when it is added.
 3. **Authentication → URL Configuration**

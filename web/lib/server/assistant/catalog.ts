@@ -52,7 +52,7 @@ const ENDPOINTS: [string, string, string, z.ZodType?][] = [
 
   ["GET", "/learning/week?start=YYYY-MM-DD", "A study week (default this week): topic, goal hours, study blocks, and every course's progress"],
   ["PUT", "/learning/week/:monday", "Set a week's topic or goal hours (path date must be a Monday)", WeekUpdate],
-  ["POST", "/learning/blocks", "Plan a study block (weekday 0 = Monday … 6 = Sunday)", BlockCreate],
+  ["POST", "/learning/blocks", "Plan a study block (weekday 0 = Monday … 6 = Sunday). Give topic_id (a course topic) to add its hours to that topic once done, resource_id for a library item", BlockCreate],
   ["PATCH", "/learning/blocks/:id", "Change or tick a study block", BlockCreate.omit({ week_start: true }).partial()],
   ["DELETE", "/learning/blocks/:id", "Delete a study block (it goes to the Archive)"],
   ["GET", "/courses", "Courses (learning modules) with progress"],

@@ -2,11 +2,13 @@ import { archiveItem } from "@/lib/server/archive";
 import { handle, ok } from "@/lib/server/api";
 import { must } from "@/lib/server/http";
 import { BlockCreate } from "@/lib/server/schemas";
+import { checkBlockLinks } from "@/lib/server/study";
 import { nonEmpty, parse, s } from "@/lib/server/validate";
 
 export const PATCH = handle<{ id: string }>(async ({ db, params, body }) => {
   const id = parse(s.id, params.id);
   const changes = nonEmpty(parse(BlockCreate.omit({ week_start: true }).partial().strict(), await body()));
+  await checkBlockLinks(db, changes);
   return must(await db.from("study_blocks").update(changes).eq("id", id).select().single());
 });
 

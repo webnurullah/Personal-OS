@@ -186,6 +186,7 @@ export type Database = {
           position: number;
           created_at: string;
           updated_at: string;
+          completed_at: string | null;
         };
         Insert: {
           id?: string;
@@ -204,6 +205,7 @@ export type Database = {
           position?: number;
           created_at?: string;
           updated_at?: string;
+          completed_at?: string | null;
         };
         Update: {
           id?: string;
@@ -222,6 +224,7 @@ export type Database = {
           position?: number;
           created_at?: string;
           updated_at?: string;
+          completed_at?: string | null;
         };
         Relationships: [
           {
@@ -947,6 +950,8 @@ export type Database = {
           activity: string;
           done: boolean;
           created_at: string;
+          topic_id: string | null;
+          resource_id: string | null;
         };
         Insert: {
           id?: string;
@@ -957,6 +962,8 @@ export type Database = {
           activity: string;
           done?: boolean;
           created_at?: string;
+          topic_id?: string | null;
+          resource_id?: string | null;
         };
         Update: {
           id?: string;
@@ -967,6 +974,8 @@ export type Database = {
           activity?: string;
           done?: boolean;
           created_at?: string;
+          topic_id?: string | null;
+          resource_id?: string | null;
         };
         Relationships: [
 

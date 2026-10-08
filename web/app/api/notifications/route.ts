@@ -2,9 +2,10 @@ import { handle } from "@/lib/server/api";
 import { addDays, daysBetween, dateIn, minutesNowIn, mondayOf, startOfDayUtc, todayIn, weekdayIndex } from "@/lib/server/dates";
 import { habitBoard } from "@/lib/server/habits";
 import { must } from "@/lib/server/http";
-import { loadHabits } from "@/lib/server/queries";
+import { courseSummaries, loadHabits } from "@/lib/server/queries";
 import { EXPIRY_WARNING_DAYS } from "@/lib/library";
 import { byTime, occurrences } from "@/lib/server/recurrence";
+import { hm } from "@/lib/format";
 import { isOnDay, isOverdue } from "@/lib/tasks";
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
@@ -26,7 +27,7 @@ export const GET = handle(async ({ db, profile: getProfile }) => {
   const notify = (profile.notify || {}) as Record<string, boolean>;
   const nowMinutes = minutesNowIn(zone);
 
-  const [openTasks, bills, events, blocks, habitData, jobs, projects, libraryDue, libraryCerts, libraryUnused, libraryPractising] = await Promise.all([
+  const [openTasks, bills, events, blocks, habitData, jobs, projects, libraryDue, libraryCerts, libraryUnused, libraryPractising, courses] = await Promise.all([
     db.from("tasks").select("due_date, end_date").is("done_at", null).lte("due_date", today).then(must),
     db.from("bills").select("*").is("paid_at", null).lte("due_date", addDays(today, 3)).order("due_date").then(must),
     db.from("events").select("*").lte("event_date", today).or(`repeat.neq.none,event_date.eq.${today}`).then(must),
@@ -44,6 +45,8 @@ export const GET = handle(async ({ db, profile: getProfile }) => {
     db.from("learning_resources").select("id, title").eq("status", "completed").is("practice_project_id", null).gte("completed_on", addDays(today, -30)).lte("completed_on", addDays(today, -3)).order("completed_on", { ascending: false }).limit(2).then(must),
     // Items with a practice project (the 10 newest), to see whether the practice has stopped.
     db.from("learning_resources").select("id, title, practice_project_id").not("practice_project_id", "is", null).order("created_at", { ascending: false }).limit(10).then(must),
+    // Courses that fell behind their plan (only looked up when study reminders are on).
+    notify.study_sessions ? courseSummaries(db, today) : Promise.resolve([]),
   ]);
 
   const items: Item[] = [];
@@ -118,6 +121,13 @@ export const GET = handle(async ({ db, profile: getProfile }) => {
 
   if (notify.study_sessions) {
     for (const block of blocks) items.push({ id: `study-${block.id}`, icon: "graduation-cap", tone: "indigo", title: `Study today: ${block.activity} (${Number(block.hours)}h)`, meta: "Learning", href: "/learning" });
+  }
+
+  // A course with something planned for an earlier week still open (the two furthest behind).
+  const behind = courses.filter((c) => c.state === "behind").sort((a, b) => b.weeks_behind - a.weeks_behind || b.behind_hours - a.behind_hours).slice(0, 2);
+  for (const course of behind) {
+    const how = course.weeks_behind > 0 ? `${plural(course.weeks_behind, "week")} behind` : "behind";
+    items.push({ id: `behind-${course.id}`, icon: "graduation-cap", tone: "amber", title: `${course.title} is ${how}: ${hm(course.behind_hours)} to catch up`, meta: "Learning", href: `/learning/${course.id}` });
   }
 
   if (habitData && nowMinutes >= 18 * 60) {

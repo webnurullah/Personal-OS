@@ -10,8 +10,9 @@ import { api, ApiError, errorMessage, refresh } from "@/lib/api";
 import { cacheMutate } from "@/lib/cache";
 import { colorOf } from "@/lib/colors";
 import { courseStats, doneHours, nextNumber, timeLeft } from "@/lib/course";
-import { addDays, formatDate } from "@/lib/dates";
-import { num, pct, plural } from "@/lib/format";
+import { addDays, formatDate, mondayOf, weekdayIndex } from "@/lib/dates";
+import { hm, num, pct, plural } from "@/lib/format";
+import { sessionLabel } from "@/lib/study";
 import type { CourseDetail, Topic, TopicStatus, Unit } from "@/lib/types";
 import { useMedia } from "@/lib/use-media";
 import { useSaveLater } from "@/lib/use-save-later";
@@ -123,6 +124,33 @@ export function CourseView({ id }: { id: string }) {
     saveLater("plan", () => {
       api(`/courses/${course.id}`, { method: "PATCH", body: { weekly_plan: plan } }).catch(failed);
     });
+  };
+
+  /**
+   * "+30m" / "+1h" on a topic adds a finished study session for today that names the topic: one record, so the Learning
+   * page, the week's hours and the topic's Spent hours all agree (the database adds the hours to the topic).
+   */
+  const logTime = async (topic: Topic, hours: number) => {
+    mutate(
+      (current) =>
+        current && {
+          ...current,
+          units: current.units.map((u) =>
+            u.id !== topic.unit_id
+              ? u
+              : { ...u, topics: u.topics.map((t) => (t.id === topic.id ? { ...t, actual_hours: Number(t.actual_hours) + hours, status: t.status === "not-started" ? "in-progress" : t.status } : t)) },
+          ),
+        },
+      { revalidate: false },
+    );
+    setSyncKey((k) => k + 1); // the "Spent" boxes show the new total
+    try {
+      await api("/learning/blocks", { method: "POST", body: { week_start: mondayOf(today), weekday: weekdayIndex(today), hours, activity: sessionLabel(topic), topic_id: topic.id, done: true } });
+      toast(`${hm(hours)} added to ${topic.code}`);
+      await refresh("/learning", "/courses");
+    } catch (e) {
+      failed(e);
+    }
   };
 
   const toggleDone = (topic: Topic) =>
@@ -346,6 +374,15 @@ export function CourseView({ id }: { id: string }) {
                           />
                           <span>h</span>
                         </label>
+                        {topic.status !== "done" && (
+                          <span className="flex gap-1.5">
+                            {[0.5, 1].map((h) => (
+                              <button key={h} type="button" className="btn btn-secondary btn-sm h-8 px-2.5 text-xs" onClick={() => logTime(topic, h)} aria-label={`Add ${hm(h)} to topic ${topic.code}`}>
+                                +{hm(h)}
+                              </button>
+                            ))}
+                          </span>
+                        )}
                       </div>
                     </li>
                   ))}

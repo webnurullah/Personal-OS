@@ -124,6 +124,9 @@ export const BlockCreate = z.object({
   hours: z.number().positive().max(24),
   activity: s.text(200),
   done: z.boolean().optional(),
+  // What it was about: a topic of one of your courses (its hours then add up there) and/or a library item.
+  topic_id: s.id.nullable().optional(),
+  resource_id: s.id.nullable().optional(),
 }).strict();
 
 // ---------- Courses ----------

@@ -14,3 +14,4 @@ lines to your own Playwright/Chromium install before running. Not part of `npm t
   (`window.innerWidth` bigger than the device width) or has sideways overflow.
 - `learning-e2e.mjs`, `library-e2e.mjs`: the Learning course page (numbers, dialogs, saves) and the Certificates & playlists library (add by link, paste a list, ideas, +1 video, Make it count). Same setup as the phone-layout checks (built app on port 3123, a stand-in API); `library-e2e.mjs` imports `applyChange` from `web/lib/library.ts` so the stand-in follows the real status rules.
 - `practice-e2e.mjs`: the hands-on part of the library (Practise it, practice progress chips, the skill ladder, the "Make it count" practice step).
+- `study-e2e.mjs`: Learning "Study next" (the card, Log time, the topic picker in the session form, Done, and +30m/+1h on the course page) at 390 and 320 px; `SHOTS=<folder>` also saves pictures.

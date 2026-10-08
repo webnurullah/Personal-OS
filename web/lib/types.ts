@@ -1,5 +1,6 @@
 // The shapes of the API's answers (see api/src/routes).
 import type { Timeframe } from "./projects";
+import type { CourseState, StudyReason } from "./study";
 
 export type ColorName =
   | "white" | "slate" | "blue" | "sky" | "cyan" | "teal" | "emerald" | "lime"
@@ -114,7 +115,7 @@ export type HabitsResponse = {
   };
 };
 
-export type StudyBlock = { id: string; week_start: string; weekday: number; hours: number; activity: string; done: boolean; created_at: string };
+export type StudyBlock = { id: string; week_start: string; weekday: number; hours: number; activity: string; done: boolean; created_at: string; topic_id: string | null; resource_id: string | null };
 
 export type CourseSummary = {
   id: string;
@@ -130,7 +131,32 @@ export type CourseSummary = {
   topic_count: number;
   unit_count: number;
   days_left: number;
+  /** Behind = something planned for an earlier week is not finished (see lib/study.ts). */
+  state: CourseState;
+  behind_hours: number;
+  weeks_behind: number;
+  /** When it would finish at your recent pace (only on the Learning page; null without a pace). */
+  forecast?: { date: string; days_late: number } | null;
 };
+
+/** One topic worth studying now, with why. */
+export type StudyNextItem = {
+  topic_id: string;
+  course_id: string;
+  course_title: string;
+  course_color: ColorName;
+  code: string;
+  title: string;
+  status: TopicStatus;
+  est_hours: number;
+  hours_left: number;
+  planned_week: number | null;
+  reason: StudyReason;
+  weeks_late: number;
+};
+/** An unfinished topic you can pick in "Log a study session". */
+export type OpenTopic = { id: string; course_id: string; label: string; status: TopicStatus; hours_left: number };
+export type StudyStats = { streak: number; weeks: { week_start: string; hours: number }[] };
 
 export type LearningWeek = {
   today: string;
@@ -139,6 +165,11 @@ export type LearningWeek = {
   goal_hours: number;
   blocks: StudyBlock[];
   courses: CourseSummary[];
+  study_next: StudyNextItem[];
+  open_topics: OpenTopic[];
+  /** Library items you are learning now (a session can name one). */
+  library: { id: string; title: string }[];
+  stats: StudyStats;
 };
 
 export type TopicStatus = "not-started" | "in-progress" | "done";

@@ -11,7 +11,8 @@ import { addDays, formatDate, mondayOf, weekdayIndex } from "@/lib/dates";
 import { timeLeft } from "@/lib/course";
 import { hm, num, pct, plural } from "@/lib/format";
 import { useNewAction } from "@/lib/new-action";
-import type { LearningWeek, StudyBlock } from "@/lib/types";
+import { forecastText } from "@/lib/study";
+import type { LearningWeek, StudyBlock, StudyNextItem } from "@/lib/types";
 import { useSaveLater } from "@/lib/use-save-later";
 import { Progress } from "@/components/ui/charts";
 import { Field } from "@/components/ui/controls";
@@ -19,6 +20,7 @@ import { useFeedback } from "@/components/ui/feedback";
 import { Modal, ModalActions } from "@/components/ui/modal";
 import { LoadError, PageHeader, PageSkeleton } from "@/components/ui/states";
 import { LearningTabs } from "./learning-tabs";
+import { StudyNext } from "./study-next";
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
@@ -28,9 +30,14 @@ export function LearningView() {
   const { toast, confirm } = useFeedback();
   const saveLater = useSaveLater(500);
   const [logging, setLogging] = useState(false);
+  const [logChoice, setLogChoice] = useState(""); // what the session form starts on: "t:<topic id>", "r:<library item id>" or nothing
   const [newCourse, setNewCourse] = useState(false);
   const [editingTopic, setEditingTopic] = useState(false);
-  useNewAction(() => setLogging(true));
+  const openLog = (choice = "") => {
+    setLogChoice(choice);
+    setLogging(true);
+  };
+  useNewAction(() => openLog());
 
   if (error && !data) return <LoadError error={error} retry={() => mutate()} />;
   if (!data) return <PageSkeleton />;
@@ -50,7 +57,8 @@ export function LearningView() {
     } catch (e) {
       toast(errorMessage(e), "error");
     }
-    await refresh("/learning");
+    // Topic hours follow the sessions, so the courses are reloaded as well.
+    await refresh("/learning", "/courses");
   };
 
   // Shown at once, saved once the clicking stops: fast clicks add up instead of each starting from the old value.
@@ -77,15 +85,20 @@ export function LearningView() {
     run(() => api(`/learning/blocks/${block.id}`, { method: "DELETE" }), "Block moved to the Archive");
   };
 
+  const finishTopic = (item: StudyNextItem) =>
+    run(() => api(`/topics/${item.topic_id}`, { method: "PATCH", body: { status: "done" } }), `${item.code} marked finished`);
+
   return (
     <>
       <PageHeader title="Learning" description="Plan your study week and watch the hours add up.">
-        <button type="button" className="btn btn-primary" onClick={() => setLogging(true)}>
+        <button type="button" className="btn btn-primary" onClick={() => openLog()}>
           <Timer className="size-4" />
           Log Study Session
         </button>
       </PageHeader>
       <LearningTabs current="courses" />
+
+      <StudyNext data={data} onLog={(topicId) => openLog(`t:${topicId}`)} onFinish={finishTopic} />
 
       <div className="mt-5 flex flex-wrap items-center gap-2">
         <button type="button" className="btn btn-ghost btn-sm btn-icon" onClick={() => setWeek(addDays(week ?? thisWeek, -7))} aria-label="Previous week">
@@ -201,7 +214,7 @@ export function LearningView() {
             ) : (
               <p className="mt-4 rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">
                 No blocks planned for this week.{" "}
-                <button type="button" className="font-medium text-blue-600" onClick={() => setLogging(true)}>Plan a study block</button>
+                <button type="button" className="font-medium text-blue-600" onClick={() => openLog()}>Plan a study block</button>
               </p>
             )}
           </div>
@@ -244,6 +257,12 @@ export function LearningView() {
                       <p className="mt-2 text-xs text-slate-500">
                         {num(course.done_hours)}h of {num(course.est_hours)}h done · {timeLeft(course.days_left)}
                       </p>
+                      {course.state === "behind" && (
+                        <p className="mt-1 text-xs font-medium text-amber-700">
+                          Behind: {hm(course.behind_hours)} to catch up{course.weeks_behind > 0 ? ` (${plural(course.weeks_behind, "week")} late)` : ""}
+                        </p>
+                      )}
+                      {course.forecast && course.state !== "done" && <p className="mt-1 text-xs text-slate-500">{forecastText(course.forecast)}</p>}
                     </Link>
                   </li>
                 ))}
@@ -268,7 +287,7 @@ export function LearningView() {
         description={isThisWeek ? "It is added as a block for this week." : `It is added to the week of ${formatDate(data.week_start, "short")}.`}
         size="md"
       >
-        <SessionForm weekStart={data.week_start} today={data.today} onClose={() => setLogging(false)} />
+        <SessionForm data={data} choice={logChoice} onClose={() => setLogging(false)} />
       </Modal>
       <Modal open={newCourse} onClose={() => setNewCourse(false)} title="New course" description="Then add its units and topics on the course page.">
         <CourseForm today={data.today} onClose={() => setNewCourse(false)} />
@@ -277,8 +296,12 @@ export function LearningView() {
   );
 }
 
-function SessionForm({ weekStart, today, onClose }: { weekStart: string; today: string; onClose: () => void }) {
+function SessionForm({ data, choice: firstChoice, onClose }: { data: LearningWeek; choice: string; onClose: () => void }) {
   const { toast } = useFeedback();
+  const { week_start: weekStart, today } = data;
+  // (A copy of this page saved before topics and the library were listed has neither; the fresh answer replaces it a moment later.)
+  const openTopics = data.open_topics ?? [];
+  const library = data.library ?? [];
   const [busy, setBusy] = useState(false);
   const isThisWeek = mondayOf(today) === weekStart;
   const [day, setDay] = useState(isThisWeek ? weekdayIndex(today) : 0);
@@ -287,14 +310,39 @@ function SessionForm({ weekStart, today, onClose }: { weekStart: string; today: 
   const [doneChoice, setDoneChoice] = useState<boolean | null>(null);
   const done = doneChoice ?? isPast;
 
+  // What it was about: a topic of a course (its hours then count there), a library item, or nothing in particular.
+  const [choice, setChoice] = useState(firstChoice);
+  const topic = choice.startsWith("t:") ? openTopics.find((t) => t.id === choice.slice(2)) : undefined;
+  const item = choice.startsWith("r:") ? library.find((r) => r.id === choice.slice(2)) : undefined;
+  const [activity, setActivity] = useState(topic?.label ?? item?.title ?? "");
+  const [typed, setTyped] = useState(false); // words typed by hand are kept when another topic is picked
+  const [finish, setFinish] = useState(false);
+  const pick = (value: string) => {
+    setChoice(value);
+    setFinish(false);
+    if (typed) return;
+    const t = value.startsWith("t:") ? openTopics.find((o) => o.id === value.slice(2)) : undefined;
+    const r = value.startsWith("r:") ? library.find((o) => o.id === value.slice(2)) : undefined;
+    setActivity(t?.label ?? r?.title ?? "");
+  };
+
   const submit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const form = new FormData(e.currentTarget);
-    const hours = Number(form.get("hours"));
+    const hours = Number(new FormData(e.currentTarget).get("hours"));
     setBusy(true);
     try {
-      await api("/learning/blocks", { method: "POST", body: { week_start: weekStart, weekday: day, hours, activity: String(form.get("activity")), done } });
-      await refresh("/learning");
+      await api("/learning/blocks", {
+        method: "POST",
+        body: { week_start: weekStart, weekday: day, hours, activity: activity.trim(), done, topic_id: topic?.id ?? null, resource_id: item?.id ?? null },
+      });
+      if (topic && finish) {
+        try {
+          await api(`/topics/${topic.id}`, { method: "PATCH", body: { status: "done" } });
+        } catch (error) {
+          toast(`The session was added, but the topic could not be marked finished: ${errorMessage(error)}`, "error");
+        }
+      }
+      await refresh("/learning", "/courses");
       toast(done ? `${hm(hours)} added to ${isThisWeek ? "this week" : "the week of " + formatDate(weekStart, "short")}` : "Block planned");
       onClose();
     } catch (error) {
@@ -306,6 +354,30 @@ function SessionForm({ weekStart, today, onClose }: { weekStart: string; today: 
 
   return (
     <form onSubmit={submit} className="space-y-4">
+      {(openTopics.length > 0 || library.length > 0) && (
+        <Field label="What are you studying?" htmlFor="session-pick" hint={topic ? `${hm(topic.hours_left)} left on this topic. A finished session adds its hours to it.` : undefined}>
+          <select id="session-pick" className="select select-lg" value={topic || item ? choice : ""} onChange={(e) => pick(e.target.value)}>
+            <option value="">Something else</option>
+            {data.courses.map((course) => {
+              const open = openTopics.filter((t) => t.course_id === course.id);
+              return open.length ? (
+                <optgroup key={course.id} label={course.title}>
+                  {open.map((t) => (
+                    <option key={t.id} value={`t:${t.id}`}>{t.label}</option>
+                  ))}
+                </optgroup>
+              ) : null;
+            })}
+            {library.length > 0 && (
+              <optgroup label="Library: learning now">
+                {library.map((r) => (
+                  <option key={r.id} value={`r:${r.id}`}>{r.title}</option>
+                ))}
+              </optgroup>
+            )}
+          </select>
+        </Field>
+      )}
       <div className="grid grid-cols-2 gap-4">
         <Field label="Day" htmlFor="session-day">
           <select id="session-day" name="weekday" className="select select-lg" value={day} onChange={(e) => setDay(Number(e.target.value))}>
@@ -319,12 +391,32 @@ function SessionForm({ weekStart, today, onClose }: { weekStart: string; today: 
         </Field>
       </div>
       <Field label="What did you study?" htmlFor="session-what">
-        <input id="session-what" name="activity" className="input" required maxLength={200} placeholder="e.g. SQL joins practice" autoComplete="off" autoFocus />
+        <input
+          id="session-what"
+          name="activity"
+          className="input"
+          required
+          maxLength={200}
+          placeholder="e.g. SQL joins practice"
+          autoComplete="off"
+          autoFocus={!topic && !item}
+          value={activity}
+          onChange={(e) => {
+            setActivity(e.target.value);
+            setTyped(true);
+          }}
+        />
       </Field>
       <label className="flex items-center gap-3 text-sm text-slate-700">
         <input type="checkbox" name="done" className="checkbox checkbox-green" checked={done} onChange={(e) => setDoneChoice(e.target.checked)} />
-        Already done (counts towards {isThisWeek ? "this week" : "that week"})
+        Already done (counts towards {isThisWeek ? "this week" : "that week"}{topic ? " and the topic" : ""})
       </label>
+      {topic && (
+        <label className="flex items-center gap-3 text-sm text-slate-700">
+          <input type="checkbox" className="checkbox checkbox-green" checked={finish} onChange={(e) => setFinish(e.target.checked)} />
+          I finished this topic
+        </label>
+      )}
       <ModalActions onCancel={onClose} submitLabel="Add block" busy={busy} />
     </form>
   );
