@@ -81,7 +81,7 @@ export function CalendarView() {
         <section className="card overflow-hidden" aria-label="Month view">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-4 sm:px-5">
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="min-w-44 text-xl font-bold text-slate-900">{formatDate(month, "month")}</h2>
+              <h2 className="w-full text-xl font-bold text-slate-900 sm:w-auto sm:min-w-44">{formatDate(month, "month")}</h2>
               <button type="button" className="btn btn-ghost btn-sm btn-icon" onClick={() => setMonth(addMonths(month, -1))} aria-label="Previous month">
                 <ChevronLeft className="size-4" />
               </button>

@@ -248,7 +248,7 @@ export function TasksView() {
                   <span className={`size-2.5 shrink-0 rounded-full ${colorOf(category.color).dot}`} />
                   <span className="w-20 truncate text-slate-700">{category.name}</span>
                   <div className="progress h-1.5 flex-1"><span className={colorOf(category.color).bar} style={{ width: `${(n / most) * 100}%` }} /></div>
-                  <span className="w-5 text-right font-semibold text-slate-800">{n}</span>
+                  <span className="min-w-5 shrink-0 whitespace-nowrap text-right font-semibold text-slate-800">{n}</span>
                 </li>
               ))}
             </ul>
@@ -272,7 +272,7 @@ function Summary({ icon, tile, label, value }: { icon: ReactNode; tile: string; 
     <div className="card flex items-center gap-3 p-3 sm:gap-4 sm:p-4">
       <span className={`icon-tile size-11 shrink-0 ${tile}`}>{icon}</span>
       <div className="min-w-0">
-        <p className="text-sm text-slate-500">{label}</p>
+        <p className="text-sm text-slate-500 [overflow-wrap:normal]">{label}</p>
         <p className="text-xl font-bold text-slate-900">{value}</p>
       </div>
     </div>
@@ -392,7 +392,7 @@ function TaskModal({ task, today, onClose }: { task: Task | "new" | null; today:
             {priorities.map((p) => (
               <label key={p}>
                 <input type="radio" name="priority" value={p} defaultChecked={(editing?.priority ?? "medium") === p} className="peer sr-only" />
-                <span className={`flex h-10 items-center justify-center gap-1.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 transition peer-focus-visible:ring-2 peer-focus-visible:ring-blue-300 ${chip[p]}`}>
+                <span className={`flex h-10 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border border-slate-200 text-sm font-medium text-slate-600 transition peer-focus-visible:ring-2 peer-focus-visible:ring-blue-300 ${chip[p]}`}>
                   <Flag className={`size-4 ${PRIORITY[p].color}`} />
                   {PRIORITY[p].label}
                 </span>

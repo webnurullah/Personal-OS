@@ -171,15 +171,15 @@ export function LearningView() {
             {data.blocks.length ? (
               <ul className="mt-4 space-y-3">
                 {data.blocks.map((block) => (
-                  <li key={block.id} className="group grid grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-x-3 gap-y-2 rounded-2xl border border-slate-200 bg-white px-3 py-3.5 sm:grid-cols-[auto_8rem_4rem_minmax(0,1fr)_auto_auto] sm:gap-x-6 sm:px-4">
+                  <li key={block.id} className="group grid grid-cols-[auto_auto_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 rounded-2xl border border-slate-200 bg-white px-3 py-3.5 md:grid-cols-[auto_8rem_4rem_minmax(0,1fr)_auto_auto] md:gap-x-6 md:px-4">
                     <input type="checkbox" className="checkbox checkbox-green checkbox-lg" checked={block.done} onChange={() => toggle(block)} aria-label={`Done: ${DAYS[block.weekday]}, ${block.activity}`} />
-                    <span className="font-semibold text-slate-900">{DAYS[block.weekday]}</span>
-                    <span className="text-slate-600 sm:border-l sm:border-slate-200 sm:pl-6">{num(block.hours)}h</span>
-                    <span className="col-span-2 col-start-2 row-start-2 min-w-0 text-slate-700 sm:col-span-1 sm:col-start-auto sm:row-start-auto sm:border-l sm:border-slate-200 sm:pl-6">{block.activity}</span>
-                    <span className={`col-start-4 row-start-2 justify-self-end badge px-3 py-1 text-sm font-semibold sm:col-start-auto sm:row-start-auto ${block.done ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100" : "bg-slate-100 text-slate-600"}`}>
+                    <span className="whitespace-nowrap font-semibold text-slate-900">{DAYS[block.weekday]}</span>
+                    <span className="text-slate-600 md:border-l md:border-slate-200 md:pl-6">{num(block.hours)}h</span>
+                    <span className="col-span-2 col-start-2 row-start-2 min-w-0 text-slate-700 md:col-span-1 md:col-start-auto md:row-start-auto md:border-l md:border-slate-200 md:pl-6">{block.activity}</span>
+                    <span className={`col-start-4 row-start-2 justify-self-end badge px-3 py-1 text-sm font-semibold md:col-start-auto md:row-start-auto ${block.done ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100" : "bg-slate-100 text-slate-600"}`}>
                       {block.done ? "Completed" : "Pending"}
                     </span>
-                    <button type="button" className="btn btn-ghost btn-sm btn-icon reveal col-start-4 row-start-1 justify-self-end sm:col-start-auto sm:row-start-auto" onClick={() => remove(block)} aria-label="Remove block">
+                    <button type="button" className="btn btn-ghost btn-sm btn-icon reveal col-start-4 row-start-1 justify-self-end md:col-start-auto md:row-start-auto" onClick={() => remove(block)} aria-label="Remove block">
                       <Trash2 className="size-4" />
                     </button>
                   </li>

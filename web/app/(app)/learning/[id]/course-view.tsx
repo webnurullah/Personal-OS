@@ -137,12 +137,12 @@ export function CourseView({ id }: { id: string }) {
   return (
     <>
       <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500">
-        <Link href="/learning" className="flex items-center gap-1 hover:text-blue-600">
+        <Link href="/learning" className="flex shrink-0 items-center gap-1 whitespace-nowrap hover:text-blue-600">
           <ChevronLeft className="size-4" />
           Learning
         </Link>
         <span>/</span>
-        <span className="truncate text-slate-700">{course.title}</span>
+        <span className="min-w-0 truncate text-slate-700">{course.title}</span>
       </nav>
 
       {/* Title + key numbers */}
@@ -220,10 +220,10 @@ export function CourseView({ id }: { id: string }) {
               {stats.units.map(({ unit, est, percent }) => (
                 <li key={unit.id}>
                   <div className="flex items-center justify-between gap-2">
-                    <span className="truncate font-medium text-slate-700">
+                    <span className="min-w-0 truncate font-medium text-slate-700">
                       {unitName(unit)} <span className="text-slate-400">({num(est)}h)</span>
                     </span>
-                    <span className="font-semibold text-slate-700">{percent}%</span>
+                    <span className="shrink-0 font-semibold text-slate-700">{percent}%</span>
                   </div>
                   <Progress value={percent} fill={colorOf(unit.color).bar} className="mt-1.5 h-2" />
                 </li>
@@ -344,8 +344,8 @@ export function CourseView({ id }: { id: string }) {
                     </li>
                   ))}
                   <li className="px-2 py-1">
-                    <button type="button" className="btn btn-ghost btn-sm text-slate-500" onClick={() => setTopicModal({ unitId: unit.id })}>
-                      <Plus className="size-4" /> Add topic to {unitName(unit)}
+                    <button type="button" className="btn btn-ghost btn-sm max-w-full text-slate-500" onClick={() => setTopicModal({ unitId: unit.id })}>
+                      <Plus className="size-4 shrink-0" /> <span className="min-w-0 truncate">Add topic to {unitName(unit)}</span>
                     </button>
                   </li>
                 </ul>

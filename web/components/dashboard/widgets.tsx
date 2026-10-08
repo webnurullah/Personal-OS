@@ -209,7 +209,7 @@ export function HabitsWidget({ data }: Props) {
                     />
                   ))}
                 </div>
-                <span className="w-7 text-right text-xs font-semibold text-slate-500">{habit.streak}d</span>
+                <span className="min-w-7 shrink-0 whitespace-nowrap text-right text-xs font-semibold text-slate-500">{habit.streak}d</span>
               </li>
             ))}
           </ul>
@@ -243,7 +243,7 @@ export function GoalsWidget({ data }: Props) {
                   </p>
                   <div className="mt-1.5 flex items-center gap-3">
                     <Progress value={goal.percent} fill={color.bar} className="h-1.5 flex-1" />
-                    <span className="w-8 text-right text-xs font-semibold text-slate-600">{goal.percent}%</span>
+                    <span className="min-w-8 shrink-0 whitespace-nowrap text-right text-xs font-semibold text-slate-600">{goal.percent}%</span>
                   </div>
                 </div>
               </li>
@@ -438,7 +438,7 @@ export function LearningWidget() {
                     <Link href={`/learning/${course.id}`} className="block py-2.5">
                       <div className="flex items-center justify-between gap-3">
                         <p className="min-w-0 truncate text-sm font-medium text-slate-800">{course.title}</p>
-                        <span className={`text-xs font-semibold ${color.text}`}>{course.percent}%</span>
+                        <span className={`shrink-0 whitespace-nowrap text-xs font-semibold ${color.text}`}>{course.percent}%</span>
                       </div>
                       <Progress value={course.percent} fill={color.bar} track="bg-slate-100" className="mt-1.5 h-1.5" />
                       <p className="mt-1 text-xs text-slate-400">
@@ -536,7 +536,7 @@ export function ProductivityWidget({ data }: Props) {
                   <div className="flex w-full flex-1 items-end justify-center pt-1.5">
                     <span className={`w-full max-w-5 rounded-t-md ${isToday ? "bg-blue-600" : "bg-blue-400"}`} style={{ height: `${(d.count / top) * 100}%` }} title={`${formatDate(d.date, "long")}: ${d.count} done`} />
                   </div>
-                  <span className="text-[10px] text-slate-500">{isToday ? "Today" : formatDate(d.date, "weekday")}</span>
+                  <span className="whitespace-nowrap text-[10px] text-slate-500">{isToday ? "Today" : formatDate(d.date, "weekday")}</span>
                 </div>
               );
             })}
