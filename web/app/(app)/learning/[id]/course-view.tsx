@@ -1,17 +1,20 @@
 "use client";
 
 import { toArchive } from "@/lib/archive";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import { CalendarCheck, CalendarDays, ChevronLeft, Clock, GraduationCap, Hourglass, Layers, Pencil, Plus, Target, Trash2 } from "lucide-react";
 import { api, ApiError, errorMessage, refresh } from "@/lib/api";
+import { cacheMutate } from "@/lib/cache";
 import { colorOf } from "@/lib/colors";
-import { courseStats, doneHours } from "@/lib/course";
+import { courseStats, doneHours, nextNumber, timeLeft } from "@/lib/course";
 import { addDays, formatDate } from "@/lib/dates";
 import { num, pct, plural } from "@/lib/format";
 import type { CourseDetail, Topic, TopicStatus, Unit } from "@/lib/types";
+import { useMedia } from "@/lib/use-media";
+import { useSaveLater } from "@/lib/use-save-later";
 import { Donut, Progress } from "@/components/ui/charts";
 import { ColorPicker, Field } from "@/components/ui/controls";
 import { useFeedback } from "@/components/ui/feedback";
@@ -27,38 +30,45 @@ const STATUSES: { value: TopicStatus; label: string }[] = [
 
 const unitName = (unit: Pick<Unit, "code" | "title">) => unit.title || `Unit ${unit.code}`;
 
-/** Waits until typing stops before saving. Anything still waiting is saved when you leave the page. */
-function useSaveLater(delay = 700) {
-  const pending = useRef(new Map<string, { timer: ReturnType<typeof setTimeout>; save: () => void }>());
-  useEffect(() => {
-    const waiting = pending.current;
-    return () => {
-      waiting.forEach(({ timer, save }) => {
-        clearTimeout(timer);
-        save();
-      });
-      waiting.clear();
-    };
-  }, []);
-  return (key: string, save: () => void) => {
-    const waiting = pending.current;
-    const old = waiting.get(key);
-    if (old) clearTimeout(old.timer);
-    const timer = setTimeout(() => {
-      waiting.delete(key);
-      save();
-    }, delay);
-    waiting.set(key, { timer, save });
-  };
-}
-
 type TopicModal = { unitId: string; topic?: Topic };
+
+const clampHours = (value: number, max: number) => Math.min(max, Math.max(0, value));
+
+/**
+ * A number box for hours that saves as you type. When you leave it, it shows the value that was really saved
+ * (the limits applied), so what is on screen is never different from what is stored.
+ */
+function HoursBox({ value, max, label, className, onValue }: { value: number; max: number; label: string; className: string; onValue: (hours: number) => void }) {
+  const read = (input: HTMLInputElement) => (input.value === "" ? 0 : input.valueAsNumber);
+  return (
+    <input
+      type="number"
+      min={0}
+      max={max}
+      step={0.25}
+      defaultValue={value || ""}
+      placeholder="–"
+      className={className}
+      aria-label={label}
+      onChange={(e) => {
+        const hours = read(e.target);
+        if (!Number.isNaN(hours)) onValue(clampHours(hours, max));
+      }}
+      onBlur={(e) => {
+        const hours = read(e.target);
+        if (!Number.isNaN(hours)) e.target.value = String(clampHours(hours, max) || "");
+      }}
+    />
+  );
+}
 
 export function CourseView({ id }: { id: string }) {
   const router = useRouter();
   const { data, error, mutate } = useSWR<CourseDetail>(`/courses/${id}`);
   const { toast, confirm } = useFeedback();
   const saveLater = useSaveLater();
+  const wide = useMedia("(min-width: 40rem)"); // one layout of the topics at a time: cards on a phone, the table from tablet up
+  const [syncKey, setSyncKey] = useState(0); // changes after a failed save so the number boxes show the real values again
   const [editingCourse, setEditingCourse] = useState(false);
   const [unitModal, setUnitModal] = useState<Unit | "new" | null>(null);
   const [topicModal, setTopicModal] = useState<TopicModal | null>(null);
@@ -81,9 +91,11 @@ export function CourseView({ id }: { id: string }) {
   const stats = courseStats<Topic, Unit>(course, units, today);
   const weekStartDate = addDays(course.start_date, (stats.thisWeek - 1) * 7);
   const started = today >= course.start_date;
+  const ended = today > course.target_date;
 
   const failed = (e: unknown) => {
     toast(errorMessage(e), "error");
+    setSyncKey((k) => k + 1);
     mutate();
   };
 
@@ -120,6 +132,8 @@ export function CourseView({ id }: { id: string }) {
     if (!ok) return;
     try {
       await api(`/courses/${course.id}`, { method: "DELETE" });
+      // Forget the saved copy of this page, so Back or another tab cannot bring the deleted course back.
+      cacheMutate(`/courses/${course.id}`, undefined, { revalidate: false }).catch(() => undefined);
       await refresh("/learning");
       toast("Course moved to the Archive");
       router.push("/learning");
@@ -184,9 +198,7 @@ export function CourseView({ id }: { id: string }) {
               Target Date
             </p>
             <p className="mt-2 text-xl font-bold leading-9 text-[#12305a] sm:text-2xl">{formatDate(course.target_date, "gb")}</p>
-            <p className="text-sm text-slate-500">
-              ({stats.daysLeft < 0 ? "date passed" : stats.daysLeft < 7 ? plural(stats.daysLeft, "day") + " left" : plural(Math.ceil(stats.daysLeft / 7), "week") + " left"})
-            </p>
+            <p className="text-sm text-slate-500">({timeLeft(stats.daysLeft)})</p>
           </div>
         </div>
       </div>
@@ -240,7 +252,7 @@ export function CourseView({ id }: { id: string }) {
               <CalendarDays className="size-5" />
             </span>
             <div>
-              <h2 id="week-title" className="text-lg font-bold leading-tight text-[#12305a]">{started ? "This Week's Plan" : "First Week's Plan"}</h2>
+              <h2 id="week-title" className="text-lg font-bold leading-tight text-[#12305a]">{ended ? "Last Week's Plan" : started ? "This Week's Plan" : "First Week's Plan"}</h2>
               <p className="text-sm font-semibold text-slate-500">
                 (Week {stats.thisWeek} · {formatDate(weekStartDate, "short")} – {formatDate(addDays(weekStartDate, 6), "short")})
               </p>
@@ -280,8 +292,8 @@ export function CourseView({ id }: { id: string }) {
             <Plus className="size-4" /> Add unit
           </button>
         </div>
-        {units.length ? (
-          <div className="divide-y divide-slate-100 sm:hidden">
+        {units.length && !wide ? (
+          <div className="divide-y divide-slate-100">
             {stats.units.map(({ unit, est }) => (
               <div key={unit.id}>
                 <button type="button" className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left ${colorOf(unit.color).soft}`} onClick={() => setUnitModal(unit)}>
@@ -323,20 +335,13 @@ export function CourseView({ id }: { id: string }) {
                         {topic.planned_week ? <span className={topic.planned_week === stats.thisWeek ? "font-semibold text-blue-700" : ""}>W{topic.planned_week}</span> : null}
                         <label className="flex items-center gap-1.5">
                           <span>Spent</span>
-                          <input
-                            type="number"
-                            min={0}
+                          <HoursBox
+                            key={`${topic.id}-${syncKey}`}
+                            value={Number(topic.actual_hours)}
                             max={1000}
-                            step={0.5}
-                            defaultValue={Number(topic.actual_hours) || ""}
-                            placeholder="–"
                             className="cell-input w-16"
-                            aria-label={`Actual hours for topic ${topic.code}`}
-                            onChange={(e) => {
-                              const value = e.target.value === "" ? 0 : e.target.valueAsNumber;
-                              if (Number.isNaN(value)) return;
-                              changeTopic(topic, { actual_hours: Math.min(1000, Math.max(0, value)) }, true);
-                            }}
+                            label={`Actual hours for topic ${topic.code}`}
+                            onValue={(hours) => changeTopic(topic, { actual_hours: hours }, true)}
                           />
                           <span>h</span>
                         </label>
@@ -357,8 +362,8 @@ export function CourseView({ id }: { id: string }) {
             </p>
           </div>
         ) : null}
-        {units.length ? (
-          <div className="relative hidden overflow-x-auto sm:block">
+        {units.length && wide ? (
+          <div className="relative overflow-x-auto">
             <table className="w-full min-w-[1220px] border-collapse text-sm">
               <thead className="bg-[#e8f1fc] text-xs font-semibold text-slate-700">
                 <tr>
@@ -411,20 +416,13 @@ export function CourseView({ id }: { id: string }) {
                           </select>
                         </td>
                         <td className="px-2 py-2 text-center">
-                          <input
-                            type="number"
-                            min={0}
+                          <HoursBox
+                            key={`${topic.id}-${syncKey}`}
+                            value={Number(topic.actual_hours)}
                             max={1000}
-                            step={0.5}
-                            defaultValue={Number(topic.actual_hours) || ""}
-                            placeholder="–"
                             className="cell-input"
-                            aria-label={`Actual hours for topic ${topic.code}`}
-                            onChange={(e) => {
-                              const value = e.target.value === "" ? 0 : e.target.valueAsNumber;
-                              if (Number.isNaN(value)) return;
-                              changeTopic(topic, { actual_hours: Math.min(1000, Math.max(0, value)) }, true);
-                            }}
+                            label={`Actual hours for topic ${topic.code}`}
+                            onValue={(hours) => changeTopic(topic, { actual_hours: hours }, true)}
                           />
                         </td>
                         <td className="px-2 py-2 text-center font-medium text-slate-700">{num(Number(topic.est_hours) - doneHours(topic))}</td>
@@ -466,7 +464,8 @@ export function CourseView({ id }: { id: string }) {
               </tfoot>
             </table>
           </div>
-        ) : (
+        ) : null}
+        {units.length === 0 && (
           <EmptyState icon={Layers} title="No units yet" text="Split the course into units, then add the topics of each unit with their estimated hours.">
             <button type="button" className="btn btn-primary" onClick={() => setUnitModal("new")}>
               <Plus className="size-4" /> Add the first unit
@@ -502,19 +501,13 @@ export function CourseView({ id }: { id: string }) {
                   <th className="border border-slate-100 px-3 py-1.5 text-left font-medium text-slate-700">Planned Hours</th>
                   {stats.plan.map((hours, i) => (
                     <td key={i} className="border border-slate-100 px-0.5 py-1">
-                      <input
-                        type="number"
-                        min={0}
+                      <HoursBox
+                        key={syncKey}
+                        value={hours}
                         max={80}
-                        step={0.5}
-                        defaultValue={hours || ""}
-                        placeholder="–"
                         className="cell-input w-full max-w-14"
-                        aria-label={`Planned hours for week ${i + 1}`}
-                        onChange={(e) => {
-                          const value = e.target.value === "" ? 0 : e.target.valueAsNumber;
-                          if (!Number.isNaN(value)) changePlan(i, Math.min(80, Math.max(0, value)));
-                        }}
+                        label={`Planned hours for week ${i + 1}`}
+                        onValue={(value) => changePlan(i, value)}
                       />
                     </td>
                   ))}
@@ -563,7 +556,7 @@ export function CourseView({ id }: { id: string }) {
           <UnitForm
             courseId={course.id}
             unit={unitModal === "new" ? undefined : unitModal}
-            nextCode={String(units.length + 1)}
+            codes={units.map((u) => ({ id: u.id, code: u.code }))}
             onClose={() => setUnitModal(null)}
             onSaved={() => mutate()}
           />
@@ -587,9 +580,18 @@ export function CourseView({ id }: { id: string }) {
   );
 }
 
-function UnitForm({ courseId, unit, nextCode, onClose, onSaved }: { courseId: string; unit?: Unit; nextCode: string; onClose: () => void; onSaved: () => void }) {
+/** Warns (does not block) when a number is already used by something else in the same list. */
+function CodeWarning({ used }: { used: boolean }) {
+  return used ? <p className="mt-1 text-xs text-amber-600">That number is already used. Pick another so the list stays clear.</p> : null;
+}
+
+function UnitForm({ courseId, unit, codes, onClose, onSaved }: { courseId: string; unit?: Unit; codes: { id: string; code: string }[]; onClose: () => void; onSaved: () => void }) {
   const { toast, confirm } = useFeedback();
   const [busy, setBusy] = useState(false);
+  // One more than the highest number in use, so a number is not handed out twice after a unit was deleted.
+  const nextCode = String(nextNumber(codes.map((c) => c.code)));
+  const [code, setCode] = useState(unit?.code ?? nextCode);
+  const used = codes.some((c) => c.id !== unit?.id && c.code === code.trim());
 
   const submit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -631,12 +633,13 @@ function UnitForm({ courseId, unit, nextCode, onClose, onSaved }: { courseId: st
     <form onSubmit={submit} className="space-y-4">
       <div className="grid grid-cols-[6rem_1fr] gap-3">
         <Field label="Number" htmlFor="unit-code">
-          <input id="unit-code" name="code" className="input" required maxLength={10} defaultValue={unit?.code ?? nextCode} autoComplete="off" />
+          <input id="unit-code" name="code" className="input" required maxLength={10} value={code} onChange={(e) => setCode(e.target.value)} autoComplete="off" />
         </Field>
         <Field label="Name" htmlFor="unit-title">
           <input id="unit-title" name="title" className="input" maxLength={200} defaultValue={unit?.title ?? `Unit ${nextCode}`} autoComplete="off" autoFocus />
         </Field>
       </div>
+      <CodeWarning used={used} />
       <Field label="Colour">
         <ColorPicker name="color" value={unit?.color ?? "blue"} />
       </Field>
@@ -668,19 +671,29 @@ function TopicForm({ courseId, units, unitId, topic, weeks, thisWeek, onClose, o
 }) {
   const { toast, confirm } = useFeedback();
   const [busy, setBusy] = useState(false);
-  const unit = units.find((u) => u.id === unitId) ?? units[0];
+  const [pickedUnit, setPickedUnit] = useState(unitId);
+  const unit = units.find((u) => u.id === pickedUnit) ?? units[0];
+  // The proposed number follows the unit chosen (one more than the highest in it, so none is handed out twice).
+  const proposal = (u: Unit) => `${u.code}.${nextNumber(u.topics.map((t) => t.code))}`;
+  const [code, setCode] = useState(topic?.code ?? proposal(unit));
+  const [codeEdited, setCodeEdited] = useState(false);
+  const used = unit.topics.some((t) => t.id !== topic?.id && t.code === code.trim());
+  // A week beyond the end of the course (left over from a shorter target date) stays visible instead of vanishing.
+  const lastWeek = Math.max(weeks, topic?.planned_week ?? 0);
 
   const submit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
     const week = String(form.get("planned_week"));
+    const planned_week = week ? Number(week) : null;
     const body = {
       code: String(form.get("code")),
       title: String(form.get("title")),
       short_title: String(form.get("short_title")),
       outcome: String(form.get("outcome")),
       est_hours: Number(form.get("est_hours")),
-      planned_week: week ? Number(week) : null,
+      // An unchanged week is not sent again: a week left beyond the course end would otherwise block every other edit.
+      ...(topic && planned_week === topic.planned_week ? {} : { planned_week }),
       notes: String(form.get("notes")),
     };
     setBusy(true);
@@ -716,16 +729,40 @@ function TopicForm({ courseId, units, unitId, topic, weeks, thisWeek, onClose, o
     <form onSubmit={submit} className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-[1fr_6rem]">
         <Field label="Unit" htmlFor="topic-unit">
-          <select id="topic-unit" name="unit_id" className="select select-lg" defaultValue={unit.id} disabled={Boolean(topic)}>
+          <select
+            id="topic-unit"
+            name="unit_id"
+            className="select select-lg"
+            value={unit.id}
+            disabled={Boolean(topic)}
+            onChange={(e) => {
+              setPickedUnit(e.target.value);
+              const next = units.find((u) => u.id === e.target.value);
+              if (next && !codeEdited && !topic) setCode(proposal(next));
+            }}
+          >
             {units.map((u) => (
               <option key={u.id} value={u.id}>{unitName(u)}</option>
             ))}
           </select>
         </Field>
         <Field label="Number" htmlFor="topic-code">
-          <input id="topic-code" name="code" className="input" required maxLength={10} defaultValue={topic?.code ?? `${unit.code}.${unit.topics.length + 1}`} autoComplete="off" />
+          <input
+            id="topic-code"
+            name="code"
+            className="input"
+            required
+            maxLength={10}
+            value={code}
+            onChange={(e) => {
+              setCode(e.target.value);
+              setCodeEdited(true);
+            }}
+            autoComplete="off"
+          />
         </Field>
       </div>
+      <CodeWarning used={used} />
       <Field label="Topic / learning outcome" htmlFor="topic-title">
         <input id="topic-title" name="title" className="input" required maxLength={300} defaultValue={topic?.title} autoComplete="off" autoFocus />
       </Field>
@@ -744,8 +781,8 @@ function TopicForm({ courseId, units, unitId, topic, weeks, thisWeek, onClose, o
         <Field label="Planned week" htmlFor="topic-week">
           <select id="topic-week" name="planned_week" className="select select-lg" defaultValue={topic ? (topic.planned_week ?? "") : thisWeek}>
             <option value="">Not planned</option>
-            {Array.from({ length: weeks }, (_, i) => (
-              <option key={i} value={i + 1}>Week {i + 1}</option>
+            {Array.from({ length: lastWeek }, (_, i) => (
+              <option key={i} value={i + 1}>{i + 1 > weeks ? `Week ${i + 1} (after the end)` : `Week ${i + 1}`}</option>
             ))}
           </select>
         </Field>

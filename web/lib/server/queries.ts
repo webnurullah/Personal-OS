@@ -1,7 +1,7 @@
 // Database reads shared by several endpoints.
 import { doneHours } from "../course.ts";
 import { addDays, daysBetween } from "./dates.ts";
-import { dbError, must } from "./http.ts";
+import { must } from "./http.ts";
 import { fetchAll } from "./paging.ts";
 import type { Db } from "./supabase.ts";
 
@@ -14,29 +14,31 @@ export async function loadHabits(db: Db, today: string) {
   return { habits, logs };
 }
 
-const round1 = (n: number) => Math.round(n * 10) / 10;
+// Hours are kept to 3 decimals: enough for quarter hours and minutes, and it hides floating-point dust (0.1 + 0.2).
+const round3 = (n: number) => Math.round(n * 1000) / 1000;
 
 /** Short progress summary for each course (the Learning page and the course list). */
 export async function courseSummaries(db: Db, today: string) {
-  const [courses, topics] = await Promise.all([
-    db.from("courses").select("id, title, subtitle, start_date, target_date, color").order("created_at"),
-    db.from("course_topics").select("course_id, unit_id, est_hours, actual_hours, status, planned_week"),
+  // Past 1,000 topics Supabase would cut the list short, so topics and units are read page by page.
+  const [courses, topics, units] = await Promise.all([
+    db.from("courses").select("id, title, subtitle, start_date, target_date, color").order("created_at").then(must),
+    fetchAll(() => db.from("course_topics").select("course_id, est_hours, actual_hours, status, planned_week").order("id")),
+    fetchAll(() => db.from("course_units").select("course_id").order("id")),
   ]);
-  if (courses.error) throw dbError(courses.error);
-  if (topics.error) throw dbError(topics.error);
 
-  return courses.data.map((course) => {
-    const mine = topics.data.filter((t) => t.course_id === course.id);
+  return courses.map((course) => {
+    const mine = topics.filter((t) => t.course_id === course.id);
     const est = mine.reduce((sum, t) => sum + Number(t.est_hours), 0);
     const done = mine.reduce((sum, t) => sum + doneHours(t), 0);
     return {
       ...course,
-      est_hours: round1(est),
-      done_hours: round1(done),
-      spent_hours: round1(mine.reduce((sum, t) => sum + Number(t.actual_hours), 0)),
+      est_hours: round3(est),
+      done_hours: round3(done),
+      spent_hours: round3(mine.reduce((sum, t) => sum + Number(t.actual_hours), 0)),
       percent: est ? Math.round((done / est) * 100) : 0,
       topic_count: mine.length,
-      unit_count: new Set(mine.map((t) => t.unit_id)).size,
+      // Counted from the units themselves, so a unit with no topics yet is still a unit.
+      unit_count: units.filter((u) => u.course_id === course.id).length,
       days_left: daysBetween(today, course.target_date),
     };
   });

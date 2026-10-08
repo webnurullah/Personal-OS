@@ -6,6 +6,7 @@ import useSWR from "swr";
 import { ArrowRight, BriefcaseBusiness, CalendarDays, ChartNoAxesColumn, ChartColumn, Clock, FileText, Footprints, GraduationCap, HeartPulse, Leaf, Moon, Pin, Plus, SquareCheck, Sun, Target, TrendingUp, Wallet } from "lucide-react";
 import { api, errorMessage, refresh } from "@/lib/api";
 import { colorOf } from "@/lib/colors";
+import { timeLeft } from "@/lib/course";
 import { daysBetween, formatDate } from "@/lib/dates";
 import { count, hm, minutesOf, pct } from "@/lib/format";
 import { useCategories, useNowMinutes } from "@/lib/hooks";
@@ -442,7 +443,7 @@ export function LearningWidget() {
                       </div>
                       <Progress value={course.percent} fill={color.bar} track="bg-slate-100" className="mt-1.5 h-1.5" />
                       <p className="mt-1 text-xs text-slate-400">
-                        {hm(course.done_hours)} of {hm(course.est_hours)} · {course.days_left > 0 ? `${course.days_left} days left` : "Target date passed"}
+                        {hm(course.done_hours)} of {hm(course.est_hours)} · {timeLeft(course.days_left)}
                       </p>
                     </Link>
                   </li>

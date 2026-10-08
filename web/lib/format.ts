@@ -17,8 +17,8 @@ export function hm(hours: number) {
   return m ? `${h}h ${m}m` : `${h}h`;
 }
 
-/** 7.5 → "7.5", 7 → "7" */
-export const num = (n: number) => String(Math.round(n * 10) / 10);
+/** 7.5 → "7.5", 7 → "7", 0.25 → "0.25" (up to 2 decimals, so quarter hours are shown as they are) */
+export const num = (n: number) => String(Math.round(n * 100) / 100);
 export const pct = (part: number, whole: number) => (whole ? Math.round((part / whole) * 100) : 0);
 export const count = (n: number) => Math.round(n).toLocaleString("en-US");
 export const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;

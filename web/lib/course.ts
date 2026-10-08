@@ -11,6 +11,31 @@ const daysBetween = (a: string, b: string) => Math.round((toMs(b) - toMs(a)) / D
 const sum = <T,>(list: T[], value: (item: T) => number) => list.reduce((total, item) => total + value(item), 0);
 const percent = (part: number, whole: number) => (whole ? Math.round((part / whole) * 100) : 0);
 
+/** A course can be at most this many weeks long (3 years): longer means a typo in the target date. */
+export const MAX_COURSE_WEEKS = 156;
+
+/**
+ * The next unit or topic number: one more than the highest in use, so a number is never handed out twice
+ * after something was deleted ("1.1", "1.3" → 4). Counts the last part only ("2.7" → 7).
+ */
+export function nextNumber(codes: string[]) {
+  const used = codes.map((code) => Number(code.split(".").pop())).filter((n) => Number.isInteger(n) && n >= 0);
+  // Codes that are not numbers ("A", "B") still count, so the answer is always more than how many exist.
+  return Math.max(used.length ? Math.max(...used) : 0, codes.length) + 1;
+}
+
+/** The position for something added at the end of a list (0 for the first one). */
+export const nextPosition = (positions: number[]) => (positions.length ? Math.max(...positions) + 1 : 0);
+
+/** How long until the target date, in words that stay correct on the day itself: "3 weeks left", "5 days left", "date passed". */
+export function timeLeft(daysLeft: number) {
+  if (daysLeft < 0) return "date passed";
+  if (daysLeft === 0) return "target date is today";
+  if (daysLeft < 7) return `${daysLeft} ${daysLeft === 1 ? "day" : "days"} left`;
+  const weeks = Math.ceil(daysLeft / 7);
+  return `${weeks} ${weeks === 1 ? "week" : "weeks"} left`;
+}
+
 /** Work finished on a topic: all of it once done, otherwise the time spent (never more than the estimate). */
 export const doneHours = (t: TopicFacts) => (t.status === "done" ? Number(t.est_hours) : Math.min(Number(t.actual_hours), Number(t.est_hours)));
 

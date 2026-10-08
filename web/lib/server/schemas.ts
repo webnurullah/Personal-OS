@@ -1,5 +1,6 @@
 // What each endpoint accepts. Anything else is refused with a 400 and the field errors.
-import { mondayOf, weekdayIndex } from "./dates.ts";
+import { courseWeeks, MAX_COURSE_WEEKS } from "../course.ts";
+import { daysBetween, mondayOf, weekdayIndex } from "./dates.ts";
 import { HttpError } from "./http.ts";
 import { s, z } from "./validate.ts";
 
@@ -156,11 +157,26 @@ export const TopicFields = z.object({
   position: z.number().int().min(0).optional(),
 }).strict();
 
-/** Week 1 always starts on a Monday, and the target must come after the start. */
-export function checkDates<T extends { start_date?: string; target_date?: string }>(c: T): T {
+/**
+ * Week 1 always starts on a Monday, the target must come after the start, and a course lasts at most 3 years.
+ * When a change sends only one of the two dates, `existing` (the saved course) supplies the other.
+ */
+export function checkDates<T extends { start_date?: string; target_date?: string }>(c: T, existing?: { start_date: string; target_date: string }): T {
   if (c.start_date) c.start_date = mondayOf(c.start_date);
-  if (c.start_date && c.target_date && c.target_date <= c.start_date) throw new HttpError(400, "The target date must be after the start date.");
+  const start = c.start_date ?? existing?.start_date;
+  const target = c.target_date ?? existing?.target_date;
+  if (start && target) {
+    if (target <= start) throw new HttpError(400, "The target date must be after the start date.");
+    if (daysBetween(start, target) > MAX_COURSE_WEEKS * 7) throw new HttpError(400, "A course can last at most 3 years. Check the target date.");
+  }
   return c;
+}
+
+/** A topic can only be planned in a week the course has. */
+export function checkPlannedWeek(week: number | null | undefined, course: { start_date: string; target_date: string }) {
+  if (week == null) return;
+  const weeks = courseWeeks({ ...course, weekly_plan: [] });
+  if (week > weeks) throw new HttpError(400, `Week ${week} is after the end of the course. The course has ${weeks} ${weeks === 1 ? "week" : "weeks"}.`);
 }
 
 // ---------- Finance ----------

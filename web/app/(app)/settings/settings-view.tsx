@@ -43,7 +43,8 @@ function useSaveProfile() {
       const updated = await api<Profile>("/profile", { method: "PATCH", body: changes });
       await mutate(updated, { revalidate: false });
       if (reloadAll) await refreshAll();
-      else await refresh("/notifications");
+      // A changed goal shows on its own page (and in the week's default), so that page reloads too.
+      else await refresh("/notifications", ...(changes.weekly_study_goal !== undefined ? ["/learning"] : []), ...(changes.step_goal !== undefined || changes.sleep_goal_minutes !== undefined || changes.water_goal !== undefined ? ["/health"] : []));
       if (message) toast(message);
       return true;
     } catch (e) {

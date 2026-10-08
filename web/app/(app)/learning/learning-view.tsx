@@ -8,9 +8,11 @@ import useSWR from "swr";
 import { ArrowUpRight, BookOpen, ChartColumn, ChevronLeft, ChevronRight, Clock, GraduationCap, Lightbulb, Minus, Pencil, Plus, Sparkles, Target, Timer, Trash2 } from "lucide-react";
 import { api, errorMessage, refresh } from "@/lib/api";
 import { addDays, formatDate, mondayOf, weekdayIndex } from "@/lib/dates";
-import { hm, num, pct } from "@/lib/format";
+import { timeLeft } from "@/lib/course";
+import { hm, num, pct, plural } from "@/lib/format";
 import { useNewAction } from "@/lib/new-action";
 import type { LearningWeek, StudyBlock } from "@/lib/types";
+import { useSaveLater } from "@/lib/use-save-later";
 import { Progress } from "@/components/ui/charts";
 import { Field } from "@/components/ui/controls";
 import { useFeedback } from "@/components/ui/feedback";
@@ -23,6 +25,7 @@ export function LearningView() {
   const [week, setWeek] = useState<string | null>(null); // Monday of the week on screen; null = this week
   const { data, error, mutate } = useSWR<LearningWeek>(week ? `/learning/week?start=${week}` : "/learning/week");
   const { toast, confirm } = useFeedback();
+  const saveLater = useSaveLater(500);
   const [logging, setLogging] = useState(false);
   const [newCourse, setNewCourse] = useState(false);
   const [editingTopic, setEditingTopic] = useState(false);
@@ -49,7 +52,15 @@ export function LearningView() {
     await refresh("/learning");
   };
 
-  const setGoal = (hours: number) => run(() => api(`/learning/week/${data.week_start}`, { method: "PUT", body: { goal_hours: Math.min(100, Math.max(0.5, hours)) } }));
+  // Shown at once, saved once the clicking stops: fast clicks add up instead of each starting from the old value.
+  const setGoal = (hours: number) => {
+    const goal_hours = Math.min(100, Math.max(0.5, hours));
+    const weekStart = data.week_start;
+    mutate({ ...data, goal_hours }, { revalidate: false });
+    saveLater("goal", () => {
+      run(() => api(`/learning/week/${weekStart}`, { method: "PUT", body: { goal_hours } }));
+    });
+  };
   const saveTopic = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const topic = String(new FormData(e.currentTarget).get("topic")).trim();
@@ -75,13 +86,13 @@ export function LearningView() {
       </PageHeader>
 
       <div className="mt-5 flex flex-wrap items-center gap-2">
-        <button type="button" className="btn btn-ghost btn-sm btn-icon" onClick={() => setWeek(addDays(data.week_start, -7))} aria-label="Previous week">
+        <button type="button" className="btn btn-ghost btn-sm btn-icon" onClick={() => setWeek(addDays(week ?? thisWeek, -7))} aria-label="Previous week">
           <ChevronLeft className="size-4" />
         </button>
         <p className="min-w-52 text-center text-sm font-semibold text-slate-700">
           {isThisWeek ? "This week" : "Week of"} · {formatDate(data.week_start, "short")} – {formatDate(addDays(data.week_start, 6), "short")}
         </p>
-        <button type="button" className="btn btn-ghost btn-sm btn-icon" onClick={() => setWeek(addDays(data.week_start, 7))} aria-label="Next week">
+        <button type="button" className="btn btn-ghost btn-sm btn-icon" onClick={() => setWeek(addDays(week ?? thisWeek, 7))} aria-label="Next week">
           <ChevronRight className="size-4" />
         </button>
         {!isThisWeek && (
@@ -219,7 +230,7 @@ export function LearningView() {
                         <div className="min-w-0 flex-1">
                           <p className="line-clamp-2 font-semibold leading-snug text-slate-900">{course.title}</p>
                           <p className="text-xs text-slate-500">
-                            {course.unit_count} units · {course.topic_count} topics · due {formatDate(course.target_date, "date")}
+                            {plural(course.unit_count, "unit")} · {plural(course.topic_count, "topic")} · due {formatDate(course.target_date, "date")}
                           </p>
                         </div>
                         <ArrowUpRight className="size-4 shrink-0 text-slate-400 transition group-hover:text-blue-600" />
@@ -229,7 +240,7 @@ export function LearningView() {
                         <span className="text-xs font-semibold text-slate-600">{course.percent}%</span>
                       </div>
                       <p className="mt-2 text-xs text-slate-500">
-                        {num(course.done_hours)}h of {num(course.est_hours)}h done · {course.days_left >= 0 ? `${Math.ceil(course.days_left / 7)} weeks left` : "target date passed"}
+                        {num(course.done_hours)}h of {num(course.est_hours)}h done · {timeLeft(course.days_left)}
                       </p>
                     </Link>
                   </li>
@@ -248,7 +259,13 @@ export function LearningView() {
         </aside>
       </div>
 
-      <Modal open={logging} onClose={() => setLogging(false)} title="Log a study session" description="It is added as a block for this week." size="md">
+      <Modal
+        open={logging}
+        onClose={() => setLogging(false)}
+        title="Log a study session"
+        description={isThisWeek ? "It is added as a block for this week." : `It is added to the week of ${formatDate(data.week_start, "short")}.`}
+        size="md"
+      >
         <SessionForm weekStart={data.week_start} today={data.today} onClose={() => setLogging(false)} />
       </Modal>
       <Modal open={newCourse} onClose={() => setNewCourse(false)} title="New course" description="Then add its units and topics on the course page.">
@@ -262,17 +279,21 @@ function SessionForm({ weekStart, today, onClose }: { weekStart: string; today: 
   const { toast } = useFeedback();
   const [busy, setBusy] = useState(false);
   const isThisWeek = mondayOf(today) === weekStart;
+  const [day, setDay] = useState(isThisWeek ? weekdayIndex(today) : 0);
+  // "Already done" is on for today and days gone by, off for a day still to come — until you choose yourself.
+  const isPast = addDays(weekStart, day) <= today;
+  const [doneChoice, setDoneChoice] = useState<boolean | null>(null);
+  const done = doneChoice ?? isPast;
 
   const submit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
     const hours = Number(form.get("hours"));
-    const done = form.get("done") === "on";
     setBusy(true);
     try {
-      await api("/learning/blocks", { method: "POST", body: { week_start: weekStart, weekday: Number(form.get("weekday")), hours, activity: String(form.get("activity")), done } });
+      await api("/learning/blocks", { method: "POST", body: { week_start: weekStart, weekday: day, hours, activity: String(form.get("activity")), done } });
       await refresh("/learning");
-      toast(done ? `${hm(hours)} added to this week` : "Block planned");
+      toast(done ? `${hm(hours)} added to ${isThisWeek ? "this week" : "the week of " + formatDate(weekStart, "short")}` : "Block planned");
       onClose();
     } catch (error) {
       toast(errorMessage(error), "error");
@@ -285,7 +306,7 @@ function SessionForm({ weekStart, today, onClose }: { weekStart: string; today: 
     <form onSubmit={submit} className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
         <Field label="Day" htmlFor="session-day">
-          <select id="session-day" name="weekday" className="select select-lg" defaultValue={isThisWeek ? weekdayIndex(today) : 0}>
+          <select id="session-day" name="weekday" className="select select-lg" value={day} onChange={(e) => setDay(Number(e.target.value))}>
             {DAYS.map((day, i) => (
               <option key={day} value={i}>{day}</option>
             ))}
@@ -299,8 +320,8 @@ function SessionForm({ weekStart, today, onClose }: { weekStart: string; today: 
         <input id="session-what" name="activity" className="input" required maxLength={200} placeholder="e.g. SQL joins practice" autoComplete="off" autoFocus />
       </Field>
       <label className="flex items-center gap-3 text-sm text-slate-700">
-        <input type="checkbox" name="done" className="checkbox checkbox-green" defaultChecked />
-        Already done (counts towards this week)
+        <input type="checkbox" name="done" className="checkbox checkbox-green" checked={done} onChange={(e) => setDoneChoice(e.target.checked)} />
+        Already done (counts towards {isThisWeek ? "this week" : "that week"})
       </label>
       <ModalActions onCancel={onClose} submitLabel="Add block" busy={busy} />
     </form>
