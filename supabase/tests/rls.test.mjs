@@ -1,5 +1,6 @@
 // Checks the migrations in a throwaway in-memory Postgres (PGlite): security rules, triggers and functions.
 // Run from supabase/tests:  npm install  then  npm test
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { makeDb, as } from './harness.mjs';
 
@@ -144,6 +145,14 @@ await qa(`insert into storage.objects (bucket_id, name, owner_id) values ('avata
 check('nothing in the bucket can be changed in place, so no overwriting (no update policy)', (await qa(`update storage.objects set name = $1 where name = $2 returning id`, [file(A, 'webp'), file(A, 'png')])).length === 0 && (await qb(`update storage.objects set name = $1 returning id`, ['x'])).length === 0 && (await qa(`select name from storage.objects where bucket_id = 'avatars'`))[0].name === file(A, 'png'));
 check('(clean up)', (await qa(`delete from storage.objects where name = $1 returning id`, [file(A, 'png')])).length === 1);
 
+// The file pasted into the Supabase SQL Editor (supabase/archive-step-2.sql) runs on a migrated database, twice, and changes nothing that the tests below rely on.
+{
+  const paste = readFileSync(new URL('../archive-step-2.sql', import.meta.url), 'utf8');
+  let ok = true;
+  try { await db.exec(paste); await db.exec(paste); } catch (e) { ok = false; console.log(String(e)); }
+  check('archive-step-2.sql runs twice without errors', ok);
+}
+
 // Archive (20261008000100_archive_items.sql)
 {
 const arch = async (kind, id, q = qa) => (await q('select archive_delete($1, $2) as id', [kind, id]))[0].id;
@@ -247,6 +256,22 @@ check('a restored transaction keeps its category', (await one('select budget_cat
 const abill = await arch('bill', bill);
 check('a bill can be archived and restored', (await restore(abill)).id === bill && (await count('bills', bill)) === 1);
 
+// a paid bill keeps its link to the transaction through delete and restore
+const paidTx = (await one(`insert into transactions (type, amount, description, tx_date) values ('expense', 99, 'Paid arch bill', '2026-10-03') returning id`)).id;
+await qa('update bills set transaction_id = $1, paid_at = now() where id = $2', [paidTx, bill]);
+const apaid = await arch('transaction', paidTx);
+check('deleting a transaction clears its paid bill link', (await one('select transaction_id from bills where id = $1', [bill])).transaction_id === null);
+await restore(apaid);
+check('restoring the transaction links its paid bill again', (await one('select transaction_id from bills where id = $1', [bill])).transaction_id === paidTx);
+
+// a delete that removes nothing (another tab got there first) leaves no entry behind
+await db.exec(`create function public.test_skip_delete() returns trigger language plpgsql as $$ begin return null; end $$;
+  create trigger test_skip_delete before delete on public.notes for each row execute function public.test_skip_delete();`);
+const raced = (await one(`insert into notes (title) values ('Raced note') returning id`)).id;
+await expectError('a delete that removed nothing is refused', () => arch('note', raced), 'Not found');
+check('…and leaves no entry in the Archive, and the note is still there', (await qa(`select id from archive_items where title = 'Raced note'`)).length === 0 && (await count('notes', raced)) === 1);
+await db.exec(`drop trigger test_skip_delete on public.notes; drop function public.test_skip_delete();`);
+
 // the simple ones
 for (const [kind, sql, titleOf] of [
   ['note', `insert into notes (title, body) values ('Arch note', 'text') returning id`, 'Arch note'],
@@ -325,6 +350,19 @@ const afterUnit = await one('select course_id, unit_id from learning_resources w
 check('deleting a unit keeps the item in its course', afterUnit.course_id === lc && afterUnit.unit_id === null, JSON.stringify(afterUnit));
 await restore(arcUnit);
 check('restoring the unit links the item to it again', (await one('select unit_id from learning_resources where id = $1', [res.id])).unit_id === lu);
+
+// An item's unit always belongs to its course.
+const lc2 = (await one(`insert into courses (title, start_date, target_date) values ('Other course', '2026-10-05', '2026-12-28') returning id`)).id;
+await qa('update learning_resources set course_id = $1 where id = $2', [lc2, res.id]);
+check('moving an item to another course drops its old unit', (await one('select course_id, unit_id from learning_resources where id = $1', [res.id])).unit_id === null);
+const mismatch = await one(`insert into learning_resources (title, course_id, unit_id) values ('Mismatch', $1, $2) returning unit_id`, [lc2, lu]);
+check('a unit of another course is not accepted on a new item', mismatch.unit_id === null);
+await qa('update learning_resources set course_id = $1, unit_id = $2 where id = $3', [lc, lu, res.id]);
+const arcUnit2 = await arch('unit', lu);
+await qa('update learning_resources set course_id = $1 where id = $2', [lc2, res.id]);
+await restore(arcUnit2);
+check('restoring a unit does not attach an item that has moved to another course', (await one('select course_id, unit_id from learning_resources where id = $1', [res.id])).unit_id === null);
+await qa('update learning_resources set course_id = $1 where id = $2', [lc, res.id]);
 
 // An item goes to the Archive and comes back with everything (certificate, skills, dates, links).
 const arcItem = await arch('resource', listed.id);

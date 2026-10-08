@@ -1,7 +1,7 @@
 // Reading job posts without AI. Run with: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
-import { extractJob, htmlToText } from "../lib/job-extract.ts";
+import { extractJob, htmlToText, siteNameFromPage, titleFromPage } from "../lib/job-extract.ts";
 import { findSkills } from "../lib/skills.ts";
 
 const today = "2026-10-06";
@@ -75,4 +75,18 @@ test("no job found leaves the fields empty", () => {
 
 test("html to text keeps list items on their own lines", () => {
   assert.equal(htmlToText("<ul><li>One &amp; two</li><li>Three</li></ul><script>x()</script>"), "• One & two\n• Three");
+});
+
+test("page titles keep apostrophes, quotes and entities, whatever the quote style or the attribute order", () => {
+  assert.equal(titleFromPage(`<head><meta property="og:title" content="Google's Ads Course | Skillshop"></head>`), "Google's Ads Course | Skillshop");
+  assert.equal(titleFromPage(`<meta content='Learn "SEO" fast' property='og:title'>`), 'Learn "SEO" fast');
+  assert.equal(titleFromPage(`<meta property="og:title" content="Tom &amp; Jerry's Guide">`), "Tom & Jerry's Guide");
+  assert.equal(titleFromPage(`<meta name="og:title" content="It's here">`), "It's here");
+  // No social title: the <title> tag.
+  assert.equal(titleFromPage(`<title>  Plain   title\n here </title>`), "Plain title here");
+  // Only the right tag counts.
+  assert.equal(titleFromPage(`<meta property="og:description" content="x"><meta property="og:title" content="Right one">`), "Right one");
+  assert.equal(titleFromPage(`<p>no head</p>`), "");
+  assert.equal(siteNameFromPage(`<meta property="og:site_name" content="Brian's Academy">`), "Brian's Academy");
+  assert.equal(siteNameFromPage(`<meta property="og:title" content="x">`), "");
 });

@@ -1,7 +1,7 @@
 // Learning library (certificates & playlists): links, progress, status rules, certificates, lists and the request schemas. Run with: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
-import { applyChange, certificateDatesProblem, certificateExpiry, compareUpNext, courseRollup, expiryLabel, hasCertificate, libraryStats, NEW_FACTS, ofCourse, parseList, progressOf, readLink, resumeLine, suggestSkills, titleFromLink, upNext } from "../lib/library.ts";
+import { applyChange, certificateDatesAfter, certificateDatesProblem, certificateExpiry, compareUpNext, courseRollup, expiryLabel, hasCertificate, libraryStats, NEW_FACTS, ofCourse, parseList, progressOf, readLink, resumeLine, suggestSkills, titleFromLink, upNext } from "../lib/library.ts";
 import { mergeSkills } from "../lib/jobs.ts";
 import { tidyTitle } from "../lib/server/resources.ts";
 import { ResourceBulk, ResourceCreate, ResourceFields } from "../lib/server/schemas.ts";
@@ -20,6 +20,11 @@ test("the platform and the kind come from the link", () => {
   assert.deepEqual(readLink("https://www.youtube.com/watch?v=abc&list=PL123"), { platform: "YouTube", kind: "video" }); // one video inside a list
   assert.deepEqual(readLink("https://www.youtube.com/watch?v=abc"), { platform: "YouTube", kind: "video" });
   assert.deepEqual(readLink("https://youtu.be/abc"), { platform: "YouTube", kind: "video" });
+  assert.deepEqual(readLink("https://youtu.be/abc?list=PL123"), { platform: "YouTube", kind: "video" }); // one video, opened from a playlist
+  assert.deepEqual(readLink("https://learn.example.com.bd/x"), { platform: "Example", kind: "other" });
+  assert.deepEqual(readLink("https://school.ac.uk/courses"), { platform: "School", kind: "other" });
+  assert.deepEqual(readLink("https://www.shikhbe.com.bd/"), { platform: "Shikhbe", kind: "other" });
+  assert.deepEqual(readLink("https://bdjobs.com/"), { platform: "Bdjobs", kind: "other" });
   assert.deepEqual(readLink("https://www.coursera.org/learn/seo"), { platform: "Coursera", kind: "certificate" });
   assert.deepEqual(readLink("udemy.com/course/google-ads"), { platform: "Udemy", kind: "certificate" }); // typed without https://
   assert.deepEqual(readLink("https://academy.hubspot.com/courses/email-marketing"), { platform: "HubSpot Academy", kind: "certificate" });
@@ -88,6 +93,16 @@ test("a certificate cannot expire before it was issued", () => {
   assert.equal(certificateDatesProblem("2026-10-01", "2026-09-01") !== null, true);
   assert.equal(certificateDatesProblem(null, "2026-09-01"), null);
   assert.equal(certificateDatesProblem("2026-10-01", null), null);
+});
+
+test("a change to a certificate date is checked against the saved other date, and a cleared date counts as cleared", () => {
+  const saved = { issued_on: "2026-10-01", expires_on: "2027-10-01" };
+  assert.equal(certificateDatesAfter(saved, {}), null);
+  assert.equal(certificateDatesAfter(saved, { expires_on: "2026-09-01" }) !== null, true); // before the saved issue date
+  assert.equal(certificateDatesAfter(saved, { issued_on: "2028-01-01" }) !== null, true); // after the saved expiry
+  assert.equal(certificateDatesAfter(saved, { issued_on: "2028-01-01", expires_on: null }), null); // the expiry is being cleared
+  assert.equal(certificateDatesAfter(saved, { issued_on: null, expires_on: "2020-01-01" }), null); // the issue date is being cleared
+  assert.equal(certificateDatesAfter({ issued_on: null, expires_on: null }, { issued_on: "2026-10-01" }), null);
 });
 
 test("certificates: earned, valid, expiring soon, expired", () => {
@@ -167,6 +182,7 @@ test("skills to add after finishing: the item's own, else those its title mentio
 test("merging skills ignores doubles written another way", () => {
   assert.deepEqual(mergeSkills(["React", "SQL"], ["react.js", "Docker", "docker", " ", "SQL"]), { skills: ["React", "SQL", "Docker"], added: ["Docker"] });
   assert.deepEqual(mergeSkills([], ["Excel"]), { skills: ["Excel"], added: ["Excel"] });
+  assert.deepEqual(mergeSkills(["React"], ["JS", "js"]), { skills: ["React", "JS"], added: ["JS"] }); // "JS" is a skill too
   assert.deepEqual(mergeSkills(["Excel"], []), { skills: ["Excel"], added: [] });
 });
 
@@ -184,6 +200,7 @@ test("a pasted list: links, titles, or both, with bullets and numbers removed", 
     - SEO Basics | https://www.coursera.org/learn/seo
     2) Google Ads Search
     www.udemy.com/course/email | Email marketing
+    academy.hubspot.com/courses/seo-training
 
     * Content Writing | not a link
   `;
@@ -192,15 +209,19 @@ test("a pasted list: links, titles, or both, with bullets and numbers removed", 
     { title: "SEO Basics", url: "https://www.coursera.org/learn/seo" },
     { title: "Google Ads Search", url: "" },
     { title: "Email marketing", url: "https://www.udemy.com/course/email" },
+    { title: "", url: "https://academy.hubspot.com/courses/seo-training" },
     { title: "Content Writing", url: "" },
   ]);
+  assert.deepEqual(parseList("Node.js basics\nNode.js"), [{ title: "Node.js basics", url: "" }, { title: "Node.js", url: "" }]); // a dot alone does not make a link
   assert.deepEqual(parseList("  \n \n"), []);
 });
 
 test("a title can be made from a link when the page cannot be read", () => {
   assert.equal(titleFromLink("https://www.coursera.org/learn/seo-basics-course"), "Seo Basics Course");
   assert.equal(titleFromLink("https://example.com/courses/google_ads.html"), "Google Ads");
-  assert.equal(titleFromLink("https://www.youtube.com/playlist?list=PL1"), "youtube.com"); // "playlist" says nothing
+  assert.equal(titleFromLink("https://www.youtube.com/playlist?list=PL1"), "YouTube playlist"); // "playlist" says nothing
+  assert.equal(titleFromLink("https://youtu.be/dQw4w9WgXcQ"), "YouTube video"); // not the video id
+  assert.equal(titleFromLink("https://www.youtube.com/watch?v=dQw4w9WgXcQ"), "YouTube video");
   assert.equal(titleFromLink("https://www.udemy.com/"), "udemy.com");
   assert.equal(titleFromLink("https://example.com/a/12345"), "example.com");
   assert.doesNotThrow(() => titleFromLink("https://example.com/%E0%A4%A")); // a broken %-code does not throw

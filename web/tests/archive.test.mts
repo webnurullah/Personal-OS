@@ -62,3 +62,18 @@ test("deleting from the Archive says it is permanent, and how much goes with it"
   assert.equal(foreverMessage("Learn SQL", "goal", 3), "“Learn SQL” and its 3 milestones will be deleted forever. This cannot be undone.");
   assert.equal(foreverMessage("Bakery site", "project", 1), "“Bakery site” and its 1 task will be deleted forever. This cannot be undone.");
 });
+
+test("the SQL file for the Supabase SQL Editor has exactly the same functions as the migration", () => {
+  const body = (sql: string, name: string) => {
+    const start = sql.search(new RegExp(`create (or replace )?function public\\.${name}\\(`));
+    assert.ok(start >= 0, `${name} not found`);
+    const end = sql.indexOf("end $$;", start);
+    return sql.slice(start, end).replace("create or replace function", "create function").replace(/\s+/g, " ");
+  };
+  const migration = readFileSync(new URL("../../supabase/migrations/20261008000100_archive_items.sql", import.meta.url), "utf8");
+  const paste = readFileSync(new URL("../../supabase/archive-step-2.sql", import.meta.url), "utf8");
+  for (const name of ["archive_delete", "archive_restore"]) assert.equal(body(paste, name), body(migration, name), name);
+  // Part 2 of the file is the newest migration, word for word.
+  const fixes = readFileSync(new URL("../../supabase/migrations/20261009000100_archive_fixes.sql", import.meta.url), "utf8");
+  assert.ok(paste.includes(fixes.trim()), "the fixes migration is not inside archive-step-2.sql");
+});

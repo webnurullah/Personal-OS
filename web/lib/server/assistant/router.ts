@@ -39,6 +39,9 @@ import * as note from "@/app/api/notes/[id]/route";
 import * as notifications from "@/app/api/notifications/route";
 import * as profile from "@/app/api/profile/route";
 import * as reminders from "@/app/api/reminders/route";
+import * as resources from "@/app/api/resources/route";
+import * as resource from "@/app/api/resources/[id]/route";
+import * as resourcePractice from "@/app/api/resources/[id]/practice/route";
 import * as reminder from "@/app/api/reminders/[id]/route";
 import * as search from "@/app/api/search/route";
 import * as tasks from "@/app/api/tasks/route";
@@ -67,6 +70,7 @@ const ROUTES: [string, Module][] = [
   ["/health", health], ["/health/:date", healthDay],
   ["/notes", notes], ["/notes/:id", note], ["/reminders", reminders], ["/reminders/:id", reminder],
   ["/jobs", jobs], ["/jobs/analyze", jobAnalyze], ["/jobs/:id", job],
+  ["/resources", resources], ["/resources/:id", resource], ["/resources/:id/practice", resourcePractice],
 ];
 
 function match(pathname: string) {

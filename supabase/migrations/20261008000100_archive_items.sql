@@ -74,6 +74,7 @@ declare
   v_title text;
   v_detail text;
   new_id uuid;
+  n_deleted int;
 begin
   if auth.uid() is null then
     raise exception 'Not signed in';
@@ -111,6 +112,11 @@ begin
 
   -- Rows that depended on it (milestones, units, history …) go with it; links from other rows are cleared.
   execute format('delete from public.%I where id = $1', cfg ->> 'table') using p_id;
+  get diagnostics n_deleted = row_count;
+  if n_deleted = 0 then
+    -- Another tab (or a double click) moved it first: undo this entry, so the item is never in the Archive twice.
+    raise exception 'Not found.' using errcode = 'P0002';
+  end if;
   return new_id;
 end $$;
 

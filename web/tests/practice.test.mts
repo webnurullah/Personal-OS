@@ -41,6 +41,16 @@ test("the subject steps fit the course: by its skills, or by words in its title"
   assert.equal(names({ title: "WordPress website from scratch", skills: [] }).includes("WordPress"), true);
   assert.equal(names({ title: "Intro to SQL", skills: [] }).includes("SQL"), true);
   assert.deepEqual(names({ title: "A course nobody has a template for", skills: [] }), []);
+  // Whole words only: "excel" is not in "excellent", "react" is not in "reaction".
+  assert.deepEqual(names({ title: "Excellent customer service", skills: [] }), []);
+  assert.deepEqual(names({ title: "Reaction time training", skills: [] }), []);
+  assert.deepEqual(names({ title: "Excel skills for business", skills: [] }), ["Excel & data"]);
+  assert.equal(names({ title: "React for beginners", skills: [] })[0], "Web development");
+  // The best match comes first: the Freelancing idea (which lists the skill Communication) gets the Freelancing steps, not the Speaking ones.
+  assert.deepEqual(names({ title: "Freelancing for beginners: profile, gigs and proposals", skills: ["Communication"] }), ["Freelancing", "Speaking & English"]);
+  assert.match(practicePlan({ title: "Freelancing for beginners: profile, gigs and proposals", skills: ["Communication"] }, today).tasks[1].title, /profile and one service/);
+  // A key in the title beats a skill: this is about speaking, with one SEO mention in the skills.
+  assert.equal(names({ title: "Presentation and public speaking", skills: ["SEO"] })[0], "Speaking & English");
   // The SEO plan has SEO-specific tasks; an unknown course gets the general "apply it" step.
   assert.match(practicePlan({ title: "x", skills: ["SEO"] }, today).tasks.map((t) => t.title).join("\n"), /SEO checklist/);
   assert.match(practicePlan({ title: "A course nobody has a template for", skills: [] }, today).tasks[1].title, /Apply it to one small real problem/);

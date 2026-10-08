@@ -127,16 +127,25 @@ function firstSentences(text: string, max = 280) {
   return cutAt > 80 ? paragraph.slice(0, cutAt + 1) : `${paragraph.slice(0, max - 1).trimEnd()}…`;
 }
 
+/** The value of a <meta> tag (any attribute order, either kind of quote, apostrophes allowed inside): `property="og:title" content="Google's Ads"`. */
+function metaContent(html: string, property: string) {
+  for (const tag of html.match(/<meta\b[^>]*>/gi) ?? []) {
+    if (!new RegExp(`(?:property|name)\\s*=\\s*(["'])${property}\\1`, "i").test(tag)) continue;
+    const content = tag.match(/\bcontent\s*=\s*(["'])([\s\S]*?)\1/i)?.[2];
+    if (content !== undefined) return content;
+  }
+  return undefined;
+}
+
 /** The title of a web page: its social-share title, else the <title> tag. */
 export function titleFromPage(html: string) {
-  const og = html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i)?.[1] ?? html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:title["']/i)?.[1];
-  const raw = decodeEntities(og ?? html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? "").replace(/\s+/g, " ").trim();
+  const raw = decodeEntities(metaContent(html, "og:title") ?? html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? "").replace(/\s+/g, " ").trim();
   return raw;
 }
 
 /** The name of the website a page belongs to (og:site_name), or "". */
 export function siteNameFromPage(html: string) {
-  return decodeEntities(html.match(/<meta[^>]+property=["']og:site_name["'][^>]+content=["']([^"']+)["']/i)?.[1] ?? "").trim();
+  return decodeEntities(metaContent(html, "og:site_name") ?? "").trim();
 }
 
 /** Cuts "Frontend Developer - Acme | BDJobs" down to the job title (and the company if it is there). */

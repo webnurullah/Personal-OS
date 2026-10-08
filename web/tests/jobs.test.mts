@@ -11,6 +11,9 @@ test("skill names match however they are written", () => {
   assert.equal(skillKey("react js"), skillKey("React"));
   assert.notEqual(skillKey("C++"), skillKey("C#"));
   assert.notEqual(skillKey("Java"), skillKey("JavaScript"));
+  assert.equal(skillKey("JS"), "js"); // not empty
+  assert.notEqual(skillKey("JS"), skillKey("TS"));
+  assert.equal(skillKey("Node.js"), "node");
 });
 
 test("a job's skills split into have and missing", () => {

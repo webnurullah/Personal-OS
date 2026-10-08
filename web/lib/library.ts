@@ -62,6 +62,8 @@ const PLATFORMS: { match: RegExp; name: string; kind: ResourceKind }[] = [
   { match: /(^|\.)(medium\.com|dev\.to|substack\.com)$/, name: "Article", kind: "reading" },
 ];
 
+const SECOND_LEVEL = new Set(["com", "co", "org", "net", "edu", "ac", "gov"]);
+
 /** Adds "https://" when a link was typed without it. */
 export function fixLink(link: string) {
   const text = link.trim();
@@ -81,7 +83,9 @@ export function readLink(link: string): { platform: string; kind: ResourceKind }
   const url = parseUrl(link);
   if (!url || !/^https?:$/.test(url.protocol)) return { platform: "", kind: "other" };
   const host = url.hostname.toLowerCase().replace(/^www\./, "");
-  if (host === "youtu.be" || /(^|\.)youtube\.com$/.test(host)) {
+  // youtu.be/<id> is one video, even when "?list=" says which playlist it was opened from.
+  if (host === "youtu.be") return { platform: "YouTube", kind: "video" };
+  if (/(^|\.)youtube\.com$/.test(host)) {
     const playlist = url.pathname.startsWith("/playlist") || (url.searchParams.has("list") && !url.searchParams.has("v"));
     return { platform: "YouTube", kind: playlist ? "playlist" : "video" };
   }
@@ -89,7 +93,9 @@ export function readLink(link: string): { platform: string; kind: ResourceKind }
   if (known) return { platform: known.name, kind: known.kind };
   // Unknown site: its name without "www." and the ending ("learn.example.com" → "Example").
   const parts = host.split(".");
-  const name = parts.length > 1 ? parts[parts.length - 2] : parts[0];
+  // "learn.example.com.bd" and "school.ac.uk": skip the second-level label of a two-part ending.
+  const twoPartEnding = parts.length >= 3 && parts[parts.length - 1].length === 2 && SECOND_LEVEL.has(parts[parts.length - 2]);
+  const name = parts.length > 1 ? parts[parts.length - (twoPartEnding ? 3 : 2)] : parts[0];
   return { platform: name ? name.charAt(0).toUpperCase() + name.slice(1) : "", kind: "other" };
 }
 
@@ -147,6 +153,11 @@ export function applyChange(current: Facts, changes: ResourceChange, today: stri
 /** Why a certificate's dates cannot be right (null when they are fine). */
 export function certificateDatesProblem(issued: string | null | undefined, expires: string | null | undefined) {
   return issued && expires && expires < issued ? "The expiry date cannot be before the date the certificate was issued." : null;
+}
+
+/** The same check for a change to an item: a date left out of the change stays as saved, a date sent as null is cleared. */
+export function certificateDatesAfter(current: { issued_on: string | null; expires_on: string | null }, change: { issued_on?: string | null; expires_on?: string | null }) {
+  return certificateDatesProblem(change.issued_on === undefined ? current.issued_on : change.issued_on, change.expires_on === undefined ? current.expires_on : change.expires_on);
 }
 
 // ---------- Certificates ----------
@@ -245,6 +256,9 @@ export function resumeLine(r: Pick<LearningResource, "title" | "platform" | "pro
 export function titleFromLink(link: string) {
   const url = parseUrl(link);
   if (!url) return link.slice(0, 300);
+  // A YouTube address says nothing readable (its path is a video id): name it by what it is.
+  const known = readLink(link);
+  if (known.platform === "YouTube") return known.kind === "playlist" ? "YouTube playlist" : "YouTube video";
   let path = url.pathname;
   try {
     path = decodeURIComponent(path);
@@ -265,7 +279,8 @@ export function parseList(text: string) {
     .filter(Boolean)
     .map((line) => {
       const parts = line.split("|").map((p) => p.trim());
-      const link = parts.find((p) => /^(https?:\/\/|www\.)/i.test(p)) ?? "";
+      // A link starts with https://, http:// or www., or is an address with a path ("academy.hubspot.com/courses/seo").
+      const link = parts.find((p) => /^(https?:\/\/|www\.)\S/i.test(p) || /^[a-z0-9-]+(\.[a-z0-9-]+)+\/\S+$/i.test(p)) ?? "";
       const title = parts.find((p) => p && p !== link) ?? "";
       return { title: title.slice(0, 300), url: link ? fixLink(link) : "" };
     })

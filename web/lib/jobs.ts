@@ -4,7 +4,11 @@ import { daysBetween } from "./dates.ts";
 type JobFacts = { id: string; title: string; status: string; deadline: string | null; skills: string[] };
 
 /** "React.js", "react js" and "ReactJS" are the same skill. */
-export const skillKey = (skill: string) => skill.toLowerCase().replace(/\.?js\b/g, "").replace(/[^a-z0-9+#]/g, "");
+export const skillKey = (skill: string) => {
+  const plain = skill.toLowerCase().replace(/[^a-z0-9+#]/g, "");
+  // "JS" on its own has nothing left once ".js" is dropped: keep it as it is.
+  return skill.toLowerCase().replace(/\.?js\b/g, "").replace(/[^a-z0-9+#]/g, "") || plain;
+};
 
 /**
  * Your skills plus new ones, without doubles ("React.js" is not added next to "React"). `added` is what was really new.

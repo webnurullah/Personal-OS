@@ -139,12 +139,24 @@ const LADDER_DAYS = { publish: 14, teach: 17, feedback: 19, profile: 21 };
 
 type Item = { title: string; skills: string[]; takeaway?: string };
 
-/** The subject template(s) that fit an item: by its skills first, then by words in its title. */
+const escapeRegex = (text: string) => text.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&");
+/** A whole word or phrase: "excel" is in "Excel skills" but not in "Excellent", "react" is not in "reaction". */
+const hasWord = (text: string, word: string) => new RegExp(`(?<![a-z0-9])${escapeRegex(word)}(?![a-z0-9])`, "i").test(text);
+
+/**
+ * The subject templates that fit an item, best first: a key said in the title counts most, then a skill the item teaches;
+ * more matching keys beat fewer, and the order of the list breaks ties.
+ */
 export function subjectsFor(item: Item) {
-  const names = [...item.skills, ...findSkills(item.title)].map((s) => s.toLowerCase());
-  const title = item.title.toLowerCase();
-  const hit = (s: Subject) => s.keys.some((k) => names.includes(k) || (k.length > 3 && title.includes(k)));
-  return PRACTICE_SUBJECTS.filter(hit);
+  const skills = [...item.skills, ...findSkills(item.title)].map((s) => s.toLowerCase());
+  return PRACTICE_SUBJECTS.map((subject, order) => ({
+    subject,
+    order,
+    score: subject.keys.reduce((total, key) => total + (hasWord(item.title, key) ? 3 : skills.includes(key) ? 2 : 0), 0),
+  }))
+    .filter((hit) => hit.score > 0)
+    .sort((a, b) => b.score - a.score || a.order - b.order)
+    .map((hit) => hit.subject);
 }
 
 /** The project and its tasks for one finished item. Dates run from `today`; the last one is 21 days later. */
