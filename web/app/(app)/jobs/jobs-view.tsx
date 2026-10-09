@@ -2,10 +2,12 @@
 
 import { toArchive } from "@/lib/archive";
 import { useState, type DragEvent, type FormEvent } from "react";
+import Link from "next/link";
 import useSWR from "swr";
 import { BriefcaseBusiness, CalendarClock, Check, ChevronDown, Download, ExternalLink, GraduationCap, LayoutGrid, Link2, List as ListIcon, Loader2, MapPin, Pencil, Plus, Sparkles, Trash2, X } from "lucide-react";
 import { api, errorMessage, refresh } from "@/lib/api";
 import { daysBetween, formatDate } from "@/lib/dates";
+import { hm } from "@/lib/format";
 import { fixLink } from "@/lib/job-actions";
 import { deadlineLabel, isOpen, matchPercent, mergeSkills, skillKey, skillMatch, skillsToLearn } from "@/lib/jobs";
 import { useNewAction } from "@/lib/new-action";
@@ -47,6 +49,8 @@ export function JobsView() {
   const [view, setView] = useState<"list" | "board">("list");
   const [learning, setLearning] = useState<Set<string>>(new Set());
   const [librarying, setLibrarying] = useState<Set<string>>(new Set());
+  const [coursing, setCoursing] = useState<Set<string>>(new Set()); // skills a course is being made for
+  const [courses, setCourses] = useState<Map<string, string>>(new Map()); // skill → the course made for it
   useNewAction(() => setEditing("new"));
 
   if (error && !data) return <LoadError error={error} retry={() => mutate()} />;
@@ -114,6 +118,26 @@ export function JobsView() {
         return next;
       });
       toast(errorMessage(e), "error");
+    }
+  };
+
+  // A small course for the skill (the matching template, or basics + a practice project + interview questions), due by the nearest last date and planned over your weekly hours.
+  const makeCourse = async (item: { skill: string; jobs: string[]; by: string | null }) => {
+    setCoursing((set) => new Set(set).add(item.skill));
+    try {
+      const made = await api<{ id: string; existing: boolean; plan: { overflow: number } | null }>("/courses/from-skill", { method: "POST", body: { skill: item.skill, jobs: item.jobs.slice(0, 10), ...(item.by ? { by: item.by } : {}) } });
+      setCourses((map) => new Map(map).set(item.skill, made.id));
+      await refresh("/courses", "/learning");
+      toast(made.existing ? `You already have a course for ${item.skill}.` : `Course made for ${item.skill}${item.by ? `, due ${formatDate(item.by, "short")}` : ""}. Open it in Learning.`);
+      if (made.plan && made.plan.overflow > 0) toast(`${hm(made.plan.overflow)} of it do not fit by that date at your weekly study goal.`, "error");
+    } catch (e) {
+      toast(errorMessage(e), "error");
+    } finally {
+      setCoursing((set) => {
+        const next = new Set(set);
+        next.delete(item.skill);
+        return next;
+      });
     }
   };
 
@@ -227,6 +251,15 @@ export function JobsView() {
                       >
                         {learning.has(s.skill) ? <><Check className="size-3.5" />Added</> : <><Plus className="size-3.5" />Task</>}
                       </button>
+                      {courses.has(s.skill) ? (
+                        <Link href={`/learning/${courses.get(s.skill)}`} className="btn btn-ghost btn-sm" title="Open the course in Learning">
+                          <GraduationCap className="size-3.5" />Open course
+                        </Link>
+                      ) : (
+                        <button type="button" className="btn btn-ghost btn-sm" disabled={coursing.has(s.skill)} onClick={() => makeCourse(s)} title={s.by ? `Makes a small course with weekly steps, due ${formatDate(s.by, "short")}` : "Makes a small course with weekly steps"}>
+                          {coursing.has(s.skill) ? <><Loader2 className="size-3.5 animate-spin" />Making…</> : <><GraduationCap className="size-3.5" />Course</>}
+                        </button>
+                      )}
                       {planned.has(skillKey(s.skill)) ? (
                         <span className="text-center text-[11px] font-medium text-emerald-700" title={planned.get(skillKey(s.skill))}>In your library</span>
                       ) : (

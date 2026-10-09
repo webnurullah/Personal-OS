@@ -1,16 +1,19 @@
 "use client";
 
 import { toArchive } from "@/lib/archive";
-import { useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import { ArrowUpRight, BookOpen, ChartColumn, ChevronLeft, ChevronRight, Clock, GraduationCap, Lightbulb, Minus, Pencil, Plus, Sparkles, Target, Timer, Trash2 } from "lucide-react";
 import { api, errorMessage, refresh } from "@/lib/api";
 import { addDays, formatDate, mondayOf, weekdayIndex } from "@/lib/dates";
+import { COURSE_TEMPLATES, templateWeeks } from "@/lib/course-templates";
 import { timeLeft } from "@/lib/course";
 import { hm, num, pct, plural } from "@/lib/format";
 import { useNewAction } from "@/lib/new-action";
+import { parseOutline } from "@/lib/outline";
+import { useProfile } from "@/lib/profile";
 import { forecastText } from "@/lib/study";
 import type { LearningWeek, StudyBlock, StudyNextItem } from "@/lib/types";
 import { useSaveLater } from "@/lib/use-save-later";
@@ -427,21 +430,56 @@ function SessionForm({ data, weekStart, choice: firstChoice, onClose }: { data: 
 export function CourseForm({ today, onClose, course }: { today: string; onClose: () => void; course?: { id: string; title: string; subtitle: string; quote: string; start_date: string; target_date: string } }) {
   const { toast } = useFeedback();
   const router = useRouter();
+  const { profile } = useProfile();
+  const weeklyGoal = Number(profile?.weekly_study_goal ?? 5);
   const [busy, setBusy] = useState(false);
+  // New course only: a template (or a pasted outline) fills the title, the dates and the units and topics.
+  const [title, setTitle] = useState(course?.title ?? "");
+  const [subtitle, setSubtitle] = useState(course?.subtitle ?? "Personal Learning Progress Tracker");
+  const [start, setStart] = useState(course?.start_date ?? today);
+  const [target, setTarget] = useState(course?.target_date ?? addDays(today, 112));
+  const [targetTouched, setTargetTouched] = useState(false);
+  const [templateKey, setTemplateKey] = useState("");
+  const [outline, setOutline] = useState("");
+  const template = COURSE_TEMPLATES.find((t) => t.key === templateKey);
+  const parsed = useMemo(() => parseOutline(outline), [outline]);
+  const weeks = useMemo(() => (outline.trim() && parsed.topicCount ? templateWeeks({ outline, weeklyHours: weeklyGoal }, weeklyGoal, parsed) : 0), [outline, parsed, weeklyGoal]);
+  // The target date follows the outline (weeks at your weekly goal) until you choose a date yourself.
+  const suggested = weeks ? addDays(mondayOf(start), weeks * 7 - 1) : null;
+  const shownTarget = !course && suggested && !targetTouched ? suggested : target;
+
+  const chooseTemplate = (key: string) => {
+    setTemplateKey(key);
+    const t = COURSE_TEMPLATES.find((x) => x.key === key);
+    if (!t) {
+      setOutline("");
+      return;
+    }
+    setOutline(t.outline);
+    if (!title.trim()) setTitle(t.title);
+    if (subtitle === "Personal Learning Progress Tracker") setSubtitle(t.subtitle);
+  };
 
   const submit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
     const body = {
-      title: String(form.get("title")),
-      subtitle: String(form.get("subtitle")),
+      title: title.trim(),
+      subtitle: subtitle.trim(),
       quote: String(form.get("quote")),
-      start_date: String(form.get("start_date")),
-      target_date: String(form.get("target_date")),
+      start_date: start,
+      target_date: shownTarget,
     };
     setBusy(true);
     try {
       const saved = await api<{ id: string }>(course ? `/courses/${course.id}` : "/courses", { method: course ? "PATCH" : "POST", body });
+      if (!course && outline.trim() && parsed.topicCount) {
+        try {
+          await api(`/courses/${saved.id}/outline`, { method: "POST", body: { text: outline, plan: true, weekly_hours: weeklyGoal } });
+        } catch (error) {
+          toast(`The course was created, but its outline could not be added: ${errorMessage(error)}`, "error");
+        }
+      }
       await refresh("/courses", "/learning");
       toast(course ? "Course saved" : "Course created");
       onClose();
@@ -455,23 +493,62 @@ export function CourseForm({ today, onClose, course }: { today: string; onClose:
 
   return (
     <form onSubmit={submit} className="space-y-4">
+      {!course && (
+        <Field label="Start from" htmlFor="course-template" hint={template ? `${plural(parsed.units.length, "unit")}, ${plural(parsed.topicCount, "topic")}, ${hm(parsed.hours)}. You can change the text below.` : "A template fills in the units and topics for you."}>
+          <select id="course-template" className="select select-lg" value={templateKey} onChange={(e) => chooseTemplate(e.target.value)}>
+            <option value="">A blank course</option>
+            {COURSE_TEMPLATES.map((t) => (
+              <option key={t.key} value={t.key}>{t.title}</option>
+            ))}
+          </select>
+        </Field>
+      )}
       <Field label="Course name" htmlFor="course-title">
-        <input id="course-title" name="title" className="input" required maxLength={300} defaultValue={course?.title} placeholder="e.g. Level 4 Award in IQA" autoComplete="off" autoFocus />
+        <input id="course-title" name="title" className="input" required maxLength={300} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Level 4 Award in IQA" autoComplete="off" autoFocus />
       </Field>
       <Field label="Subtitle" htmlFor="course-subtitle">
-        <input id="course-subtitle" name="subtitle" className="input" maxLength={120} defaultValue={course?.subtitle ?? "Personal Learning Progress Tracker"} />
+        <input id="course-subtitle" name="subtitle" className="input" maxLength={120} value={subtitle} onChange={(e) => setSubtitle(e.target.value)} />
       </Field>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Start date" htmlFor="course-start" hint="Week 1 starts on that week's Monday.">
-          <input id="course-start" name="start_date" type="date" className="input" required defaultValue={course?.start_date ?? today} />
+          <input id="course-start" name="start_date" type="date" className="input" required value={start} onChange={(e) => setStart(e.target.value)} />
         </Field>
-        <Field label="Target date" htmlFor="course-target">
-          <input id="course-target" name="target_date" type="date" className="input" required defaultValue={course?.target_date ?? addDays(today, 112)} />
+        <Field label="Target date" htmlFor="course-target" hint={!course && suggested && !targetTouched ? `${plural(weeks, "week")} at your goal of ${num(weeklyGoal)}h a week.` : undefined}>
+          <input
+            id="course-target"
+            name="target_date"
+            type="date"
+            className="input"
+            required
+            value={shownTarget}
+            onChange={(e) => {
+              setTarget(e.target.value);
+              setTargetTouched(true);
+            }}
+          />
         </Field>
       </div>
       <Field label="Motto (optional)" htmlFor="course-quote">
         <input id="course-quote" name="quote" className="input" maxLength={200} defaultValue={course?.quote} placeholder="Plan your learning. Track your progress. Achieve your goal." />
       </Field>
+      {!course && (
+        <details className="rounded-2xl border border-slate-200 p-3" open={Boolean(outline)}>
+          <summary className="cursor-pointer text-sm font-medium text-slate-700">{outline ? "Outline: units and topics to add" : "Or paste an outline (optional)"}</summary>
+          <textarea
+            id="course-outline"
+            aria-label="Outline"
+            className="input mt-3 min-h-40 font-mono text-sm"
+            value={outline}
+            onChange={(e) => {
+              setOutline(e.target.value);
+              setTemplateKey("");
+            }}
+            placeholder={"Unit 1: SEO basics\n- What is SEO | 1h\n- Keyword research | 2.5h"}
+            spellCheck={false}
+          />
+          <p className="mt-2 text-xs text-slate-500">One unit per line, its topics under it starting with “-”, hours at the end (2h, 90m). The weeks are planned for you.</p>
+        </details>
+      )}
       <ModalActions onCancel={onClose} submitLabel={course ? "Save course" : "Create course"} busy={busy} />
     </form>
   );

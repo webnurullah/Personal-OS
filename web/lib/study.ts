@@ -48,7 +48,7 @@ export function topicReason(t: Pick<StudyTopic, "status" | "planned_week" | "est
   return t.status === "in-progress" ? "in-progress" : "next";
 }
 
-const byOrder = (a: StudyTopic, b: StudyTopic) => a.unit_position - b.unit_position || a.position - b.position || a.code.localeCompare(b.code, undefined, { numeric: true });
+export const byOrder = (a: StudyTopic, b: StudyTopic) => a.unit_position - b.unit_position || a.position - b.position || a.code.localeCompare(b.code, undefined, { numeric: true });
 
 /**
  * Every unfinished topic of the courses that have started, best first: what is behind comes first (the most weeks late first),
@@ -71,6 +71,8 @@ export function rankTopics(courses: StudyCourse[], topics: StudyTopic[], today: 
     // Week numbers belong to each course, so how late they are is what can be compared.
     if (a.reason === "overdue" && a.weeksLate !== b.weeksLate) return b.weeksLate - a.weeksLate;
     if (a.reason === "this-week" && a.topic.status !== b.topic.status) return a.topic.status === "in-progress" ? -1 : 1;
+    // A topic whose hours are all logged only needs ticking off: it goes after the ones with work left.
+    if ((a.hoursLeft > 0) !== (b.hoursLeft > 0)) return a.hoursLeft > 0 ? -1 : 1;
     // Between courses, the one due first goes first.
     return a.course.target_date.localeCompare(b.course.target_date) || a.course.id.localeCompare(b.course.id) || byOrder(a.topic, b.topic);
   });

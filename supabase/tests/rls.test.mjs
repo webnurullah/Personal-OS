@@ -385,59 +385,90 @@ await qa('update learning_resources set practice_project_id = $1 where id = $2',
 await qa('delete from projects where id = $1', [practice]);
 check('deleting the practice project keeps the item', (await one('select practice_project_id from learning_resources where id = $1', [res.id])).practice_project_id === null);
 
-// One progress record: a finished study session adds its hours to its topic (20261010000000_study_topic_link.sql)
+// One progress record: a topic's Spent hours = hours typed by hand + its finished sessions (20261010000000_study_topic_link.sql)
 {
   const sc = (await one(`insert into courses (title, start_date, target_date) values ('Study course', '2026-10-05', '2026-12-28') returning id`)).id;
   const su = (await one(`insert into course_units (course_id, code, title) values ($1, '1', 'U') returning id`, [sc])).id;
   const [t1, t2] = (await qa(`insert into course_topics (course_id, unit_id, code, title, est_hours, status, actual_hours) values ($1, $2, '1.1', 'Joins', 3, 'not-started', 0), ($1, $2, '1.2', 'Indexes', 2, 'in-progress', 1) returning id`, [sc, su])).map((t) => t.id);
-  const topic = (id) => one('select actual_hours::float h, status, completed_at is not null as stamped from course_topics where id = $1', [id]);
-  const block = (topicId, hours, done) => one(`insert into study_blocks (week_start, weekday, hours, activity, done, topic_id) values ('2026-10-05', 1, $1, 'SQL joins', $2, $3) returning id`, [hours, done, topicId]);
+  const topic = (id) => one('select actual_hours::float h, manual_hours::float m, status, completed_at is not null as stamped from course_topics where id = $1', [id]);
+  const hours = async (id) => (await topic(id)).h;
+  const block = (topicId, h, done) => one(`insert into study_blocks (week_start, weekday, hours, activity, done, topic_id) values ('2026-10-05', 1, $1, 'SQL joins', $2, $3) returning id`, [h, done, topicId]);
+
+  check('a topic added with hours has them as hand-typed hours', (await topic(t2)).m === 1 && (await topic(t2)).h === 1 && (await topic(t1)).m === 0);
 
   const planned = await block(t1, 1.5, false);
-  check('a planned session adds nothing to its topic', (await topic(t1)).h === 0 && (await topic(t1)).status === 'not-started');
+  check('a planned session adds nothing to its topic', (await hours(t1)) === 0 && (await topic(t1)).status === 'not-started');
   await qa('update study_blocks set done = true where id = $1', [planned.id]);
-  check('ticking a session adds its hours and starts the topic', JSON.stringify(await topic(t1)) === JSON.stringify({ h: 1.5, status: 'in-progress', stamped: false }), JSON.stringify(await topic(t1)));
+  check('ticking a session adds its hours and starts the topic', JSON.stringify(await topic(t1)) === JSON.stringify({ h: 1.5, m: 0, status: 'in-progress', stamped: false }), JSON.stringify(await topic(t1)));
   await qa('update study_blocks set done = false where id = $1', [planned.id]);
-  check('un-ticking takes them off again', (await topic(t1)).h === 0);
+  check('un-ticking takes them off again', (await hours(t1)) === 0);
   await qa('update study_blocks set done = true where id = $1', [planned.id]);
   await qa('update study_blocks set hours = 2.25 where id = $1', [planned.id]);
-  check('changing the hours of a finished session changes the topic by the difference', (await topic(t1)).h === 2.25);
+  check('changing the hours of a finished session changes the topic', (await hours(t1)) === 2.25);
   await qa(`update study_blocks set activity = 'Renamed' where id = $1`, [planned.id]);
-  check('editing only the words changes nothing', (await topic(t1)).h === 2.25);
+  check('editing only the words changes nothing', (await hours(t1)) === 2.25);
   await qa('update study_blocks set topic_id = $1 where id = $2', [t2, planned.id]);
-  check('moving a session to another topic moves its hours (hours typed by hand stay)', (await topic(t1)).h === 0 && (await topic(t2)).h === 3.25, JSON.stringify([await topic(t1), await topic(t2)]));
-  await qa('update study_blocks set topic_id = null where id = $1', [planned.id]);
-  check('taking the topic off a session removes its hours from that topic', (await topic(t2)).h === 1);
+  check('moving a session to another topic moves its hours (hours typed by hand stay)', (await hours(t1)) === 0 && (await hours(t2)) === 3.25, JSON.stringify([await topic(t1), await topic(t2)]));
+  await qa('update study_blocks set topic_id = null, topic_ref = null where id = $1', [planned.id]);
+  check('taking the topic off a session removes its hours from that topic', (await hours(t2)) === 1);
   await qa('update study_blocks set topic_id = $1 where id = $2', [t1, planned.id]);
+  check('a session names the topic it is about', (await one('select topic_ref from study_blocks where id = $1', [planned.id])).topic_ref === t1);
+
+  // Typing a number into Spent sets the total; the sessions are part of it.
+  await qa('update course_topics set actual_hours = 5 where id = $1', [t1]);
+  check('typing a total keeps the sessions in it: the rest is hand-typed', JSON.stringify(await topic(t1)) === JSON.stringify({ h: 5, m: 2.75, status: 'in-progress', stamped: false }), JSON.stringify(await topic(t1)));
+  await qa('update course_topics set actual_hours = 1 where id = $1', [t1]);
+  check('a total below the sessions is the sessions (nothing hand-typed)', (await topic(t1)).h === 2.25 && (await topic(t1)).m === 0);
+  await qa('update course_topics set actual_hours = 4 where id = $1', [t1]);
+  await qa('update study_blocks set done = false where id = $1', [planned.id]);
+  check('un-ticking leaves the hand-typed hours', (await topic(t1)).h === 1.75 && (await topic(t1)).m === 1.75);
+  await qa('update study_blocks set done = true where id = $1', [planned.id]);
+  check('and ticking again gives back exactly what was taken off', (await topic(t1)).h === 4 && (await topic(t1)).m === 1.75);
+  await qa('update course_topics set actual_hours = 0 where id = $1', [t1]);
+  await qa('update course_topics set actual_hours = 2.25 where id = $1', [t1]);
+  check('the hand-typed share never goes below 0', (await topic(t1)).h === 2.25 && (await topic(t1)).m === 0);
 
   // Removing a session (to the Archive) takes its hours off; bringing it back puts them on again.
   const archived = await arch('study_block', planned.id);
-  check('deleting a session takes its hours off the topic', (await topic(t1)).h === 0);
+  check('deleting a session takes its hours off the topic', (await hours(t1)) === 0);
   await restore(archived);
-  check('restoring it adds them again, still linked', (await topic(t1)).h === 2.25 && (await one('select topic_id from study_blocks where id = $1', [planned.id])).topic_id === t1);
+  check('restoring it adds them again, still linked', (await hours(t1)) === 2.25 && (await one('select topic_id from study_blocks where id = $1', [planned.id])).topic_id === t1);
 
-  // Hours never go below 0, even when the topic was reduced by hand.
-  await qa('update course_topics set actual_hours = 0.5 where id = $1', [t1]);
-  await qa('update study_blocks set done = false where id = $1', [planned.id]);
-  check('hours never go below 0', (await topic(t1)).h === 0);
-  await qa('update study_blocks set done = true where id = $1', [planned.id]);
-
-  // A deleted topic keeps its sessions, unlinked; restoring the topic keeps the hours it had.
+  // A deleted topic keeps its sessions; brought back, it takes them back with the hours it had.
+  await qa('update course_topics set actual_hours = 3.25 where id = $1', [t1]); // 1 typed by hand + 2.25 in the session
   const archivedTopic = await arch('topic', t1);
-  check('deleting a topic keeps its sessions, unlinked', (await one('select topic_id from study_blocks where id = $1', [planned.id])).topic_id === null);
+  check('deleting a topic keeps its sessions, unlinked but still about it', (await one('select topic_id, topic_ref from study_blocks where id = $1', [planned.id])).topic_id === null && (await one('select topic_ref from study_blocks where id = $1', [planned.id])).topic_ref === t1);
   await restore(archivedTopic);
-  check('a restored topic has the hours it had', (await topic(t1)).h === 2.25);
-  const later = await block(t1, 1, true);
-  const orphan = await arch('study_block', later.id);
+  check('a topic brought back takes its sessions back and keeps the same total', (await one('select topic_id from study_blocks where id = $1', [planned.id])).topic_id === t1 && JSON.stringify(await topic(t1)) === JSON.stringify({ h: 3.25, m: 1, status: 'in-progress', stamped: false }), JSON.stringify(await topic(t1)));
+  await qa('delete from study_blocks where id = $1', [planned.id]);
+  check('and deleting the session afterwards takes its hours off', (await topic(t1)).h === 1);
+  const planned2 = await block(t1, 2.25, true);
+
+  // The same for a whole unit and a whole course.
+  const archivedUnit = await arch('unit', su);
+  check('a unit deleted unlinks the sessions of its topics', (await one('select topic_id from study_blocks where id = $1', [planned2.id])).topic_id === null);
+  await restore(archivedUnit);
+  check('a unit brought back gives its topics their sessions again, totals unchanged', (await one('select topic_id from study_blocks where id = $1', [planned2.id])).topic_id === t1 && (await hours(t1)) === 3.25 && (await hours(t2)) === 1);
+  const archivedCourse = await arch('course', sc);
+  await restore(archivedCourse);
+  check('a course brought back too', (await one('select topic_id from study_blocks where id = $1', [planned2.id])).topic_id === t1 && (await hours(t1)) === 3.25 && (await hours(t2)) === 1);
+
+  // The session is the one brought back last: it finds its topic by itself.
+  const lone = await arch('study_block', planned2.id);
   const archivedTopic2 = await arch('topic', t1);
-  await restore(orphan);
-  check('a session restored after its topic was deleted comes back unlinked', (await one('select topic_id, done from study_blocks where id = $1', [later.id])).topic_id === null);
+  await restore(lone);
+  check('a session restored after its topic was deleted comes back unlinked', (await one('select topic_id from study_blocks where id = $1', [planned2.id])).topic_id === null);
   await restore(archivedTopic2);
-  check('…and the topic keeps the hours it had', (await topic(t1)).h === 2.25);
+  check('…and finds the topic when it is brought back', (await one('select topic_id from study_blocks where id = $1', [planned2.id])).topic_id === t1 && (await hours(t1)) === 3.25, JSON.stringify(await topic(t1)));
+  await qa('delete from study_blocks where id = $1', [planned2.id]);
+
+  // An old Archive copy of a topic (made before topics kept hand-typed hours) has its hours as hand-typed hours.
+  const oldHours = (await one(`insert into course_topics (course_id, unit_id, code, title, est_hours, actual_hours) values ($1, $2, '1.9', 'Typed', 2, 1.5) returning id`, [sc, su])).id;
+  check('hours given when a topic is added are its hand-typed hours', (await topic(oldHours)).m === 1.5);
 
   // A session without a topic never touches any topic.
   await block(null, 2, true);
-  check('a session with no topic changes no topic', (await topic(t2)).h === 1);
+  check('a session with no topic changes no topic', (await hours(t2)) === 1);
 
   // The time a topic was finished.
   await qa(`update course_topics set status = 'done' where id = $1`, [t2]);
@@ -456,12 +487,11 @@ check('deleting the practice project keeps the item', (await one('select practic
   await qa(`update course_topics set status = 'done' where id = $1`, [old.id]);
   check('finishing it now stamps it', (await topic(old.id)).stamped === true);
 
-  // A session can name a library item; deleting the item only unlinks it.
+  // A session can name a library item; deleting the item only unlinks it, and through the Archive the sessions come back.
   const item = (await one(`insert into learning_resources (title, kind) values ('SQL playlist', 'playlist') returning id`)).id;
   const viaItem = await one(`insert into study_blocks (week_start, weekday, hours, activity, resource_id) values ('2026-10-05', 2, 1, 'Watched 3 videos', $1) returning id`, [item]);
   await qa('delete from learning_resources where id = $1', [item]);
   check('deleting a library item only unlinks its sessions', (await one('select resource_id from study_blocks where id = $1', [viaItem.id])).resource_id === null);
-  // Through the Archive the sessions come back to the item with it.
   const item2 = (await one(`insert into learning_resources (title, kind) values ('Another playlist', 'playlist') returning id`)).id;
   const viaItem2 = await one(`insert into study_blocks (week_start, weekday, hours, activity, resource_id) values ('2026-10-05', 3, 1, 'Watched 2 videos', $1) returning id`, [item2]);
   const archivedItem = await arch('resource', item2);
@@ -469,10 +499,54 @@ check('deleting the practice project keeps the item', (await one('select practic
   await restore(archivedItem);
   check('an item brought back gets its sessions again', (await one('select resource_id from study_blocks where id = $1', [viaItem2.id])).resource_id === item2);
 
-  // Nobody else's topic can be changed through a session.
+  // Nobody else's topic can be changed through a session, and nobody else's sessions are taken over by a topic of mine.
   const before = await topic(t2);
   await qb(`insert into study_blocks (week_start, weekday, hours, activity, done, topic_id) values ('2026-10-05', 1, 5, 'Sneaky', true, $1)`, [t2]);
   check("a session of another user cannot change my topic's hours", JSON.stringify(await topic(t2)) === JSON.stringify(before));
+  const theirs = await one(`insert into study_blocks (week_start, weekday, hours, activity, done, topic_ref) values ('2026-10-05', 1, 7, 'Theirs', true, $1) returning id`, [t1]);
+  void theirs;
+  const mineAgain = (await qb(`select count(*)::int n from study_blocks where topic_id is not null`))[0].n;
+  check("another user's sessions are not attached to my topics", mineAgain === 1);
+}
+
+// Faster setup: an outline in one go, and the weeks of many topics in one go (20261011000000_course_planning.sql)
+{
+  const pc = (await one(`insert into courses (title, start_date, target_date) values ('Plan course', '2026-10-05', '2026-12-28') returning id`)).id;
+  const outline = JSON.stringify([
+    { code: '1', title: 'SEO', color: 'blue', position: 0, topics: [{ code: '1.1', title: 'Keywords', est_hours: 2, position: 0 }, { code: '1.2', title: 'Links', est_hours: 1.5, position: 1, planned_week: 2 }] },
+    { code: '2', title: 'Ads', color: 'emerald', position: 1, topics: [{ code: '2.1', title: 'Google Ads', est_hours: 3, position: 0 }] },
+  ]);
+  const made = (await qa('select add_course_outline($1, $2::jsonb) as r', [pc, outline]))[0].r;
+  check('an outline adds its units and topics', made.units === 2 && made.topics === 3, JSON.stringify(made));
+  const rows = await qa(`select u.code uc, u.title ut, u.color::text uco, u.position up, t.code tc, t.title tt, t.est_hours::float h, t.planned_week w, t.position tp, t.status from course_units u join course_topics t on t.unit_id = u.id where u.course_id = $1 order by t.code`, [pc]);
+  check('with the right codes, order, hours and weeks', rows.length === 3 && rows[0].tc === '1.1' && rows[0].uc === '1' && rows[0].ut === 'SEO' && rows[0].uco === 'blue' && rows[1].w === 2 && rows[2].h === 3 && rows[2].up === 1 && rows[2].status === 'not-started' && rows[0].w === null, JSON.stringify(rows));
+
+  // All or nothing: a bad topic (empty title) in the second unit adds nothing at all.
+  const bad = JSON.stringify([{ code: '3', title: 'Good', color: 'blue', position: 2, topics: [{ code: '3.1', title: 'ok', est_hours: 1, position: 0 }] }, { code: '4', title: 'Bad', color: 'blue', position: 3, topics: [{ code: '4.1', title: '', est_hours: 1, position: 0 }] }]);
+  await expectError('a bad topic stops the whole outline', () => qa('select add_course_outline($1, $2::jsonb)', [pc, bad]), 'check constraint');
+  check('and nothing from it was added', (await qa('select count(*)::int n from course_units where course_id = $1', [pc]))[0].n === 2);
+  await expectError('more than 30 units is refused', () => qa('select add_course_outline($1, $2::jsonb)', [pc, JSON.stringify(Array.from({ length: 31 }, (_, i) => ({ code: String(i), title: 'x', color: 'blue', position: i, topics: [] })))]), 'up to 30 units');
+  await expectError('more than 300 topics is refused', () => qa('select add_course_outline($1, $2::jsonb)', [pc, JSON.stringify([{ code: '9', title: 'x', color: 'blue', position: 9, topics: Array.from({ length: 301 }, (_, i) => ({ code: `9.${i}`, title: 't', est_hours: 1, position: i })) }])]), 'up to 300 topics');
+  await expectError('not a list is refused', () => qa(`select add_course_outline($1, '{}'::jsonb)`, [pc]), 'up to 30 units');
+  await expectError("another person's course is not found", () => qb('select add_course_outline($1, $2::jsonb)', [pc, outline]), 'Not found');
+  await expectError('a signed-out visitor cannot call it', () => qanon('select add_course_outline($1, $2::jsonb)', [pc, outline]), 'permission denied');
+
+  // Planning: weeks of many topics and the weekly plan together.
+  const ids = (await qa('select id from course_topics where course_id = $1 order by code', [pc])).map((r) => r.id);
+  const other = (await one(`insert into courses (title, start_date, target_date) values ('Other plan course', '2026-10-05', '2026-12-28') returning id`)).id;
+  const otherUnit = (await one(`insert into course_units (course_id, code, title) values ($1, '1', 'U') returning id`, [other])).id;
+  const otherTopic = (await one(`insert into course_topics (course_id, unit_id, code, title, est_hours, planned_week) values ($1, $2, '1.1', 'Elsewhere', 1, 7) returning id`, [other, otherUnit])).id;
+  const weeks = JSON.stringify([{ id: ids[0], week: 3 }, { id: ids[1], week: 3 }, { id: ids[2], week: 5 }, { id: otherTopic, week: 9 }]);
+  const changed = (await qa('select plan_course($1, $2::jsonb, $3::numeric[]) as n', [pc, weeks, '{0,0,3.5,0,3}']))[0].n;
+  const planned = await qa('select code, planned_week w from course_topics where course_id = $1 order by code', [pc]);
+  check('planning sets the weeks and counts them', changed === 3 && planned.map((r) => r.w).join() === '3,3,5', JSON.stringify({ changed, planned }));
+  check('and the weekly plan', (await one('select weekly_plan::text w from courses where id = $1', [pc])).w === '{0.00,0.00,3.50,0.00,3.00}');
+  check("a topic of another course in the list is left alone", (await one('select planned_week w from course_topics where id = $1', [otherTopic])).w === 7);
+  await expectError('a week outside 1 to 156 is refused', () => qa('select plan_course($1, $2::jsonb, $3::numeric[])', [pc, JSON.stringify([{ id: ids[0], week: 0 }]), '{1}']), 'between 1 and 156');
+  await expectError('more than 80 hours in a week is refused', () => qa('select plan_course($1, $2::jsonb, $3::numeric[])', [pc, '[]', '{81}']), 'out of range');
+  await expectError("another person's course is not found", () => qb('select plan_course($1, $2::jsonb, $3::numeric[])', [pc, weeks, '{1}']), 'Not found');
+  check('a refused plan changed nothing', (await qa('select string_agg(planned_week::text, \',\' order by code) w from course_topics where course_id = $1', [pc]))[0].w === '3,3,5');
+  await expectError('a signed-out visitor cannot call it', () => qanon('select plan_course($1, $2::jsonb, $3::numeric[])', [pc, weeks, '{1}']), 'permission denied');
 }
 }
 

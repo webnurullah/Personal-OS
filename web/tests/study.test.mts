@@ -110,6 +110,15 @@ test("a topic with all its hours logged is neither listed as late nor makes the 
   assert.equal(courseHealth(A, [full, { status: "in-progress", est_hours: 2, actual_hours: 0.5, planned_week: 2 }], TODAY).behindHours, 1.5);
 });
 
+test("topics whose hours are all logged come after the ones that still have work left", () => {
+  const full1 = topic("A", { status: "in-progress", est_hours: 2, actual_hours: 2 });
+  const full2 = topic("A", { status: "in-progress", est_hours: 2, actual_hours: 2 });
+  const open = topic("A", { status: "in-progress", est_hours: 3, actual_hours: 1 });
+  const ranked = rankTopics([A], [full1, full2, open], TODAY);
+  assert.deepEqual(ranked.map((i) => i.topic.id), [open.id, full1.id, full2.id]);
+  assert.deepEqual(pickNext(ranked, 2, 2).map((i) => i.topic.id), [open.id, full1.id]);
+});
+
 test("how a reason reads", () => {
   assert.equal(reasonText({ reason: "overdue", weeksLate: 1 }), "1 week behind");
   assert.equal(reasonText({ reason: "overdue", weeksLate: 3 }), "3 weeks behind");

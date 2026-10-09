@@ -168,6 +168,31 @@ for (const width of [390, 320]) {
   await ctx.close();
 }
 
+// ---------- Two taps that both fail, and a typed total that the database raises ----------
+{
+  const ctx = await newPhone(browser, 390);
+  await apiMock(ctx, { "/courses/c1": detail });
+  await ctx.route(/\/api\/learning\/blocks$/, async (route) => {
+    await new Promise((r) => setTimeout(r, 150));
+    return route.fulfill({ status: 500, json: { error: { message: "The database is down" } } });
+  });
+  // Spent cannot be lower than the sessions: typing 1 is kept as 3.
+  await ctx.route(/\/api\/topics\/a$/, (route) => route.fulfill({ json: { ...detail.units[0].topics[0], actual_hours: 3 } }));
+  const page = await ctx.newPage();
+  await page.goto(`${BASE}/learning/c1`);
+  await page.getByText("Topic 1.1").first().waitFor();
+  const box = page.getByLabel("Actual hours for topic 1.1");
+  await page.getByRole("button", { name: "Add 30m to topic 1.1" }).click();
+  await page.getByRole("button", { name: "Add 30m to topic 1.1" }).click();
+  await page.waitForTimeout(1500);
+  check("two taps that both fail leave the saved hours, not a phantom hour", (await box.inputValue()) === "1.25", await box.inputValue());
+  await box.fill("1");
+  await box.blur();
+  await page.waitForTimeout(1500);
+  check("a typed total that the database raises is shown as saved", (await box.inputValue()) === "3", await box.inputValue());
+  await ctx.close();
+}
+
 // ---------- Study next while another week is on screen ----------
 {
   const ctx = await newPhone(browser, 390);

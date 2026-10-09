@@ -5,7 +5,7 @@ import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
-import { CalendarCheck, CalendarDays, ChevronLeft, Clock, GraduationCap, Hourglass, Layers, Pencil, Plus, Target, Trash2 } from "lucide-react";
+import { CalendarCheck, CalendarDays, ChevronLeft, ClipboardPaste, Clock, GraduationCap, Hourglass, Layers, Pencil, Plus, Route, Target, Trash2 } from "lucide-react";
 import { api, ApiError, errorMessage, refresh } from "@/lib/api";
 import { cacheMutate } from "@/lib/cache";
 import { colorOf } from "@/lib/colors";
@@ -14,6 +14,7 @@ import { addDays, formatDate, mondayOf, weekdayIndex } from "@/lib/dates";
 import { hm, num, pct, plural } from "@/lib/format";
 import { sessionLabel } from "@/lib/study";
 import type { CourseDetail, Topic, TopicStatus, Unit } from "@/lib/types";
+import { useProfile } from "@/lib/profile";
 import { useMedia } from "@/lib/use-media";
 import { useSaveLater } from "@/lib/use-save-later";
 import { Donut, Progress } from "@/components/ui/charts";
@@ -23,6 +24,7 @@ import { Modal, ModalActions } from "@/components/ui/modal";
 import { EmptyState, LoadError, PageSkeleton } from "@/components/ui/states";
 import { CourseLibrary } from "../library/course-library";
 import { CourseForm } from "../learning-view";
+import { OutlineDialog, PlanDialog } from "./planning-dialogs";
 
 const STATUSES: { value: TopicStatus; label: string }[] = [
   { value: "not-started", label: "Not Started" },
@@ -74,6 +76,10 @@ export function CourseView({ id }: { id: string }) {
   const [editingCourse, setEditingCourse] = useState(false);
   const [unitModal, setUnitModal] = useState<Unit | "new" | null>(null);
   const [topicModal, setTopicModal] = useState<TopicModal | null>(null);
+  const [outlineOpen, setOutlineOpen] = useState(false);
+  const [planOpen, setPlanOpen] = useState(false);
+  const { profile } = useProfile();
+  const weeklyGoal = Number(profile?.weekly_study_goal ?? 5);
 
   if (error && !data) {
     if (error instanceof ApiError && (error.status === 404 || error.status === 400)) {
@@ -95,12 +101,24 @@ export function CourseView({ id }: { id: string }) {
   const started = today >= course.start_date;
   const ended = today > course.target_date;
 
-  const failed = async (e: unknown) => {
+  const failed = async (e: unknown, undo?: () => void) => {
     toast(errorMessage(e), "error");
-    // Show the saved values again; the number boxes are made new only once those are back.
+    undo?.(); // back to what was saved, also when there is no connection to ask again
+    // Then ask again; the number boxes are made new only once the saved values are back.
     await mutate().catch(() => undefined);
     setSyncKey((k) => k + 1);
   };
+
+  /** Puts a topic's values back to what they were before a change that could not be saved. */
+  const revertTopic = (topic: Topic, keys: string[]) =>
+    mutate(
+      (current) =>
+        current && {
+          ...current,
+          units: current.units.map((u) => (u.id !== topic.unit_id ? u : { ...u, topics: u.topics.map((t) => (t.id === topic.id ? { ...t, ...Object.fromEntries(keys.map((k) => [k, topic[k as keyof Topic]])) } : t)) })),
+        },
+      { revalidate: false },
+    );
 
   /** Shows the change at once, then saves it (straight away, or once typing stops). */
   const changeTopic = (topic: Topic, changes: Partial<Pick<Topic, "status" | "actual_hours">>, later = false) => {
@@ -113,7 +131,17 @@ export function CourseView({ id }: { id: string }) {
       { revalidate: false },
     );
     const save = () => {
-      api(`/topics/${topic.id}`, { method: "PATCH", body: changes }).then(() => refresh("/learning"), failed);
+      api<Topic>(`/topics/${topic.id}`, { method: "PATCH", body: changes }).then(
+        (saved) => {
+          // The database sets the Spent total: it cannot be lower than the study sessions on the topic. Show what it kept.
+          if ("actual_hours" in changes && Math.abs(Number(saved.actual_hours) - Number(changes.actual_hours)) > 0.001) {
+            mutate((current) => current && { ...current, units: current.units.map((u) => (u.id !== topic.unit_id ? u : { ...u, topics: u.topics.map((t) => (t.id === topic.id ? { ...t, actual_hours: saved.actual_hours } : t)) })) }, { revalidate: false });
+            setSyncKey((k) => k + 1);
+          }
+          return refresh("/learning");
+        },
+        (e) => failed(e, () => revertTopic(topic, Object.keys(changes))),
+      );
     };
     if (later) saveLater(`topic-${topic.id}`, save);
     else save();
@@ -150,8 +178,13 @@ export function CourseView({ id }: { id: string }) {
       toast(`${hm(hours)} added to ${topic.code}`);
       await refresh("/learning", "/courses");
     } catch (e) {
-      await mutate(data, { revalidate: false }); // back to what it was before the tap (also when there is no connection to ask again)
-      await failed(e);
+      // Take this tap's hours off again (other taps that are still on their way keep theirs).
+      await failed(e, () =>
+        mutate(
+          (current) => current && { ...current, units: current.units.map((u) => (u.id !== topic.unit_id ? u : { ...u, topics: u.topics.map((t) => (t.id === topic.id ? { ...t, actual_hours: Math.max(0, Number(t.actual_hours) - hours) } : t)) })) },
+          { revalidate: false },
+        ),
+      );
     }
   };
 
@@ -319,9 +352,19 @@ export function CourseView({ id }: { id: string }) {
           <h2 id="topics-title" className="flex items-center gap-2 text-lg font-bold text-[#12305a]">
             <Layers className="size-5" /> Topics
           </h2>
-          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setUnitModal("new")}>
-            <Plus className="size-4" /> Add unit
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setOutlineOpen(true)}>
+              <ClipboardPaste className="size-4" /> Paste outline
+            </button>
+            {units.length > 0 && (
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => setPlanOpen(true)}>
+                <Route className="size-4" /> Plan weeks
+              </button>
+            )}
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setUnitModal("new")}>
+              <Plus className="size-4" /> Add unit
+            </button>
+          </div>
         </div>
         {units.length && !wide ? (
           <div className="divide-y divide-slate-100">
@@ -506,9 +549,12 @@ export function CourseView({ id }: { id: string }) {
           </div>
         ) : null}
         {units.length === 0 && (
-          <EmptyState icon={Layers} title="No units yet" text="Split the course into units, then add the topics of each unit with their estimated hours.">
-            <button type="button" className="btn btn-primary" onClick={() => setUnitModal("new")}>
-              <Plus className="size-4" /> Add the first unit
+          <EmptyState icon={Layers} title="No units yet" text="Paste an outline (or pick a template) to fill the whole course in one go, or add the units one by one.">
+            <button type="button" className="btn btn-primary" onClick={() => setOutlineOpen(true)}>
+              <ClipboardPaste className="size-4" /> Paste an outline
+            </button>
+            <button type="button" className="btn btn-secondary" onClick={() => setUnitModal("new")}>
+              <Plus className="size-4" /> Add a unit
             </button>
           </EmptyState>
         )}
@@ -593,6 +639,29 @@ export function CourseView({ id }: { id: string }) {
 
       <Modal open={editingCourse} onClose={() => setEditingCourse(false)} title="Edit course">
         <CourseForm today={today} course={course} onClose={() => setEditingCourse(false)} />
+      </Modal>
+      <Modal open={outlineOpen} onClose={() => setOutlineOpen(false)} title="Paste an outline" description="Units and topics are added after what the course already has." size="lg">
+        {outlineOpen && (
+          <OutlineDialog
+            course={course}
+            hasPlan={units.some((u) => u.topics.some((t) => t.planned_week != null))}
+            weeklyGoal={weeklyGoal}
+            onClose={() => setOutlineOpen(false)}
+            onDone={() => setSyncKey((k) => k + 1)}
+          />
+        )}
+      </Modal>
+      <Modal open={planOpen} onClose={() => setPlanOpen(false)} title="Plan the weeks" description="Give the topics that are left a week each, from this week to the target date." size="md">
+        {planOpen && (
+          <PlanDialog
+            course={course}
+            topics={units.flatMap((u) => u.topics)}
+            today={today}
+            weeklyGoal={weeklyGoal}
+            onClose={() => setPlanOpen(false)}
+            onDone={() => setSyncKey((k) => k + 1)}
+          />
+        )}
       </Modal>
       <Modal open={unitModal !== null} onClose={() => setUnitModal(null)} title={unitModal === "new" ? "Add unit" : "Edit unit"} size="sm">
         {unitModal !== null && (

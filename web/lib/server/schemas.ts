@@ -161,6 +161,18 @@ export const TopicFields = z.object({
   position: z.number().int().min(0).optional(),
 }).strict();
 
+// A pasted outline (or a template), and planning the weeks of a course.
+export const OutlineInput = z.object({
+  text: z.string().max(30_000),
+  default_hours: z.number().min(0.25).max(500).optional(),
+  /** Also give the new topics their weeks (spread over the weeks left at `weekly_hours` a week). */
+  plan: z.boolean().optional(),
+  weekly_hours: z.number().min(0.5).max(80).optional(),
+}).strict();
+export const PlanInput = z.object({ mode: z.enum(["plan", "carry"]), weekly_hours: z.number().min(0.5).max(80).optional() }).strict();
+/** A course for one missing skill (Job Apply): `by` is the last date among the jobs that ask for it. */
+export const SkillCourseInput = z.object({ skill: s.text(60), by: s.date.optional(), jobs: z.array(s.text(100)).max(10).optional() }).strict();
+
 /**
  * Week 1 always starts on a Monday, the target must come after the start, and a course lasts at most 3 years.
  * When a change sends only one of the two dates, `existing` (the saved course) supplies the other.

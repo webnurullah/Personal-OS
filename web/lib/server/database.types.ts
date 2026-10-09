@@ -187,6 +187,7 @@ export type Database = {
           created_at: string;
           updated_at: string;
           completed_at: string | null;
+          manual_hours: number;
         };
         Insert: {
           id?: string;
@@ -206,6 +207,7 @@ export type Database = {
           created_at?: string;
           updated_at?: string;
           completed_at?: string | null;
+          manual_hours?: number;
         };
         Update: {
           id?: string;
@@ -225,6 +227,7 @@ export type Database = {
           created_at?: string;
           updated_at?: string;
           completed_at?: string | null;
+          manual_hours?: number;
         };
         Relationships: [
           {
@@ -951,6 +954,7 @@ export type Database = {
           done: boolean;
           created_at: string;
           topic_id: string | null;
+          topic_ref: string | null;
           resource_id: string | null;
         };
         Insert: {
@@ -963,6 +967,7 @@ export type Database = {
           done?: boolean;
           created_at?: string;
           topic_id?: string | null;
+          topic_ref?: string | null;
           resource_id?: string | null;
         };
         Update: {
@@ -975,6 +980,7 @@ export type Database = {
           done?: boolean;
           created_at?: string;
           topic_id?: string | null;
+          topic_ref?: string | null;
           resource_id?: string | null;
         };
         Relationships: [
@@ -1114,6 +1120,10 @@ export type Database = {
     };
     Views: { [_ in never]: never };
     Functions: {
+      add_course_outline: {
+        Args: { p_course: string; p_units: Json };
+        Returns: Json;
+      };
       archive_delete: {
         Args: { p_kind: string; p_id: string };
         Returns: string;
@@ -1141,6 +1151,10 @@ export type Database = {
       pay_bill: {
         Args: { p_bill_id: string; p_method: string; p_date: string };
         Returns: Database['public']['Tables']['transactions']['Row'];
+      };
+      plan_course: {
+        Args: { p_course: string; p_weeks: Json; p_weekly_plan: number[] };
+        Returns: number;
       };
     };
     Enums: { [_ in never]: never };
