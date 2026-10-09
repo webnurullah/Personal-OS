@@ -2,7 +2,7 @@
 import {
   BillFields, BlockCreate, BudgetCategoryFields, CategoryCreate, CourseFields, EventFields, GoalCreate, HabitCreate, HabitUpdate,
   HealthFields, JobAdd, JobCreate, JobFields, METHODS, MilestoneCreate, NoteFields, OutlineInput, PlanInput, ProfileUpdate, ReminderFields, ResourceCreate, ResourceFields, TaskCreate, TaskUpdate,
-  TopicFields, TxFields, UnitFields, WeekUpdate,
+  TopicFields, TxFields, UnitFields, WeekTasksInput, WeekUpdate,
 } from "../schemas.ts";
 import { z } from "../validate.ts";
 
@@ -65,6 +65,7 @@ const ENDPOINTS: [string, string, string, z.ZodType?][] = [
   ["DELETE", "/units/:id", "Delete a unit and its topics (it goes to the Archive)"],
   ["POST", "/courses/:id/topics", "Add a topic to a unit of the course", TopicFields],
   ["POST", "/courses/:id/outline", "Add units and topics to a course from pasted outline text (one unit per line, its topics under it starting with \"-\" and ending with hours such as 2h); plan: true also gives the new topics weeks", OutlineInput],
+  ["POST", "/courses/:id/tasks", "Make a task (\"Study: 2.1 …\", due at the end of the week) for each topic still to study in a week of the course; week defaults to this week", WeekTasksInput],
   ["POST", "/courses/:id/plan", "Plan the weeks of a course: mode plan spreads unfinished topics from this week over weekly_hours a week, mode carry moves late topics to this week", PlanInput],
   ["PATCH", "/topics/:id", "Change a topic (status, actual_hours …)", TopicFields.omit({ unit_id: true }).partial()],
   ["DELETE", "/topics/:id", "Delete a topic (it goes to the Archive)"],

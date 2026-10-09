@@ -4,13 +4,14 @@ import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "rea
 import useSWR from "swr";
 import { Bot, Eraser, SendHorizontal, Sparkles, X } from "lucide-react";
 import { api, errorMessage, refresh, refreshAll } from "@/lib/api";
-import { formatDate } from "@/lib/dates";
+import { formatDate, mondayOf, weekdayIndex } from "@/lib/dates";
 import { saveJobFromLink } from "@/lib/job-actions";
 import { mergeSkills } from "@/lib/jobs";
-import { formatTime } from "@/lib/format";
+import { formatTime, hm } from "@/lib/format";
 import { useProfile } from "@/lib/profile";
 import { EXAMPLES, parseQuickAdd, type Command } from "@/lib/quickadd";
-import type { BudgetCategory, FinanceMonth, HabitsResponse, List, Task } from "@/lib/types";
+import { matchBest } from "@/lib/study-match";
+import type { BudgetCategory, FinanceMonth, HabitsResponse, LearningWeek, List, ResourceRead, Task } from "@/lib/types";
 
 type Message = { role: "user" | "assistant"; content: string; error?: boolean };
 
@@ -174,6 +175,29 @@ export function Assistant() {
         return `Saved **${job.title}**${job.company ? ` at ${job.company}` : ""}: ${found.join(", ")}.${analysis.by === "rules" || !job.deadline ? " Open Job Apply to check the details." : ""}`;
       }
 
+      case "study": {
+        // The topic (or the playlist you are learning) that shares the most words; with no clear match it is plain study time.
+        const week = await api<LearningWeek>("/learning/week");
+        const topic = c.text ? matchBest(c.text, week.open_topics ?? []) : null;
+        const item = !topic && c.text ? matchBest(c.text, (week.library ?? []).map((r) => ({ id: r.id, label: r.title }))) : null;
+        const label = topic?.label ?? item?.label ?? c.text;
+        await api("/learning/blocks", {
+          method: "POST",
+          body: { week_start: mondayOf(c.date), weekday: weekdayIndex(c.date), hours: c.hours, activity: label || "Study", done: true, topic_id: topic?.id ?? null, resource_id: item?.id ?? null },
+        });
+        await refresh("/learning", "/courses");
+        const where = topic ? `on **${topic.label}** (its hours go to the topic)` : item ? `on **${item.label}**` : c.text ? "as study time (no topic or playlist matched those words)" : "as study time";
+        return `Logged **${hm(c.hours)}** ${where}${c.date === today ? "" : `, ${formatDate(c.date, "short")}`}.`;
+      }
+
+      case "course": {
+        const read = await api<ResourceRead>("/resources/read", { method: "POST", body: { url: c.url } });
+        if (!read.title) return `I could not read a title from that page${read.note ? ` (${read.note})` : ""}. Add it in Learning → Certificates & playlists and type the title.`;
+        await api("/resources", { method: "POST", body: { title: read.title, url: read.url, platform: read.platform, provider: read.provider, kind: read.kind } });
+        await refresh("/resources");
+        return `Added **${read.title}**${read.platform ? ` (${read.platform})` : ""} to your Learning library.`;
+      }
+
       case "skills": {
         const { skills, added: fresh } = mergeSkills(profile?.skills ?? [], c.skills);
         if (!fresh.length) return "You already have those skills listed.";
@@ -206,7 +230,7 @@ export function Assistant() {
         reply({ role: "assistant", content: answer.reply });
         if (answer.changed) await refreshAll();
       } else {
-        reply({ role: "assistant", content: `I did not understand that. Start with a word like **task**, **event**, **note**, **remind**, **spent**, **tick** or **job**. Type **help** to see examples.` });
+        reply({ role: "assistant", content: `I did not understand that. Start with a word like **task**, **event**, **note**, **remind**, **spent**, **tick**, **job**, **study** or **course**. Type **help** to see examples.` });
       }
     } catch (error) {
       reply({ role: "assistant", content: errorMessage(error), error: true });

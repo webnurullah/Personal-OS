@@ -130,6 +130,11 @@ export const GET = handle(async ({ db, profile: getProfile }) => {
     items.push({ id: `behind-${course.id}`, icon: "graduation-cap", tone: "amber", title: `${course.title} is ${how}: ${hm(course.behind_hours)} to catch up`, meta: "Learning", href: `/learning/${course.id}` });
   }
 
+  // On Sunday: look back at the study week (hours against the goal, what was finished, one line about it).
+  if (notify.study_sessions && weekdayIndex(today) === 6 && courses.length) {
+    items.push({ id: "study-review", icon: "graduation-cap", tone: "indigo", title: "Review your study week", meta: "Learning", href: "/learning" });
+  }
+
   if (habitData && nowMinutes >= 18 * 60) {
     const board = habitBoard(habitData.habits, habitData.logs, today, 1, 1);
     const left = board.summary.total - board.summary.done_today;

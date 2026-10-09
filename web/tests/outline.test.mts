@@ -146,6 +146,12 @@ test("a hostile paste of 30,000 letters is read in a moment (no regex that takes
     "- " + "1 ".repeat(14_000) + "x",
     "- " + "1".repeat(29_000) + "h",
     "x " + "1.5 ".repeat(7_000) + "h",
+    // Hours followed by a very long run of spaces or tabs (a tab counts as 4 spaces when read).
+    "- x 1h" + "\t".repeat(29_000) + "x",
+    "- x 1-1h" + "\t".repeat(29_000) + "x",
+    "- x 1h 30m" + "\t".repeat(29_000) + "x",
+    "- x 1h30m" + " ".repeat(29_000) + "x",
+    "Unit " + "1".repeat(29_000) + ".1\n- t",
   ];
   for (const text of cases) {
     const started = performance.now();
@@ -189,4 +195,39 @@ test("more ways to write the hours; numbers that belong to the title are left al
   assert.deepEqual(read("Python Full Course in 4 Hours"), { text: "Python Full Course in 4 Hours", hours: null });
   assert.deepEqual(read("Python Full Course - 4 Hours"), { text: "Python Full Course", hours: 4 });
   assert.deepEqual(read("Excel for 30 minutes"), { text: "Excel for 30 minutes", hours: null });
+});
+
+test("a number in the title is not taken for the start of a range of hours", () => {
+  const read = (line: string) => { const t = parseOutline(`- ${line}`).units[0].topics[0]; return [t.title, t.hours]; };
+  assert.deepEqual(read("Windows 10 - 2h"), ["Windows 10", 2]);
+  assert.deepEqual(read("SQL 101 - 3h"), ["SQL 101", 3]);
+  assert.deepEqual(read("Excel 2016 - 90m"), ["Excel 2016", 1.5]);
+  assert.deepEqual(read("Python 3.11 - 2h"), ["Python 3.11", 2]);
+  assert.deepEqual(read("Lesson 2 - 3h"), ["Lesson 2", 3]);
+  assert.deepEqual(read("Day 3 – 1h"), ["Day 3", 1]);
+  assert.deepEqual(read("SQL 101-3h"), ["SQL 101", 3]); // a range goes up
+  assert.deepEqual(read("Go (2-3h)"), ["Go", 3]);
+  assert.deepEqual(read("Go 2–3h"), ["Go", 3]);
+  assert.equal(parseOutline("Windows 10 - 2h\n- x").units[0].title, "Windows 10");
+});
+
+test("a colon heading makes numbered lines topics; numbered lines with topics of their own stay units", () => {
+  const colon = parseOutline("Basics:\n1. a\n2. b\nAdvanced:\n1. c");
+  assert.deepEqual(colon.units.map((u) => [u.title, u.topics.map((t) => t.title)]), [["Basics", ["a", "b"]], ["Advanced", ["c"]]]);
+  const titled = parseOutline("# My course\n1. SEO\n   - keywords\n2. Ads\n   - google");
+  assert.deepEqual(titled.units.map((u) => [u.title, u.topics.map((t) => t.title)]), [["My course", []], ["SEO", ["keywords"]], ["Ads", ["google"]]]);
+  const part = parseOutline("1. SEO\n- keywords\nPart 2\n2. Ads\n- google");
+  assert.deepEqual(part.units.map((u) => u.title).slice(0, 1), ["SEO"]);
+  const words = parseOutline("Unit 1: Basics\n1. what\n2. why\nUnit 2: More\n1. how");
+  assert.deepEqual(words.units.map((u) => [u.title, u.topics.length]), [["Basics", 2], ["More", 1]]);
+});
+
+test("a heading word needs a real number after it", () => {
+  assert.equal(parseOutline("Part 3D printing\n- slicing").units[0].title, "Part 3D printing");
+  assert.equal(parseOutline("Chapter 5G networks\n- x").units[0].title, "Chapter 5G networks");
+  assert.equal(parseOutline("Module 2FA\n- x").units[0].title, "Module 2FA");
+  assert.equal(parseOutline("Unit 3a Basics\n- x").units[0].title, "Unit 3a Basics");
+  assert.equal(parseOutline("Unit 3: Basics\n- x").units[0].title, "Basics");
+  assert.equal(parseOutline("Chapter 4. Ads\n- x").units[0].title, "Ads");
+  assert.equal(parseOutline("Module III - Ads\n- x").units[0].title, "Ads");
 });

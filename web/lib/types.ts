@@ -82,6 +82,12 @@ export type Goal = {
   deadline: string | null;
   note: string;
   completed_on: string | null;
+  /** What the goal follows instead of a typed number: a course or the certificates you earn. */
+  link_kind: "course" | "certificates" | null;
+  course_id: string | null;
+  course_title: string | null;
+  /** True when the numbers come from what it follows (they cannot be updated by hand). */
+  linked: boolean;
   milestones: Milestone[];
   percent: number;
 };
@@ -157,6 +163,16 @@ export type StudyNextItem = {
 /** An unfinished topic you can pick in "Log a study session". */
 export type OpenTopic = { id: string; course_id: string; label: string; status: TopicStatus; hours_left: number };
 export type StudyStats = { streak: number; weeks: { week_start: string; hours: number }[] };
+/** A finished topic or library item that is due to be looked at again (1, 7 or 21 days after it was finished). */
+export type RevisionDue = { kind: "topic" | "resource"; id: string; title: string; label: string; step: number; dueAfter: number; daysSince: number; href: string };
+/** A study week in review. */
+export type WeekReview = {
+  topics_done: { id: string; course_id: string; code: string; title: string }[];
+  items_done: { id: string; title: string }[];
+  /** Topics planned for an earlier week that are not finished. */
+  late: number;
+  reflection: string;
+};
 
 export type LearningWeek = {
   today: string;
@@ -170,6 +186,9 @@ export type LearningWeek = {
   /** Library items you are learning now (a session can name one). */
   library: { id: string; title: string }[];
   stats: StudyStats;
+  revision: RevisionDue[];
+  late: number;
+  review: WeekReview;
 };
 
 export type TopicStatus = "not-started" | "in-progress" | "done";

@@ -4,6 +4,7 @@
 //   tick Exercise                          done call the bank
 //   spent 450 lunch bkash                  earned 20000 salary bank
 //   job https://…                          skill react, sql
+//   study 1h sql joins                     course https://… (adds it to the Learning library)
 import { extractDate, extractTime } from "./parse-date.ts";
 
 export type Priority = "low" | "medium" | "high";
@@ -19,6 +20,8 @@ export type Command =
   | { type: "money"; kind: "expense" | "income"; amount: number; description: string; method: Method; tx_date: string }
   | { type: "job"; url: string }
   | { type: "skills"; skills: string[] }
+  | { type: "study"; hours: number; text: string; date: string }
+  | { type: "course"; url: string }
   | { type: "help" };
 
 export type Parsed = { command: Command } | { error: string } | null;
@@ -34,6 +37,8 @@ export const EXAMPLES = [
   { text: "earned 20000 salary bank", about: "Record income" },
   { text: "job https://example.com/jobs/123", about: "Save a job" },
   { text: "skill react, sql, english", about: "Add skills you have" },
+  { text: "study 1h sql joins", about: "Log study time (on the topic that fits the words)" },
+  { text: "course https://www.coursera.org/learn/seo", about: "Add a course or playlist to your Learning library" },
 ];
 
 const METHODS: [RegExp, Method][] = [
@@ -156,6 +161,22 @@ export function parseQuickAdd(input: string, today: string): Parsed {
       return { command: { type: "job", url } };
     }
 
+    case "study":
+    case "studied": {
+      const date = extractDate(text, today, { future: false });
+      const found = findDuration(date?.rest ?? text);
+      if (!found) return { error: "How long? e.g. study 1h sql joins, or study 45m excel pivot tables" };
+      if (found.hours < 0.25 || found.hours > 24) return { error: "Use a time between 15 minutes and 24 hours, e.g. study 1h sql joins" };
+      return { command: { type: "study", hours: found.hours, text: clean(found.rest).slice(0, 200), date: date?.value ?? today } };
+    }
+
+    case "course":
+    case "playlist": {
+      const url = text.match(/https?:\/\/\S+/i)?.[0];
+      if (!url) return { error: "Paste the link of the course or playlist, e.g. course https://www.coursera.org/learn/seo" };
+      return { command: { type: "course", url } };
+    }
+
     case "skill":
     case "skills": {
       const skills = text.split(/[,;\n]/).map((s) => s.trim()).filter(Boolean);
@@ -167,6 +188,21 @@ export function parseQuickAdd(input: string, today: string): Parsed {
       return null;
   }
 }
+
+/**
+ * The first length of time in the words ("1h", "90m", "1.5 hours", "1h30m", "45 min") and the words without it.
+ * Used by "study 1h sql joins": the time can come before, after or inside the words.
+ */
+export function findDuration(text: string): { hours: number; rest: string } | null {
+  const compound = text.match(/(?:^|\s)(\d+(?:[.,]\d+)?)\s*h(?:ours?|rs?)?\s*(\d+)\s*m(?:in(?:ute)?s?)?(?=\s|$|[.,;])/i);
+  if (compound) return { hours: Number(compound[1].replace(",", ".")) + Number(compound[2]) / 60, rest: cutAt(text, compound) };
+  const single = text.match(/(?:^|\s)(\d+(?:[.,]\d+)?)\s*(hours?|hrs?|h|minutes?|mins?|m)(?=\s|$|[.,;])/i);
+  if (!single) return null;
+  const value = Number(single[1].replace(",", "."));
+  return { hours: /^m/i.test(single[2]) ? value / 60 : value, rest: cutAt(text, single) };
+}
+
+const cutAt = (text: string, m: RegExpMatchArray) => `${text.slice(0, m.index)} ${text.slice((m.index ?? 0) + m[0].length)}`.replace(/\s{2,}/g, " ").trim();
 
 function addHour(hhmm: string) {
   const h = Number(hhmm.slice(0, 2)) + 1;

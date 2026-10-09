@@ -81,3 +81,24 @@ test("not a command, or a command with something missing", () => {
   assert.ok("error" in (parseQuickAdd("spent lunch", today) ?? {}));
   assert.ok("error" in (parseQuickAdd("job example.com", today) ?? {}));
 });
+
+test("study: time and words, a day, and what is refused", () => {
+  assert.deepEqual(cmd("study 1h sql joins"), { type: "study", hours: 1, text: "sql joins", date: today });
+  assert.deepEqual(cmd("study sql joins 90m"), { type: "study", hours: 1.5, text: "sql joins", date: today });
+  assert.deepEqual(cmd("studied 1h30m excel pivot tables"), { type: "study", hours: 1.5, text: "excel pivot tables", date: today });
+  assert.deepEqual(cmd("study 2 hours seo yesterday"), { type: "study", hours: 2, text: "seo", date: "2026-10-05" });
+  assert.deepEqual(cmd("study 45 min"), { type: "study", hours: 0.75, text: "", date: today });
+  assert.deepEqual(cmd("study 0,5h english"), { type: "study", hours: 0.5, text: "english", date: today });
+  assert.ok("error" in (parseQuickAdd("study sql joins", today) ?? {}), "no time");
+  assert.ok("error" in (parseQuickAdd("study 5m sql", today) ?? {}), "under 15 minutes");
+  assert.ok("error" in (parseQuickAdd("study 25h sql", today) ?? {}), "over a day");
+  assert.ok("error" in (parseQuickAdd("study", today) ?? {}));
+  // A number that is not a time stays in the words.
+  assert.deepEqual(cmd("study 1h chapter 3 of sql 101"), { type: "study", hours: 1, text: "chapter 3 of sql 101", date: today });
+});
+
+test("course: a link to add to the library", () => {
+  assert.deepEqual(cmd("course https://www.coursera.org/learn/seo"), { type: "course", url: "https://www.coursera.org/learn/seo" });
+  assert.deepEqual(cmd("playlist https://www.youtube.com/playlist?list=PL123"), { type: "course", url: "https://www.youtube.com/playlist?list=PL123" });
+  assert.ok("error" in (parseQuickAdd("course seo basics", today) ?? {}));
+});

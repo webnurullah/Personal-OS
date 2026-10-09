@@ -229,7 +229,7 @@ test("the text a session gets from its topic", () => {
 
 // ---------- The server side: the overview the Learning page is given, and the checks on a session's links ----------
 import { HttpError } from "../lib/server/http.ts";
-import { checkBlockLinks, studyOverview } from "../lib/server/study.ts";
+import { checkBlockLinks, studyOverview, weekReview } from "../lib/server/study.ts";
 import { summariseCourses } from "../lib/server/queries.ts";
 import { BlockCreate } from "../lib/server/schemas.ts";
 import type { Db } from "../lib/server/supabase.ts";
@@ -247,6 +247,7 @@ function fakeDb(tables: Record<string, Row[]>, failing: string[] = []) {
         eq: (column: string, value: unknown) => { rows = rows.filter((r) => r[column] === value); return q; },
         gte: (column: string, value: string) => { rows = rows.filter((r) => String(r[column]) >= value); return q; },
         lt: (column: string, value: string) => { rows = rows.filter((r) => String(r[column]) < value); return q; },
+        lte: (column: string, value: string) => { rows = rows.filter((r) => String(r[column]) <= value); return q; },
         order: () => q,
         limit: (count: number) => { rows = rows.slice(0, count); return q; },
         range: (from: number, to: number) => Promise.resolve({ data: shown().slice(from, to + 1), error: null }),
@@ -345,4 +346,41 @@ test("a streak longer than the 11 weeks read every time is followed further back
 test("a database failure while checking a session's links is a server error, not 'not yours'", async () => {
   const db = fakeDb({ course_topics: [{ id: "T1" }] }, ["course_topics"]);
   await assert.rejects(checkBlockLinks(db, { topic_id: "T1" }), (e: unknown) => e instanceof HttpError && e.status === 500);
+});
+
+test("revision: finished topics and library items that are due to be looked at again", async () => {
+  const db = fakeDb({
+    courses: courseRows, course_units: unitRows, course_topics: [
+      { ...topicRows[1], status: "done", completed_at: "2026-10-07T04:00:00+00:00", revision_step: 0 }, // finished yesterday: first look
+      { ...row("x1", "A", "u1", "1.5"), status: "done", completed_at: "2026-10-01T04:00:00+00:00", revision_step: 1 }, // 7 days ago, first look done: second look
+      { ...row("x2", "A", "u1", "1.6"), status: "done", completed_at: "2026-09-17T04:00:00+00:00", revision_step: 3 }, // all three done
+      { ...row("x3", "A", "u1", "1.7"), status: "done", completed_at: "2026-10-08T01:00:00+00:00", revision_step: 0 }, // finished today
+    ],
+    study_blocks: [],
+    learning_resources: [
+      { id: "r9", title: "SEO basics", platform: "Coursera", provider: "", status: "completed", completed_on: "2026-10-01", revision_step: 1 },
+      { id: "r8", title: "Old course", platform: "Udemy", provider: "", status: "completed", completed_on: "2026-07-01", revision_step: 0 },
+    ],
+  });
+  const o = await studyOverview(db, TODAY, "UTC");
+  assert.deepEqual(o.revision.map((r) => [r.kind, r.id, r.step, r.dueAfter, r.daysSince]), [["topic", "a2", 0, 1, 1], ["topic", "x1", 1, 7, 7], ["resource", "r9", 1, 7, 7]]);
+  assert.equal(o.revision.find((r) => r.id === "a2")?.label, "Digital Marketing");
+  assert.equal(o.revision.find((r) => r.id === "r9")?.href, "/learning/library");
+  assert.equal(o.revision.find((r) => r.id === "x1")?.href, "/learning/A");
+});
+
+test("the week in review: what was finished in it, how many are late, and the note", async () => {
+  const db = fakeDb({
+    course_topics: [
+      { id: "t1", course_id: "A", code: "1.1", title: "Joins", status: "done", completed_at: "2026-10-06T08:00:00+00:00" },
+      { id: "t2", course_id: "A", code: "1.2", title: "Old", status: "done", completed_at: "2026-09-28T08:00:00+00:00" },
+      { id: "t3", course_id: "A", code: "1.3", title: "Open", status: "in-progress", completed_at: null },
+    ],
+    learning_resources: [{ id: "r1", title: "SEO", status: "completed", completed_on: "2026-10-07" }, { id: "r2", title: "Old", status: "completed", completed_on: "2026-09-20" }],
+    study_weeks: [{ week_start: "2026-10-05", reflection: "Good week, SQL clicked." }],
+  });
+  const review = await weekReview(db, "2026-10-05", "UTC", 3);
+  assert.deepEqual(review, { topics_done: [{ id: "t1", course_id: "A", code: "1.1", title: "Joins" }], items_done: [{ id: "r1", title: "SEO" }], late: 3, reflection: "Good week, SQL clicked." });
+  const quiet = await weekReview(db, "2026-10-12", "UTC", 0);
+  assert.deepEqual(quiet, { topics_done: [], items_done: [], late: 0, reflection: "" });
 });

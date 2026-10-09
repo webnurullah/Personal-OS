@@ -32,11 +32,11 @@ function tidy(s: string) {
 const NUMBER = "(\\d+(?:[.,]\\d+)?)";
 const SEP = "(?:^|[\\s|(:\\-–—,~≈])";
 // "2h", "1.5 hours", "90 min", "(2h)", "| 2h", "- 2h", "~2h" at the very end of a line (with the separator in front of it).
-const TRAILING_DURATION = new RegExp(`${SEP}${NUMBER}\\s*(hours?|hrs?|h|minutes?|mins?|m)\\s*\\)?\\.?\\s*$`, "i");
+const TRAILING_DURATION = new RegExp(`${SEP}${NUMBER}\\s*(hours?|hrs?|h|minutes?|mins?|m)$`, "i");
 // "1h30m", "1h 30 min": hours and minutes written together.
-const COMPOUND_DURATION = new RegExp(`${SEP}${NUMBER}\\s*h(?:ours?|rs?)?\\s*(\\d+)\\s*m(?:in(?:ute)?s?)?\\s*\\)?\\.?\\s*$`, "i");
+const COMPOUND_DURATION = new RegExp(`${SEP}${NUMBER}\\s*h(?:ours?|rs?)?\\s*(\\d+)\\s*m(?:in(?:ute)?s?)?$`, "i");
 // "2-3h", "(2–3 hours)": the longer is taken.
-const RANGE_DURATION = new RegExp(`${SEP}${NUMBER}\\s*[-–]\\s*${NUMBER}\\s*(hours?|hrs?|h|minutes?|mins?|m)\\s*\\)?\\.?\\s*$`, "i");
+const RANGE_DURATION = new RegExp(`${SEP}${NUMBER}[-–]${NUMBER}\\s*(hours?|hrs?|h|minutes?|mins?|m)$`, "i");
 // "| 2" (a bare number after a bar).
 const TRAILING_BAR_NUMBER = /\|\s*(\d+(?:[.,]\d+)?)\s*$/;
 // "Docker in 1 hour": after these words the number is part of the title, not the hours of the topic.
@@ -46,7 +46,12 @@ const num = (text: string) => Number(text.replace(",", "."));
 
 /** Takes the hours off the end of a line: "Keyword research 1h 30m" → { text: "Keyword research", hours: 1.5 }. */
 export function takeHours(line: string): { text: string; hours: number | null } {
-  const text = line.trim();
+  // A closing bracket, a full stop and spaces after the hours are not part of them: cut off with a loop, so that the
+  // patterns below end exactly at the hours (a pattern with a run of optional spaces in front of "$" takes quadratic time
+  // on a long run of spaces).
+  let end = line.length;
+  while (end > 0 && /[\s).]/.test(line[end - 1])) end -= 1;
+  const text = line.slice(0, end).trim();
   const found = (m: RegExpMatchArray, hours: number) => ({ text: tidy(text.slice(0, m.index)), hours });
   // The hours belong to the line only after a separator ("| 2h", "(2h)", "- 2h"): after plain spaces the number may be a
   // part of the title ("Docker in 1 hour").
@@ -55,8 +60,9 @@ export function takeHours(line: string): { text: string; hours: number | null } 
   const compound = text.match(COMPOUND_DURATION);
   if (compound && !afterWords(compound)) return found(compound, num(compound[1]) + Number(compound[2]) / 60);
   const range = text.match(RANGE_DURATION);
-  if (range && !afterWords(range)) {
-    const upper = Math.max(num(range[1]), num(range[2]));
+  // A range goes up ("2-3h"); "101-3h" is a number in the title and 3 hours.
+  if (range && num(range[1]) <= num(range[2]) && !afterWords(range)) {
+    const upper = num(range[2]);
     return found(range, /^m/i.test(range[3]) ? upper / 60 : upper);
   }
   const single = text.match(TRAILING_DURATION);
@@ -85,14 +91,32 @@ const SINGLE_NUMBER = /^(\s*)\d+[.)]\s+(.*)$/;
 const TWO_LEVEL = /^\s*\d+(?:\.\d+)+[.)]?\s+/;
 // "Unit 2: Ads", "Module III - Ads", "Chapter 4. Ads", "Part: Ads", "Unit - Ads". Not "Modules in Python", "Part of speech",
 // "Part-time work", "Unit-testing", "Part I will teach" or "Module 1.1 Intro": those are ordinary titles.
-const HEADING_WORD = /^(?:unit|module|chapter|section|part)(?:\s+(?:\d+(?![\d.]*\d)|[ivx]{1,6}(?=\s*[:.\-–—]|\s*$))\s*[:.\-–—]?|\s*:|\s+[-–—])\s*(.*)$/i;
+const HEADING_WORD = /^(?:unit|module|chapter|section|part)(?:\s+(?:\d+(?!\.?\d|[a-z])|[ivx]{1,6}(?=\s*[:.\-–—]|\s*$))\s*[:.\-–—]?|\s*:|\s+[-–—])\s*(.*)$/i;
 const MARKDOWN_HEADING = /^#{1,6}\s*(.*)$/;
 
 /** `explicit`: the line says it is a unit (a heading word, "#", a colon or a number); a plain line at the left edge only is one by position. */
 type Line = { kind: "unit" | "topic"; text: string; explicit: boolean };
 
-/** In a text with "Unit 1: …" style headings, numbered lines under them are topics; without such headings a single number is a unit. */
-const hasWordHeadings = (raw: string[]) => raw.some((l) => HEADING_WORD.test(l.trim()) || MARKDOWN_HEADING.test(l.trim()));
+/**
+ * Are the single numbers at the left edge ("1. Intro") topics rather than units? They are when the text has unit headings of
+ * another kind ("Unit 1:", "#", "Basics:") and no numbered line has topics of its own under it. When they have ("1. SEO" with
+ * "- keywords" under it) they are the units, whatever else is in the text (a "# My course" title, a "Part 2" line).
+ */
+function numbersAreTopics(raw: string[]) {
+  let headings = false;
+  let numberedAbove = false; // the last line read was a single number at the left edge
+  for (const rawLine of raw) {
+    const line = rawLine.replace(/\t/g, "    ").trimEnd();
+    if (!line.trim() || /^[\s\-_=*#]{3,}$/.test(line)) continue;
+    const trimmed = line.trim();
+    const indent = line.length - line.trimStart().length;
+    if (numberedAbove && (indent >= 2 || /^[-*•·▪◦–]\s/.test(trimmed))) return false;
+    const bullet = BULLET.test(line);
+    numberedAbove = bullet && indent === 0 && SINGLE_NUMBER.test(line) && !TWO_LEVEL.test(line);
+    if (!bullet && (MARKDOWN_HEADING.test(trimmed) || HEADING_WORD.test(trimmed) || trimmed.endsWith(":"))) headings = true;
+  }
+  return headings;
+}
 
 function classify(raw: string, numbersAreTopics: boolean): Line | null {
   const line = raw.replace(/\t/g, "    ").trimEnd();
@@ -127,8 +151,8 @@ export function parseOutline(text: string, defaultHours = DEFAULT_TOPIC_HOURS, f
   const hoursDefault = clampHours(defaultHours);
   const hoursOf = (taken: number | null) => (taken === null ? hoursDefault : clampHours(taken));
   const rawLines = text.slice(0, OUTLINE_LIMITS.text).split(/\r?\n/);
-  const numbersAreTopics = hasWordHeadings(rawLines);
-  let lines = rawLines.map((l) => classify(l, numbersAreTopics)).filter((l): l is Line => l !== null);
+  const numbersAsTopics = numbersAreTopics(rawLines);
+  let lines = rawLines.map((l) => classify(l, numbersAsTopics)).filter((l): l is Line => l !== null);
   // Nothing but plain lines: all of them are topics.
   if (lines.length > 1 && lines.every((l) => l.kind === "unit" && !l.explicit)) lines = lines.map((l) => ({ ...l, kind: "topic" as const }));
 

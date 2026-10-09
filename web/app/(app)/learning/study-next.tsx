@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { Check, Flame, ListChecks, Timer } from "lucide-react";
+import { Check, Flame, ListChecks, RotateCcw, Timer, Hourglass } from "lucide-react";
 import { formatDate } from "@/lib/dates";
 import { hm, num, plural } from "@/lib/format";
+import { finishedText } from "@/lib/revision";
 import { reasonText, type StudyReason } from "@/lib/study";
-import type { LearningWeek, StudyNextItem } from "@/lib/types";
+import type { LearningWeek, RevisionDue, StudyNextItem } from "@/lib/types";
 
 const REASON_STYLE: Record<StudyReason, string> = {
   overdue: "bg-amber-50 text-amber-800 ring-1 ring-amber-100",
@@ -35,9 +36,10 @@ function WeekBars({ weeks, goal }: { weeks: LearningWeek["stats"]["weeks"]; goal
 }
 
 /** What to study today: the few topics that matter most, with one tap to log time or finish them. */
-export function StudyNext({ data, onLog, onFinish }: { data: LearningWeek; onLog: (topicId: string) => void; onFinish: (item: StudyNextItem) => void }) {
-  if (!data.courses.length) return null; // the "My courses" card already says how to start
+export function StudyNext({ data, onLog, onFinish, onFocus, onRevised }: { data: LearningWeek; onLog: (topicId: string) => void; onFinish: (item: StudyNextItem) => void; onFocus: (topicId: string) => void; onRevised: (item: RevisionDue) => void }) {
   if (!data.study_next || !data.stats) return null; // a copy saved before this existed: shown once the fresh answer arrives
+  const revision = data.revision ?? [];
+  if (!data.courses.length && !revision.length) return null; // the "My courses" card already says how to start
   const { stats, study_next: items } = data;
   const behind = data.courses.filter((c) => c.state === "behind").length;
 
@@ -78,6 +80,9 @@ export function StudyNext({ data, onLog, onFinish }: { data: LearningWeek; onLog
                 <button type="button" className="btn btn-primary btn-sm" onClick={() => onLog(item.topic_id)}>
                   <Timer className="size-4" /> Log time
                 </button>
+                <button type="button" className="btn btn-ghost btn-sm btn-icon" onClick={() => onFocus(item.topic_id)} aria-label={`Start a focus timer on ${item.code} ${item.title}`} title="Start a focus timer">
+                  <Hourglass className="size-4" />
+                </button>
                 <button type="button" className="btn btn-secondary btn-sm" onClick={() => onFinish(item)} aria-label={`Mark ${item.code} ${item.title} finished`}>
                   <Check className="size-4" /> Done
                 </button>
@@ -89,6 +94,29 @@ export function StudyNext({ data, onLog, onFinish }: { data: LearningWeek; onLog
         <p className="mt-4 rounded-2xl border border-dashed border-slate-200 px-4 py-6 text-center text-sm text-slate-500">
           Nothing to study right now. Add topics to a course, or wait for your next course to start.
         </p>
+      )}
+
+      {revision.length > 0 && (
+        <div className="mt-5 border-t border-slate-100 pt-4">
+          <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+            <RotateCcw className="size-4 text-violet-600" aria-hidden /> Time to revise
+          </h3>
+          <ul className="mt-3 space-y-2">
+            {revision.map((r) => (
+              <li key={`${r.kind}-${r.id}`} className="flex flex-col gap-2 rounded-2xl bg-violet-50/60 p-3 ring-1 ring-violet-100 sm:flex-row sm:items-center sm:gap-4">
+                <div className="min-w-0 flex-1">
+                  <Link href={r.href} className="line-clamp-2 text-sm font-medium text-slate-900 hover:underline">{r.title}</Link>
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    {r.label ? `${r.label} · ` : ""}{finishedText(r.daysSince)} · look {r.step + 1} of 3
+                  </p>
+                </div>
+                <button type="button" className="btn btn-secondary btn-sm shrink-0 self-start sm:self-auto" onClick={() => onRevised(r)} aria-label={`Mark ${r.title} revised`}>
+                  <Check className="size-4" /> Revised
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </section>
   );

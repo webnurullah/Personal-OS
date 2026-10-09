@@ -3,7 +3,7 @@
 import { toArchive } from "@/lib/archive";
 import { useState, type FormEvent, type ReactNode } from "react";
 import useSWR from "swr";
-import { Hourglass, PartyPopper, Pencil, Plus, Target, Trash2, TrendingUp, Trophy, X } from "lucide-react";
+import { GraduationCap, Hourglass, PartyPopper, Pencil, Plus, Target, Trash2, TrendingUp, Trophy, X } from "lucide-react";
 import { api, errorMessage, refresh } from "@/lib/api";
 import { colorOf } from "@/lib/colors";
 import { daysBetween, formatDate } from "@/lib/dates";
@@ -11,7 +11,7 @@ import { num } from "@/lib/format";
 import { useCategories } from "@/lib/hooks";
 import { useNewAction } from "@/lib/new-action";
 import { useProfile } from "@/lib/profile";
-import type { ColorName, Goal, GoalStatus } from "@/lib/types";
+import type { ColorName, CourseSummary, Goal, GoalStatus } from "@/lib/types";
 import { Progress } from "@/components/ui/charts";
 import { ColorPicker, Field, IconPicker, Segmented } from "@/components/ui/controls";
 import { useFeedback } from "@/components/ui/feedback";
@@ -174,6 +174,18 @@ function GoalCard({ goal, today, onEdit, onUpdate }: { goal: Goal; today: string
         </p>
       </div>
       <Progress value={goal.percent} fill={color.bar} className="mt-2 h-2.5" />
+      {goal.link_kind && goal.progress_mode === "value" && (
+        <p className="mt-2 flex items-center gap-1.5 text-xs text-slate-500">
+          <GraduationCap className="size-3.5 shrink-0" />
+          <span className="min-w-0 truncate">
+            {goal.link_kind === "certificates"
+              ? "Counts the certificates you complete"
+              : goal.linked
+                ? `Follows the course “${goal.course_title ?? ""}”`
+                : "Its course is gone or has no hours: showing the last numbers"}
+          </span>
+        </p>
+      )}
 
       {goal.milestones.length > 0 && (
         <ul className="mt-5 space-y-2.5 text-sm">
@@ -221,7 +233,7 @@ function GoalCard({ goal, today, onEdit, onUpdate }: { goal: Goal; today: string
           <button type="button" className="btn btn-ghost btn-sm btn-icon" onClick={onEdit} aria-label="Edit goal">
             <Pencil className="size-4" />
           </button>
-          {goal.progress_mode === "value" && goal.status !== "completed" && (
+          {goal.progress_mode === "value" && goal.status !== "completed" && !goal.linked && (
             <button type="button" className="btn btn-secondary btn-sm" onClick={onUpdate}>
               Update
             </button>
@@ -285,6 +297,9 @@ function GoalForm({ editing, onClose }: { editing: Goal | null; onClose: () => v
   const { toast } = useFeedback();
   const [busy, setBusy] = useState(false);
   const [mode, setMode] = useState<"value" | "milestones">(editing?.progress_mode ?? "value");
+  const [link, setLink] = useState<"" | "course" | "certificates">(editing?.link_kind ?? "");
+  const [courseId, setCourseId] = useState(editing?.course_id ?? "");
+  const { data: courses } = useSWR<{ items: CourseSummary[] }>(mode === "value" && link === "course" ? "/courses" : null);
 
   const submit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -298,9 +313,22 @@ function GoalForm({ editing, onClose }: { editing: Goal | null; onClose: () => v
       deadline: String(form.get("deadline")) || null,
       note: String(form.get("note")),
     };
-    if (mode === "value") {
+    const followed = mode === "value" ? link : "";
+    body.link_kind = followed || null;
+    body.course_id = followed === "course" ? courseId : null;
+    if (followed === "course") {
+      const course = courses?.items.find((c) => c.id === courseId);
+      if (!course) {
+        toast("Pick the course this goal follows.", "error");
+        return;
+      }
+      // The numbers typed by hand are the course's today; they show again only if the course is deleted.
+      body.target_value = Math.max(0.01, Number(course.est_hours));
+      body.current_value = Number(course.done_hours);
+      body.unit = "hours";
+    } else if (mode === "value") {
       body.target_value = Number(form.get("target_value"));
-      body.current_value = Number(form.get("current_value") || 0);
+      body.current_value = followed === "certificates" ? 0 : Number(form.get("current_value") || 0);
       body.unit = String(form.get("unit")).trim();
     }
     setBusy(true);
@@ -339,7 +367,10 @@ function GoalForm({ editing, onClose }: { editing: Goal | null; onClose: () => v
         <Segmented
           label="Progress"
           value={mode}
-          onChange={setMode}
+          onChange={(next) => {
+            setMode(next);
+            if (next === "milestones") setLink("");
+          }}
           options={[
             { value: "value", label: "A number (money, km, books…)" },
             { value: "milestones", label: "Milestones I tick" },
@@ -347,15 +378,36 @@ function GoalForm({ editing, onClose }: { editing: Goal | null; onClose: () => v
         />
       </fieldset>
       {mode === "value" && (
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Field label="Now" htmlFor="goal-current">
-            <input id="goal-current" name="current_value" type="number" min={0} step="any" className="input" defaultValue={editing?.current_value ?? 0} />
-          </Field>
+        <Field label="Progress comes from" htmlFor="goal-link" hint={link === "course" ? "The hours you finish in the course move this goal by themselves." : link === "certificates" ? "Each certificate course you complete from now on counts one." : undefined}>
+          <select id="goal-link" className="select select-lg" value={link} onChange={(e) => setLink(e.target.value as "" | "course" | "certificates")}>
+            <option value="">A number I update myself</option>
+            <option value="course">A course (Learning)</option>
+            <option value="certificates">Certificates I earn (Learning)</option>
+          </select>
+        </Field>
+      )}
+      {mode === "value" && link === "course" && (
+        <Field label="Course" htmlFor="goal-course">
+          <select id="goal-course" className="select select-lg" value={courseId} onChange={(e) => setCourseId(e.target.value)} required>
+            <option value="">{courses ? "Choose a course…" : "Loading…"}</option>
+            {courses?.items.map((c) => (
+              <option key={c.id} value={c.id}>{c.title}</option>
+            ))}
+          </select>
+        </Field>
+      )}
+      {mode === "value" && link !== "course" && (
+        <div className={`grid gap-4 ${link === "certificates" ? "sm:grid-cols-2" : "sm:grid-cols-3"}`}>
+          {link === "" && (
+            <Field label="Now" htmlFor="goal-current">
+              <input id="goal-current" name="current_value" type="number" min={0} step="any" className="input" defaultValue={editing?.current_value ?? 0} />
+            </Field>
+          )}
           <Field label="Target" htmlFor="goal-target">
-            <input id="goal-target" name="target_value" type="number" min={0.01} step="any" className="input" required defaultValue={editing?.target_value} placeholder="e.g. 120000" />
+            <input id="goal-target" name="target_value" type="number" min={0.01} step="any" className="input" required defaultValue={editing?.target_value} placeholder={link === "certificates" ? "e.g. 2" : "e.g. 120000"} />
           </Field>
           <Field label="Unit" htmlFor="goal-unit">
-            <input id="goal-unit" name="unit" className="input" maxLength={20} defaultValue={editing?.unit ?? "৳"} list="goal-units" autoComplete="off" />
+            <input key={link} id="goal-unit" name="unit" className="input" maxLength={20} defaultValue={link === "certificates" ? "certificates" : (editing?.unit ?? "৳")} list="goal-units" autoComplete="off" />
             <datalist id="goal-units">
               <option value="৳" /><option value="km" /><option value="books" /><option value="hours" /><option value="kg" />
             </datalist>

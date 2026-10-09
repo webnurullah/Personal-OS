@@ -91,7 +91,7 @@ export function OutlineDialog({ course, hasPlan, weeklyGoal, onClose, onDone }: 
         <input type="checkbox" className="checkbox checkbox-green mt-0.5" checked={plan} onChange={(e) => setPlan(e.target.checked)} />
         <span>
           Also plan the weeks
-          <span className="block text-xs text-slate-500">Spreads every unfinished topic over the weeks left, {num(weeklyGoal)}h a week (your weekly goal).{hasPlan ? " This replaces the weeks you set before." : ""}</span>
+          <span className="block text-xs text-slate-500">Spreads every unfinished topic over the weeks left, {num(Math.min(80, weeklyGoal))}h a week (your weekly goal).{hasPlan ? " This replaces the weeks you set before." : ""}</span>
         </span>
       </label>
       <ModalActions onCancel={onClose} submitLabel="Add to the course" busy={busy} disabled={!parsed.topicCount && !parsed.units.length} />
@@ -102,7 +102,7 @@ export function OutlineDialog({ course, hasPlan, weeklyGoal, onClose, onDone }: 
 /** Plan the weeks: spread what is left over your weekly hours, or only move the late topics to this week. */
 export function PlanDialog({ course, topics, today, weeklyGoal, onClose, onDone }: { course: Pick<Course, "id" | "start_date" | "target_date">; topics: Topic[]; today: string; weeklyGoal: number; onClose: () => void; onDone: () => void }) {
   const { toast } = useFeedback();
-  const [hours, setHours] = useState(String(weeklyGoal));
+  const [hours, setHours] = useState(String(Math.min(80, weeklyGoal))); // a week of the plan holds at most 80 hours
   const [busy, setBusy] = useState<"plan" | "carry" | null>(null);
   const planTopics: PlanTopic[] = topics.map((t) => ({ id: t.id, code: t.code, status: t.status, est_hours: Number(t.est_hours), actual_hours: Number(t.actual_hours), planned_week: t.planned_week, unit_position: 0, position: t.position }));
   const pace = neededPace(course, planTopics, today);

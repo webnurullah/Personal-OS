@@ -5,7 +5,7 @@ import { useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
-import { CalendarCheck, CalendarDays, ChevronLeft, ClipboardPaste, Clock, GraduationCap, Hourglass, Layers, Pencil, Plus, Route, Target, Trash2 } from "lucide-react";
+import { CalendarCheck, CalendarDays, ChevronLeft, ClipboardPaste, Clock, GraduationCap, Hourglass, Layers, ListPlus, Pencil, Plus, Route, Target, Trash2 } from "lucide-react";
 import { api, ApiError, errorMessage, refresh } from "@/lib/api";
 import { cacheMutate } from "@/lib/cache";
 import { colorOf } from "@/lib/colors";
@@ -193,6 +193,17 @@ export function CourseView({ id }: { id: string }) {
     }
   };
 
+  /** A task for each topic still to study in this week's plan (due at the end of the week); pressing it twice adds nothing twice. */
+  const addWeekTasks = async () => {
+    try {
+      const made = await api<{ created: number; skipped: number; due_date: string }>(`/courses/${course.id}/tasks`, { method: "POST", body: {} });
+      await refresh("/tasks");
+      toast(made.created ? `${plural(made.created, "task")} added, due ${formatDate(made.due_date, "short")}${made.skipped ? ` (${made.skipped} already there)` : ""}` : "Those topics are already in your tasks.");
+    } catch (e) {
+      toast(errorMessage(e), "error");
+    }
+  };
+
   const toggleDone = (topic: Topic) =>
     changeTopic(topic, { status: topic.status === "done" ? (Number(topic.actual_hours) > 0 ? "in-progress" : "not-started") : "done" });
 
@@ -340,6 +351,11 @@ export function CourseView({ id }: { id: string }) {
             </ul>
           ) : (
             <p className="mt-4 text-sm text-slate-500">No topics planned for this week. Give topics a week in the table below.</p>
+          )}
+          {stats.weekTopics.some((t) => t.status !== "done") && (
+            <button type="button" className="btn btn-secondary btn-sm mt-4" onClick={addWeekTasks}>
+              <ListPlus className="size-4" /> Add to my tasks
+            </button>
           )}
         </section>
 

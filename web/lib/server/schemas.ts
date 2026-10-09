@@ -1,5 +1,6 @@
 // What each endpoint accepts. Anything else is refused with a 400 and the field errors.
 import { courseWeeks, MAX_COURSE_WEEKS } from "../course.ts";
+import { GOAL_LINK_KINDS } from "../goal-link.ts";
 import { isHttpUrl } from "../projects.ts";
 import { daysBetween, mondayOf, weekdayIndex } from "./dates.ts";
 import { HttpError } from "./http.ts";
@@ -94,7 +95,20 @@ export const GoalCreate = z.object({
   unit: s.optionalText(20).optional(),
   deadline: s.date.nullable().optional(),
   note: s.optionalText(500).optional(),
+  // A goal can follow a course (its hours) or the certificates you earn instead of a number typed by hand.
+  link_kind: z.enum(GOAL_LINK_KINDS).nullable().optional(),
+  course_id: s.id.nullable().optional(),
 }).strict();
+
+/** What a goal follows has to make sense: a course needs its course, nothing else has one, and it is measured in a number. */
+export function checkGoalLink<T extends { link_kind?: string | null; course_id?: string | null; progress_mode?: string }>(goal: T): T {
+  if (goal.link_kind === "course" && !goal.course_id) throw new HttpError(400, "Pick the course this goal follows.");
+  if (goal.link_kind !== "course" && goal.course_id) throw new HttpError(400, "A course can only be chosen when the goal follows a course.");
+  if (goal.link_kind && goal.progress_mode === "milestones") throw new HttpError(400, "A goal that follows a course or certificates is measured in a number, not milestones.");
+  // Following nothing (or only the certificates) clears the course.
+  if (goal.link_kind !== undefined && goal.link_kind !== "course") return { ...goal, course_id: null };
+  return goal;
+}
 
 export const MilestoneCreate = z.object({
   title: s.text(200),
@@ -116,7 +130,7 @@ export const HabitUpdate = HabitCreate.partial().extend({ archived: z.boolean().
 // ---------- Learning ----------
 export const monday = s.date.refine((d) => weekdayIndex(d) === 0, "The week must start on a Monday");
 
-export const WeekUpdate = z.object({ topic: s.optionalText(120), goal_hours: z.number().positive().max(100) }).partial().strict();
+export const WeekUpdate = z.object({ topic: s.optionalText(120), goal_hours: z.number().positive().max(100), reflection: s.optionalText(500) }).partial().strict();
 
 export const BlockCreate = z.object({
   week_start: monday,
@@ -155,6 +169,8 @@ export const TopicFields = z.object({
   outcome: s.optionalText(300).optional(),
   est_hours: z.number().positive().max(500),
   planned_week: z.number().int().min(1).max(156).nullable().optional(),
+  /** How many of the three look-backs (after 1, 7 and 21 days) of a finished topic are done. */
+  revision_step: z.number().int().min(0).max(3).optional(),
   status: z.enum(["not-started", "in-progress", "done"]).optional(),
   actual_hours: z.number().min(0).max(1000).optional(),
   notes: s.optionalText(300).optional(),
@@ -170,6 +186,8 @@ export const OutlineInput = z.object({
   weekly_hours: z.number().min(0.5).max(100).optional(), // as many as the weekly study goal may be; a week is planned with at most 80
 }).strict();
 export const PlanInput = z.object({ mode: z.enum(["plan", "carry"]), weekly_hours: z.number().min(0.5).max(100).optional() }).strict();
+/** Tasks for the topics of one week of a course (this week when `week` is left out). */
+export const WeekTasksInput = z.object({ week: z.number().int().min(1).max(156).optional() }).strict();
 /** A course for one missing skill (Job Apply): `by` is the last date among the jobs that ask for it. */
 export const SkillCourseInput = z.object({ skill: s.text(60), by: s.date.optional(), jobs: z.array(s.text(200)).max(10).optional() }).strict();
 
@@ -218,6 +236,8 @@ export const ResourceFields = z.object({
   cost: z.number().min(0).max(10_000_000),
   skills: z.array(z.string().trim().min(1).max(60)).max(30),
   rating: z.number().int().min(1).max(5).nullable(),
+  /** How many of the three look-backs (after 1, 7 and 21 days) of a finished item are done. */
+  revision_step: z.number().int().min(0).max(3),
   takeaway: s.optionalText(300),
   dropped_reason: s.optionalText(300),
   notes: s.optionalText(2000),

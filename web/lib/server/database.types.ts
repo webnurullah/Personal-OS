@@ -188,6 +188,7 @@ export type Database = {
           updated_at: string;
           completed_at: string | null;
           manual_hours: number | null;
+          revision_step: number | null;
         };
         Insert: {
           id?: string;
@@ -208,6 +209,7 @@ export type Database = {
           updated_at?: string;
           completed_at?: string | null;
           manual_hours?: number;
+          revision_step?: number | null;
         };
         Update: {
           id?: string;
@@ -228,6 +230,7 @@ export type Database = {
           updated_at?: string;
           completed_at?: string | null;
           manual_hours?: number;
+          revision_step?: number | null;
         };
         Relationships: [
           {
@@ -443,6 +446,8 @@ export type Database = {
           completed_on: string | null;
           created_at: string;
           updated_at: string;
+          link_kind: string | null;
+          course_id: string | null;
         };
         Insert: {
           id?: string;
@@ -461,6 +466,8 @@ export type Database = {
           completed_on?: string | null;
           created_at?: string;
           updated_at?: string;
+          link_kind?: string | null;
+          course_id?: string | null;
         };
         Update: {
           id?: string;
@@ -479,6 +486,8 @@ export type Database = {
           completed_on?: string | null;
           created_at?: string;
           updated_at?: string;
+          link_kind?: string | null;
+          course_id?: string | null;
         };
         Relationships: [
           {
@@ -683,6 +692,7 @@ export type Database = {
           expires_on: string | null;
           created_at: string;
           updated_at: string;
+          revision_step: number | null;
         };
         Insert: {
           id?: string;
@@ -715,6 +725,7 @@ export type Database = {
           expires_on?: string | null;
           created_at?: string;
           updated_at?: string;
+          revision_step?: number | null;
         };
         Update: {
           id?: string;
@@ -747,6 +758,7 @@ export type Database = {
           expires_on?: string | null;
           created_at?: string;
           updated_at?: string;
+          revision_step?: number | null;
         };
         Relationships: [
 
@@ -993,18 +1005,21 @@ export type Database = {
           week_start: string;
           topic: string;
           goal_hours: number | null;
+          reflection: string;
         };
         Insert: {
           user_id?: string;
           week_start: string;
           topic?: string;
           goal_hours?: number | null;
+          reflection?: string;
         };
         Update: {
           user_id?: string;
           week_start?: string;
           topic?: string;
           goal_hours?: number | null;
+          reflection?: string;
         };
         Relationships: [
 

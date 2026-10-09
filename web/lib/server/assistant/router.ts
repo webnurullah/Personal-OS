@@ -7,6 +7,7 @@ import * as courses from "@/app/api/courses/route";
 import * as course from "@/app/api/courses/[id]/route";
 import * as courseOutline from "@/app/api/courses/[id]/outline/route";
 import * as coursePlan from "@/app/api/courses/[id]/plan/route";
+import * as courseTasks from "@/app/api/courses/[id]/tasks/route";
 import * as courseTopics from "@/app/api/courses/[id]/topics/route";
 import * as courseUnits from "@/app/api/courses/[id]/units/route";
 import * as dashboard from "@/app/api/dashboard/route";
@@ -64,7 +65,7 @@ const ROUTES: [string, Module][] = [
   ["/goals", goals], ["/goals/:id", goal], ["/goals/:id/milestones", goalMilestones], ["/milestones/:id", milestone],
   ["/habits", habits], ["/habits/:id", habit], ["/habits/:id/logs/:date", habitLog],
   ["/learning/week", week], ["/learning/week/:start", weekStart], ["/learning/blocks", blocks], ["/learning/blocks/:id", block],
-  ["/courses", courses], ["/courses/:id", course], ["/courses/:id/units", courseUnits], ["/courses/:id/topics", courseTopics], ["/courses/:id/outline", courseOutline], ["/courses/:id/plan", coursePlan],
+  ["/courses", courses], ["/courses/:id", course], ["/courses/:id/units", courseUnits], ["/courses/:id/topics", courseTopics], ["/courses/:id/outline", courseOutline], ["/courses/:id/plan", coursePlan], ["/courses/:id/tasks", courseTasks],
   ["/units/:id", unit], ["/topics/:id", topic],
   ["/finance", finance], ["/finance/transactions", transactions], ["/finance/transactions/:id", transaction],
   ["/finance/categories", budgetCategories], ["/finance/categories/:id", budgetCategory],

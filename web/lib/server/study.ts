@@ -1,7 +1,8 @@
 // Learning → what to study next, worked out from the courses and the finished study sessions.
 import { forecastFinish, hoursByWeek, pickNext, rankTopics, recentWeeks, sessionLabel, weekStreak, weeklyPace, hoursLeft, type StudyTopic } from "../study.ts";
-import type { OpenTopic, StudyNextItem } from "../types.ts";
-import { addDays, mondayOf } from "./dates.ts";
+import { revisionDue, type RevisionCandidate } from "../revision.ts";
+import type { OpenTopic, StudyNextItem, WeekReview } from "../types.ts";
+import { addDays, dateIn, mondayOf, startOfDayUtc } from "./dates.ts";
 import { dbError, HttpError, must } from "./http.ts";
 import { fetchAll } from "./paging.ts";
 import { loadCourseFacts, summariseCourses } from "./queries.ts";
@@ -11,6 +12,8 @@ import type { Db } from "./supabase.ts";
 const MAX_OPEN_TOPICS = 300;
 /** How far back the finished sessions are read every time: 11 weeks before this one (the last 8 weeks, and the pace). */
 const LOOK_BACK_DAYS = 77;
+/** Finished topics and items older than this have no look-back left to do (the last one is due after 21 days, and is let go after 30 more). */
+const REVISION_LOOK_BACK_DAYS = 60;
 /** A streak that reaches the start of that window is followed further back, up to 3 years. */
 const STREAK_LIMIT_WEEKS = 156;
 
@@ -18,12 +21,15 @@ const STREAK_LIMIT_WEEKS = 156;
  * The Learning page's numbers beyond the week itself: every course (behind or not, and when it would finish at your pace),
  * the few topics to study next, the topics you can pick for a session, the library items in progress, and the streak.
  */
-export async function studyOverview(db: Db, today: string) {
+export async function studyOverview(db: Db, today: string, zone = "UTC") {
   const thisWeek = mondayOf(today);
-  const [facts, blocks, library] = await Promise.all([
+  const [facts, blocks, library, doneTopics, doneItems] = await Promise.all([
     loadCourseFacts(db),
     fetchAll(() => db.from("study_blocks").select("id, week_start, weekday, hours, topic_id").eq("done", true).gte("week_start", addDays(thisWeek, -LOOK_BACK_DAYS)).order("id")),
     db.from("learning_resources").select("id, title").eq("status", "learning").order("created_at").limit(50).then(must),
+    // Finished in the last 2 months and not looked at 3 times yet: the candidates for revision.
+    db.from("course_topics").select("id, course_id, code, title, completed_at, revision_step").eq("status", "done").lt("revision_step", 3).gte("completed_at", startOfDayUtc(addDays(today, -REVISION_LOOK_BACK_DAYS), zone)).then(must),
+    db.from("learning_resources").select("id, title, platform, provider, completed_on, revision_step").eq("status", "completed").lt("revision_step", 3).gte("completed_on", addDays(today, -REVISION_LOOK_BACK_DAYS)).then(must),
   ]);
 
   const unitPosition = new Map(facts.units.map((u) => [u.id, u.position]));
@@ -79,12 +85,38 @@ export async function studyOverview(db: Db, today: string) {
     hours_left: hoursLeft(item.topic),
   }));
 
+  const courseTitle = new Map(facts.courses.map((c) => [c.id, c.title]));
+  const candidates: RevisionCandidate[] = [
+    ...doneTopics.filter((t) => t.completed_at).map((t) => ({ kind: "topic" as const, id: t.id, title: sessionLabel(t), label: courseTitle.get(t.course_id) ?? "", step: Number(t.revision_step ?? 0), finishedOn: dateIn(new Date(t.completed_at!), zone), href: `/learning/${t.course_id}` })),
+    ...doneItems.filter((r) => r.completed_on).map((r) => ({ kind: "resource" as const, id: r.id, title: r.title, label: r.provider || r.platform || "", step: Number(r.revision_step ?? 0), finishedOn: r.completed_on!, href: "/learning/library" })),
+  ];
+
   return {
     courses,
     study_next: pickNext(ranked).map(asNext),
     open_topics: open,
     library,
     stats: { streak: weekStreak(byWeek, thisWeek), weeks: recentWeeks(byWeek, thisWeek, 8) },
+    /** Topics and library items finished a day, a week or three weeks ago that are due to be looked at again. */
+    revision: revisionDue(candidates, today).slice(0, 5),
+    /** Unfinished topics planned for an earlier week. */
+    late: ranked.filter((i) => i.reason === "overdue").length,
+  };
+}
+
+/** The week in review: what was finished in it and what you wrote about it. */
+export async function weekReview(db: Db, weekStart: string, zone: string, late: number): Promise<WeekReview> {
+  const [topics, items, week] = await Promise.all([
+    db.from("course_topics").select("id, course_id, code, title").eq("status", "done").gte("completed_at", startOfDayUtc(weekStart, zone)).lt("completed_at", startOfDayUtc(addDays(weekStart, 7), zone)).order("completed_at").then(must),
+    db.from("learning_resources").select("id, title").eq("status", "completed").gte("completed_on", weekStart).lte("completed_on", addDays(weekStart, 6)).order("completed_on").then(must),
+    db.from("study_weeks").select("reflection").eq("week_start", weekStart).maybeSingle(),
+  ]);
+  if (week.error) throw dbError(week.error);
+  return {
+    topics_done: topics.map((t) => ({ id: t.id, course_id: t.course_id, code: t.code, title: t.title })),
+    items_done: items.map((r) => ({ id: r.id, title: r.title })),
+    late,
+    reflection: week.data?.reflection ?? "",
   };
 }
 

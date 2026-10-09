@@ -53,22 +53,25 @@ export function autoPlan(course: PlanCourse, topics: PlanTopic[], weeklyHours: n
   const fixed = new Array<number>(weeks).fill(0);
   for (const t of topics) if (!moving.has(t.id) && t.planned_week != null && t.planned_week >= first && t.planned_week <= weeks) fixed[t.planned_week - 1] += Number(t.est_hours);
 
-  const load = new Array<number>(weeks).fill(0);
-  load[first - 1] = fixed[first - 1];
+  // Every week starts with the hours of the topics that stay in it, so a later week that already holds a finished topic has
+  // that much less room for the topics being placed.
+  const load = [...fixed];
   const assignments: Assignment[] = [];
   let week = first;
   for (const topic of todo) {
     const need = hoursLeft(topic);
-    // The next week, unless this one is still empty (a topic bigger than a week gets one to itself) or it is the last.
-    if (load[week - 1] > 0 && load[week - 1] + need > cap + 1e-9 && week < weeks) week += 1;
+    // On to the next week that has room, unless this one is still empty (a topic bigger than a week gets one to itself) or
+    // it is the last.
+    while (load[week - 1] > 0 && load[week - 1] + need > cap + 1e-9 && week < weeks) week += 1;
     load[week - 1] += need;
     assignments.push({ id: topic.id, week });
   }
-  // What the last week holds beyond what a week can take did not fit before the target date.
-  const overflow = Math.max(0, load[weeks - 1] - cap);
+  // What the last week holds beyond what a week can take (and beyond what the finished topics in it already held) did not
+  // fit before the target date.
+  const overflow = Math.max(0, load[weeks - 1] - Math.max(cap, fixed[weeks - 1]));
 
   const weekly_plan = Array.from({ length: weeks }, (_, i) =>
-    i + 1 < first ? Math.min(MAX_WEEK_HOURS, Number(course.weekly_plan[i] ?? 0)) : Math.min(MAX_WEEK_HOURS, round2(load[i] + (i + 1 === first ? 0 : fixed[i]))),
+    i + 1 < first ? Math.min(MAX_WEEK_HOURS, Number(course.weekly_plan[i] ?? 0)) : Math.min(MAX_WEEK_HOURS, round2(load[i])),
   );
   return { assignments, weekly_plan, firstWeek: first, lastWeek: assignments.length ? Math.max(...assignments.map((a) => a.week)) : first, overflow: round2(overflow) };
 }

@@ -610,6 +610,78 @@ check('deleting the practice project keeps the item', (await one('select practic
   await expectError('a table of hours instead of a list is refused', () => qa('select plan_course($1, $2::jsonb, $3::numeric[])', [pc, '[]', '{{1,2},{3,4}}']), 'out of range');
   await expectError('a signed-out visitor cannot call it', () => qanon('select plan_course($1, $2::jsonb, $3::numeric[])', [pc, weeks, '{1}']), 'permission denied');
 }
+
+  // ---------- Step 6: revision, the weekly review and goals linked to a course ----------
+  {
+    const rc = (await one(`insert into courses (title, start_date, target_date) values ('Revision course', '2026-10-05', '2026-12-28') returning id`)).id;
+    const ru = (await one(`insert into course_units (course_id, code, title) values ($1, '1', 'U') returning id`, [rc])).id;
+    const rt = (await one(`insert into course_topics (course_id, unit_id, code, title, est_hours) values ($1, $2, '1.1', 'Revise me', 2) returning id`, [rc, ru])).id;
+    const step = async (id, table = 'course_topics') => (await one(`select revision_step s from ${table} where id = $1`, [id])).s;
+
+    check('a new topic starts its look-backs at 0', (await step(rt)) === 0);
+    await qa('update course_topics set revision_step = 2 where id = $1', [rt]);
+    check('and the step can be moved', (await step(rt)) === 2);
+    await expectError('a step above 3 is refused', () => qa('update course_topics set revision_step = 4 where id = $1', [rt]), 'check constraint');
+    await qa(`update course_topics set status = 'done' where id = $1`, [rt]);
+    check('finishing a topic starts the look-backs again', (await step(rt)) === 0);
+    await qa(`update course_topics set revision_step = 1 where id = $1`, [rt]);
+    await qa(`update course_topics set status = 'in-progress', revision_step = 3 where id = $1`, [rt]);
+    check('a change that sets the step itself keeps it', (await step(rt)) === 3);
+
+    // A topic or item brought back from a copy made before revision existed starts at 0.
+    const aTopic = await arch('topic', rt);
+    await db.exec(`update archive_items set data = jsonb_set(data, '{row}', (data -> 'row') - 'revision_step') where id = '${aTopic}'`);
+    await restore(aTopic);
+    check('an old Archive copy of a topic is brought back at step 0', (await step(rt)) === 0);
+
+    const ri = (await one(`insert into learning_resources (title, kind) values ('Revision item', 'certificate') returning id`)).id;
+    check('a new library item starts at 0', (await step(ri, 'learning_resources')) === 0);
+    await qa(`update learning_resources set status = 'completed', revision_step = 2 where id = $1`, [ri]);
+    await qa(`update learning_resources set status = 'learning' where id = $1`, [ri]);
+    check('an item that is started again restarts its look-backs', (await step(ri, 'learning_resources')) === 0);
+    const aItem = await arch('resource', ri);
+    await db.exec(`update archive_items set data = jsonb_set(data, '{row}', (data -> 'row') - 'revision_step') where id = '${aItem}'`);
+    await restore(aItem);
+    check('an old Archive copy of a library item is brought back at step 0', (await step(ri, 'learning_resources')) === 0);
+
+    // The weekly review: one line of up to 500 characters.
+    await qa(`insert into study_weeks (week_start, reflection) values ('2026-10-12', 'Good week.')`);
+    check('a week keeps its reflection', (await one(`select reflection r from study_weeks where week_start = '2026-10-12'`)).r === 'Good week.');
+    check('and has none by default', (await one(`insert into study_weeks (week_start) values ('2026-10-19') returning reflection r`)).r === '');
+    await expectError('a reflection over 500 characters is refused', () => qa(`update study_weeks set reflection = $1 where week_start = '2026-10-12'`, ['x'.repeat(501)]), 'check constraint');
+
+    // Goals linked to a course or to certificates.
+    const g = (await one(`insert into goals (title, link_kind, course_id) values ('Finish the course', 'course', $1) returning id`, [rc])).id;
+    const goalLink = async (id) => await one('select link_kind k, course_id c from goals where id = $1', [id]);
+    check('a goal can follow a course', JSON.stringify(await goalLink(g)) === JSON.stringify({ k: 'course', c: rc }));
+    await expectError('only a course or certificates can be followed', () => qa(`insert into goals (title, link_kind) values ('Bad', 'bogus')`), 'check constraint');
+    const cg = (await one(`insert into goals (title, link_kind, target_value, unit) values ('2 certificates', 'certificates', 2, 'certificates') returning id`)).id;
+    check('a goal can follow the certificates', (await goalLink(cg)).k === 'certificates' && (await goalLink(cg)).c === null);
+
+    // A deleted course leaves the goal (with its typed numbers); the Archive gives the course back to its goal.
+    const aCourse = await arch('course', rc);
+    check('a course deleted to the Archive leaves its goal, unlinked', JSON.stringify(await goalLink(g)) === JSON.stringify({ k: 'course', c: null }), JSON.stringify(await goalLink(g)));
+    await restore(aCourse);
+    check('a course brought back gets its goal again', (await goalLink(g)).c === rc);
+
+    // A goal in the Archive: the course is kept when it exists, and cleared when it does not.
+    const aGoal = await arch('goal', g);
+    await restore(aGoal);
+    check('a goal brought back keeps its course', (await goalLink(g)).c === rc);
+    const aGoal2 = await arch('goal', g);
+    const aCourse2 = await arch('course', rc);
+    await restore(aGoal2);
+    check('a goal brought back while its course is deleted loses only the course', JSON.stringify(await goalLink(g)) === JSON.stringify({ k: 'course', c: null }), JSON.stringify(await goalLink(g)));
+    await restore(aCourse2);
+    check('it does not get the course back later (the course never knew it): pick it again', (await goalLink(g)).c === null);
+    await qa('update goals set course_id = $1 where id = $2', [rc, g]);
+
+    // An old copy of a goal (made before links existed) is brought back unlinked.
+    const aGoal3 = await arch('goal', g);
+    await db.exec(`update archive_items set data = jsonb_set(data, '{row}', (data -> 'row') - 'link_kind' - 'course_id') where id = '${aGoal3}'`);
+    await restore(aGoal3);
+    check('an old Archive copy of a goal is brought back unlinked', JSON.stringify(await goalLink(g)) === JSON.stringify({ k: null, c: null }), JSON.stringify(await goalLink(g)));
+  }
 }
 
 // Security advisor fixes (20261006000100_security_hardening.sql)

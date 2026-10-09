@@ -5,7 +5,7 @@ import { useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
-import { ArrowUpRight, BookOpen, ChartColumn, ChevronLeft, ChevronRight, Clock, GraduationCap, Lightbulb, Minus, Pencil, Plus, Sparkles, Target, Timer, Trash2 } from "lucide-react";
+import { ArrowUpRight, BookOpen, ChartColumn, ChevronLeft, ChevronRight, Clock, GraduationCap, Hourglass, Lightbulb, Minus, Pencil, Plus, Sparkles, Target, Timer, Trash2 } from "lucide-react";
 import { api, errorMessage, refresh } from "@/lib/api";
 import { addDays, formatDate, mondayOf, weekdayIndex } from "@/lib/dates";
 import { COURSE_TEMPLATES, templateWeeks } from "@/lib/course-templates";
@@ -14,8 +14,11 @@ import { hm, num, pct, plural } from "@/lib/format";
 import { useNewAction } from "@/lib/new-action";
 import { OUTLINE_LIMITS, parseOutline } from "@/lib/outline";
 import { useProfile } from "@/lib/profile";
+import { clock } from "@/lib/focus";
+import { REVISION_DAYS } from "@/lib/revision";
 import { forecastText } from "@/lib/study";
-import type { LearningWeek, StudyBlock, StudyNextItem } from "@/lib/types";
+import { useFocus } from "@/lib/use-focus";
+import type { LearningWeek, RevisionDue, StudyBlock, StudyNextItem } from "@/lib/types";
 import { useSaveLater } from "@/lib/use-save-later";
 import { Progress } from "@/components/ui/charts";
 import { Field } from "@/components/ui/controls";
@@ -24,6 +27,7 @@ import { Modal, ModalActions } from "@/components/ui/modal";
 import { LoadError, PageHeader, PageSkeleton } from "@/components/ui/states";
 import { LearningTabs } from "./learning-tabs";
 import { StudyNext } from "./study-next";
+import { WeekReview } from "./week-review";
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
@@ -35,11 +39,14 @@ export function LearningView() {
   const [logging, setLogging] = useState(false);
   const [logChoice, setLogChoice] = useState(""); // what the session form starts on: "t:<topic id>", "r:<library item id>" or nothing
   const [logNow, setLogNow] = useState(false); // from "Study next" (always about today): this week, even when another week is on screen
+  const [logHours, setLogHours] = useState<number | undefined>(undefined); // from the focus timer: the time on the clock
+  const focus = useFocus();
   const [newCourse, setNewCourse] = useState(false);
   const [editingTopic, setEditingTopic] = useState(false);
-  const openLog = (choice = "", now = false) => {
+  const openLog = (choice = "", now = false, hours?: number) => {
     setLogChoice(choice);
     setLogNow(now);
+    setLogHours(hours);
     setLogging(true);
   };
   useNewAction(() => openLog());
@@ -90,12 +97,33 @@ export function LearningView() {
     run(() => api(`/learning/blocks/${block.id}`, { method: "DELETE" }), "Block moved to the Archive");
   };
 
+  /** Stops the focus timer and opens the session form with the time on the clock (to the nearest quarter hour). */
+  const stopFocus = () => {
+    const done = focus.stop();
+    if (done) openLog(done.choice, true, done.hours);
+  };
+  const focusLabel = focus.choice.startsWith("t:")
+    ? data.open_topics?.find((t) => t.id === focus.choice.slice(2))?.label
+    : focus.choice.startsWith("r:")
+      ? data.library?.find((r) => r.id === focus.choice.slice(2))?.title
+      : undefined;
+  const markRevised = (item: RevisionDue) =>
+    run(
+      () => api(item.kind === "topic" ? `/topics/${item.id}` : `/resources/${item.id}`, { method: "PATCH", body: { revision_step: item.step + 1 } }),
+      item.step + 1 >= REVISION_DAYS.length ? "All three looks done. Well done!" : `Revised. The next look is in ${REVISION_DAYS[item.step + 1] - REVISION_DAYS[item.step]} days.`,
+    );
   const finishTopic = (item: StudyNextItem) =>
     run(() => api(`/topics/${item.topic_id}`, { method: "PATCH", body: { status: "done" } }), `${item.code} marked finished`);
 
   return (
     <>
       <PageHeader title="Learning" description="Plan your study week and watch the hours add up.">
+        {!focus.running && (
+          <button type="button" className="btn btn-secondary" onClick={() => focus.start()}>
+            <Hourglass className="size-4" />
+            Focus
+          </button>
+        )}
         <button type="button" className="btn btn-primary" onClick={() => openLog()}>
           <Timer className="size-4" />
           Log Study Session
@@ -103,7 +131,19 @@ export function LearningView() {
       </PageHeader>
       <LearningTabs current="courses" />
 
-      <StudyNext data={data} onLog={(topicId) => openLog(`t:${topicId}`, true)} onFinish={finishTopic} />
+      {focus.running && (
+        <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl bg-indigo-600 px-4 py-3 text-white shadow-lg shadow-indigo-600/20" role="timer" aria-label="Focus timer">
+          <Hourglass className="size-5 shrink-0" aria-hidden />
+          <span className="text-xl font-bold tabular-nums">{clock(focus.elapsed)}</span>
+          <span className="min-w-0 flex-1 truncate text-sm text-indigo-100">{focusLabel ?? "Focusing"}</span>
+          <span className="flex gap-2">
+            <button type="button" className="btn btn-sm bg-white text-indigo-700 hover:bg-indigo-50" onClick={stopFocus}>Stop and log</button>
+            <button type="button" className="btn btn-sm bg-indigo-500 text-white hover:bg-indigo-400" onClick={focus.cancel}>Cancel</button>
+          </span>
+        </div>
+      )}
+
+      <StudyNext data={data} onLog={(topicId) => openLog(`t:${topicId}`, true)} onFinish={finishTopic} onFocus={(topicId) => focus.start(`t:${topicId}`)} onRevised={markRevised} />
 
       <div className="mt-5 flex flex-wrap items-center gap-2">
         <button type="button" className="btn btn-ghost btn-sm btn-icon" onClick={() => setWeek(addDays(week ?? thisWeek, -7))} aria-label="Previous week">
@@ -285,6 +325,8 @@ export function LearningView() {
         </aside>
       </div>
 
+      <WeekReview key={data.week_start} data={data} />
+
       <Modal
         open={logging}
         onClose={() => setLogging(false)}
@@ -292,7 +334,7 @@ export function LearningView() {
         description={isThisWeek || logNow ? "It is added as a block for this week." : `It is added to the week of ${formatDate(data.week_start, "short")}.`}
         size="md"
       >
-        <SessionForm data={data} weekStart={logNow ? thisWeek : data.week_start} choice={logChoice} onClose={() => setLogging(false)} />
+        <SessionForm data={data} weekStart={logNow ? thisWeek : data.week_start} choice={logChoice} defaultHours={logHours} onClose={() => setLogging(false)} />
       </Modal>
       <Modal open={newCourse} onClose={() => setNewCourse(false)} title="New course" description="Then add its units and topics on the course page.">
         <CourseForm today={data.today} onClose={() => setNewCourse(false)} />
@@ -301,7 +343,7 @@ export function LearningView() {
   );
 }
 
-function SessionForm({ data, weekStart, choice: firstChoice, onClose }: { data: LearningWeek; weekStart: string; choice: string; onClose: () => void }) {
+function SessionForm({ data, weekStart, choice: firstChoice, defaultHours, onClose }: { data: LearningWeek; weekStart: string; choice: string; defaultHours?: number; onClose: () => void }) {
   const { toast } = useFeedback();
   const { today } = data;
   // (A copy of this page saved before topics and the library were listed has neither; the fresh answer replaces it a moment later.)
@@ -395,7 +437,7 @@ function SessionForm({ data, weekStart, choice: firstChoice, onClose }: { data: 
           </select>
         </Field>
         <Field label="Hours" htmlFor="session-hours">
-          <input id="session-hours" name="hours" type="number" min={0.25} max={24} step={0.25} defaultValue={1} className="input" required />
+          <input id="session-hours" name="hours" type="number" min={0.25} max={24} step={0.25} defaultValue={defaultHours ?? 1} className="input" required />
         </Field>
       </div>
       <Field label="What did you study?" htmlFor="session-what">

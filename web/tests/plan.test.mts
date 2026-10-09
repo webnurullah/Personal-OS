@@ -166,3 +166,17 @@ test("a course that ends exactly 156 weeks after it starts is planned in 156 wee
   assert.ok(odd.assignments.every((a) => a.week <= 156));
   assert.ok(carryOver({ ...last, target_date: addDays(start, 156 * 7) }, [topic({ id: "a", planned_week: 1 })], addDays(start, 156 * 7)).weekly_plan.length === 156);
 });
+
+test("finished topics in later weeks leave less room there, and the overflow counts only what was placed", () => {
+  const four: PlanCourse = { start_date: "2026-01-05", target_date: "2026-02-01", weekly_plan: [0, 0, 0, 0] };
+  const six = Array.from({ length: 6 }, (_, i) => topic({ id: `n${i}`, position: i + 1 }));
+  const plan = autoPlan(four, [topic({ id: "d3", status: "done", est_hours: 4, planned_week: 3 }), ...six], 5, "2026-01-05");
+  assert.deepEqual(plan.weekly_plan, [4, 4, 4, 4], "week 3 already holds 4h of finished work: 2 more would pass 5h, so they go to week 4");
+  assert.equal(plan.overflow, 0);
+  assert.deepEqual(plan.assignments.map((a) => a.week), [1, 1, 2, 2, 4, 4]);
+
+  const last = autoPlan(four, [topic({ id: "d4", status: "done", est_hours: 4, planned_week: 4 }), ...Array.from({ length: 12 }, (_, i) => topic({ id: `m${i}`, position: i + 1 }))], 5, "2026-01-05");
+  // 24h to place: weeks 1-3 take 4h each, the rest goes into the last week, which already holds 4h.
+  assert.equal(last.weekly_plan.reduce((a, b) => a + b, 0), 28);
+  assert.equal(last.overflow, last.weekly_plan[3] - 5, "everything beyond a normal week in the last week did not fit");
+});

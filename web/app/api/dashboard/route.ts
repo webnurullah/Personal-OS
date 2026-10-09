@@ -1,6 +1,6 @@
 import { handle } from "@/lib/server/api";
 import { addDays, dateIn, monthRange, startOfDayUtc, todayIn } from "@/lib/server/dates";
-import { withProgress } from "@/lib/server/goals";
+import { linkGoals, withProgress } from "@/lib/server/goals";
 import { habitBoard } from "@/lib/server/habits";
 import { dbError, must } from "@/lib/server/http";
 import { fetchAll } from "@/lib/server/paging";
@@ -43,7 +43,7 @@ export const GET = handle(async ({ db, profile: getProfile }) => {
   const board = habitBoard(habitData.habits, habitData.logs, today, 5, 1);
 
   // ----- Goals -----
-  const goals = goalRows.map(withProgress);
+  const goals = (await linkGoals(db, goalRows)).map(withProgress);
 
   // ----- Budget: spent this month per category (savings included) -----
   const spentBy: Record<string, number> = {};
