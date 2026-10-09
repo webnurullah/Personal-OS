@@ -136,3 +136,20 @@ test("numbering continues after the units a course already has", () => {
   // Codes fit the database limit (10 letters).
   assert.ok(numberOutline(parseOutline(Array.from({ length: 30 }, (_, i) => `U${i}\n- t`).join("\n")), { codes: ["900"], positions: [] }).every((u) => u.topics.every((t) => t.code.length <= 10)));
 });
+
+test("a hostile paste of 30,000 letters is read in a moment (no regex that takes quadratic time)", () => {
+  const cases = [
+    "- a" + " ".repeat(29_000) + "x",
+    "- x" + ". ".repeat(14_000) + "y",
+    "- x" + " |".repeat(14_000) + "y",
+    "x" + " - ".repeat(9_000) + "y\n- t",
+    "- " + "1 ".repeat(14_000) + "x",
+    "- " + "1".repeat(29_000) + "h",
+    "x " + "1.5 ".repeat(7_000) + "h",
+  ];
+  for (const text of cases) {
+    const started = performance.now();
+    parseOutline(text);
+    assert.ok(performance.now() - started < 250, `${text.slice(0, 12)}… took ${Math.round(performance.now() - started)} ms`);
+  }
+});

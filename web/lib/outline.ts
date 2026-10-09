@@ -17,8 +17,16 @@ const MAX_HOURS = 500;
 
 const round4th = (n: number) => Math.round(n * 4) / 4;
 const clampHours = (n: number) => Math.min(MAX_HOURS, Math.max(MIN_HOURS, round4th(n)));
-/** Collapses spaces and trims separators ("- ", "| ", ":") from both ends. */
-const tidy = (s: string) => s.replace(/\s+/g, " ").replace(/^[\s|:\-–—,.]+|[\s|:\-–—,.]+$/g, "");
+const SEPARATORS = " |:-–—,.";
+/** Collapses spaces and trims separators ("- ", "| ", ":") from both ends. A loop, not a regex: a long run of separators in a pasted text must not take quadratic time. */
+function tidy(s: string) {
+  const text = s.replace(/\s+/g, " ");
+  let from = 0;
+  let to = text.length;
+  while (from < to && SEPARATORS.includes(text[from])) from += 1;
+  while (to > from && SEPARATORS.includes(text[to - 1])) to -= 1;
+  return text.slice(from, to);
+}
 
 // "2h", "1.5 hours", "90 min", "(2h)", "| 2h", "- 2h" at the very end of a line (with the separator in front of it).
 const TRAILING_DURATION = /(?:^|[\s|(:\-–—,])(\d+(?:[.,]\d+)?)\s*(hours?|hrs?|h|minutes?|mins?|m)\s*\)?\.?\s*$/i;
@@ -59,7 +67,7 @@ const MARKDOWN_HEADING = /^#{1,6}\s*(.*)$/;
 type Line = { kind: "unit" | "topic"; text: string };
 
 function classify(raw: string): Line | null {
-  const line = raw.replace(/\t/g, "    ").replace(/\s+$/, "");
+  const line = raw.replace(/\t/g, "    ").trimEnd();
   if (!line.trim() || /^[\s\-_=*#]{3,}$/.test(line)) return null;
   const indent = line.length - line.trimStart().length;
   const trimmed = line.trim();
