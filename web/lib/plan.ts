@@ -1,6 +1,6 @@
 // Learning → planning the weeks: which week each unfinished topic goes in, from the hours it still needs and the hours
 // you can study a week (rules, no AI). Plain functions: the server applies the answer, the tests check it.
-import { courseWeeks, currentWeek } from "./course.ts";
+import { courseWeeks, currentWeek, MAX_COURSE_WEEKS } from "./course.ts";
 import { addDays, daysBetween, mondayOf } from "./dates.ts";
 import type { Outline } from "./outline.ts";
 import { byOrder, hoursLeft, type StudyTopic } from "./study.ts";
@@ -42,12 +42,19 @@ export function planningWeek(course: Pick<PlanCourse, "start_date" | "target_dat
  * What does not fit before the target date goes into the last week and is counted in `overflow`.
  */
 export function autoPlan(course: PlanCourse, topics: PlanTopic[], weeklyHours: number, today: string): Plan {
-  const weeks = courseWeeks(course);
-  const first = planningWeek(course, today);
+  const weeks = Math.min(MAX_COURSE_WEEKS, courseWeeks(course));
+  const first = Math.min(weeks, planningWeek(course, today));
   const cap = Math.min(MAX_WEEK_HOURS, Math.max(0.5, weeklyHours));
   const todo = topics.filter((t) => t.status !== "done" && hoursLeft(t) > 0).sort(byOrder as (a: PlanTopic, b: PlanTopic) => number);
+  const moving = new Set(todo.map((t) => t.id));
+
+  // Topics that stay where they are (finished, or all their hours logged) still belong to their weeks: they are part of the
+  // week's planned hours, and what was already done this week leaves less of this week to fill.
+  const fixed = new Array<number>(weeks).fill(0);
+  for (const t of topics) if (!moving.has(t.id) && t.planned_week != null && t.planned_week >= first && t.planned_week <= weeks) fixed[t.planned_week - 1] += Number(t.est_hours);
 
   const load = new Array<number>(weeks).fill(0);
+  load[first - 1] = fixed[first - 1];
   const assignments: Assignment[] = [];
   let week = first;
   for (const topic of todo) {
@@ -60,7 +67,9 @@ export function autoPlan(course: PlanCourse, topics: PlanTopic[], weeklyHours: n
   // What the last week holds beyond what a week can take did not fit before the target date.
   const overflow = Math.max(0, load[weeks - 1] - cap);
 
-  const weekly_plan = Array.from({ length: weeks }, (_, i) => (i + 1 < first ? Math.min(MAX_WEEK_HOURS, Number(course.weekly_plan[i] ?? 0)) : Math.min(MAX_WEEK_HOURS, round2(load[i]))));
+  const weekly_plan = Array.from({ length: weeks }, (_, i) =>
+    i + 1 < first ? Math.min(MAX_WEEK_HOURS, Number(course.weekly_plan[i] ?? 0)) : Math.min(MAX_WEEK_HOURS, round2(load[i] + (i + 1 === first ? 0 : fixed[i]))),
+  );
   return { assignments, weekly_plan, firstWeek: first, lastWeek: assignments.length ? Math.max(...assignments.map((a) => a.week)) : first, overflow: round2(overflow) };
 }
 
@@ -69,8 +78,8 @@ export function autoPlan(course: PlanCourse, topics: PlanTopic[], weeklyHours: n
  * grows by their hours. Nothing else changes.
  */
 export function carryOver(course: PlanCourse, topics: PlanTopic[], today: string): Plan {
-  const weeks = courseWeeks(course);
-  const week = planningWeek(course, today);
+  const weeks = Math.min(MAX_COURSE_WEEKS, courseWeeks(course));
+  const week = Math.min(weeks, planningWeek(course, today));
   const late = topics.filter((t) => t.status !== "done" && t.planned_week != null && t.planned_week < week && hoursLeft(t) > 0);
   const extra = late.reduce((sum, t) => sum + hoursLeft(t), 0);
   const weekly_plan = Array.from({ length: weeks }, (_, i) => Math.min(MAX_WEEK_HOURS, Number(course.weekly_plan[i] ?? 0) + (i + 1 === week ? round2(extra) : 0)));

@@ -153,3 +153,40 @@ test("a hostile paste of 30,000 letters is read in a moment (no regex that takes
     assert.ok(performance.now() - started < 250, `${text.slice(0, 12)}… took ${Math.round(performance.now() - started)} ms`);
   }
 });
+
+test("a long flat list is still one unit of topics; a skeleton of units stays units", () => {
+  const lessons = Array.from({ length: 45 }, (_, i) => `Lesson ${i + 1} 1h`).join("\n");
+  const flat = parseOutline(lessons);
+  assert.deepEqual([flat.units.length, flat.units[0].title, flat.topicCount], [1, "Topics", 45]);
+  assert.deepEqual(flat.warnings, []);
+  assert.deepEqual(shape("Unit 1: Basics\nUnit 2: Advanced\nUnit 3: Project"), [["Basics", []], ["Advanced", []], ["Project", []]]);
+  assert.deepEqual(shape("## Basics\n## Advanced"), [["Basics", []], ["Advanced", []]]);
+  assert.deepEqual(shape("Tools:\nBasics:"), [["Tools", []], ["Basics", []]]);
+  assert.deepEqual(shape("1. Basics\n2. Advanced"), [["Basics", []], ["Advanced", []]]);
+});
+
+test("numbered topics under 'Unit 1:' style headings are topics", () => {
+  assert.deepEqual(shape("Unit 1: A\n1. x\n2. y\nUnit 2: B\n1. z"), [["A", [["x", 2], ["y", 2]]], ["B", [["z", 2]]]]);
+  assert.deepEqual(shape("Module 1 - A\n1) x 1h\nModule 2 - B\n1) z"), [["A", [["x", 1]]], ["B", [["z", 2]]]]);
+});
+
+test("titles keep their dots and hyphens; only real heading words are taken off", () => {
+  assert.deepEqual(shape("U\n- .NET Core | 3h\n- .htaccess rules\n- Intro."), [["U", [[".NET Core", 3], [".htaccess rules", 2], ["Intro", 2]]]]);
+  const titles = (text: string) => parseOutline(text).units.map((u) => u.title);
+  assert.deepEqual(titles("Unit-testing frameworks:\n- a\nPart-time work:\n- b\nModule 1.1 Introduction:\n- c\nPart I will teach:\n- d"), ["Unit-testing frameworks", "Part-time work", "Module 1.1 Introduction", "Part I will teach"]);
+  assert.deepEqual(titles("Unit - Basics\n- a\nPart III: Ads\n- b\nChapter 4. Wrap-up\n- c\nSection: Last\n- d"), ["Basics", "Ads", "Wrap-up", "Last"]);
+});
+
+test("more ways to write the hours; numbers that belong to the title are left alone", () => {
+  const read = (line: string) => takeHours(line);
+  assert.deepEqual(read("Kotlin 1h30m"), { text: "Kotlin", hours: 1.5 });
+  assert.deepEqual(read("Kotlin 1h 30 min"), { text: "Kotlin", hours: 1.5 });
+  assert.deepEqual(read("Rust ~2h"), { text: "Rust", hours: 2 });
+  assert.deepEqual(read("Go (2-3h)"), { text: "Go", hours: 3 });
+  assert.deepEqual(read("Go 2–3 hours"), { text: "Go", hours: 3 });
+  assert.deepEqual(read("Docker | 1 hour"), { text: "Docker", hours: 1 });
+  assert.deepEqual(read("Docker in 1 hour"), { text: "Docker in 1 hour", hours: null });
+  assert.deepEqual(read("Python Full Course in 4 Hours"), { text: "Python Full Course in 4 Hours", hours: null });
+  assert.deepEqual(read("Python Full Course - 4 Hours"), { text: "Python Full Course", hours: 4 });
+  assert.deepEqual(read("Excel for 30 minutes"), { text: "Excel for 30 minutes", hours: null });
+});

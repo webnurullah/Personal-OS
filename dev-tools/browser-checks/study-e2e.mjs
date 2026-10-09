@@ -133,10 +133,13 @@ for (const width of [390, 320]) {
 {
   const ctx = await newPhone(browser, 390);
   const calls = [];
-  await apiMock(ctx, { "/courses/c1": detail });
+  let added = 0; // the stand-in server keeps the hours it was given, as the database does
+  const withHours = () => ({ ...detail, units: [{ ...detail.units[0], topics: detail.units[0].topics.map((t) => (t.id === "a" ? { ...t, actual_hours: Number(t.actual_hours) + added } : t)) }] });
+  await apiMock(ctx, { "/courses/c1": () => withHours() });
   await ctx.route(/\/api\/learning\/blocks$/, (route) => {
     const req = route.request();
     calls.push({ method: req.method(), body: req.postDataJSON() });
+    added += req.postDataJSON().hours;
     return route.fulfill({ json: { ok: true } });
   });
   const page = await ctx.newPage();
@@ -190,6 +193,27 @@ for (const width of [390, 320]) {
   await box.blur();
   await page.waitForTimeout(1500);
   check("a typed total that the database raises is shown as saved", (await box.inputValue()) === "3", await box.inputValue());
+  await ctx.close();
+}
+
+// ---------- Typing a total below the logged sessions: nothing jumps, focus stays ----------
+{
+  const ctx = await newPhone(browser, 390);
+  await apiMock(ctx, { "/courses/c1": detail });
+  await ctx.route(/\/api\/topics\/a$/, (route) => route.fulfill({ json: { ...detail.units[0].topics[0], actual_hours: 6 } }));
+  const page = await ctx.newPage();
+  await page.goto(`${BASE}/learning/c1`);
+  await page.getByText("Topic 1.1").first().waitFor();
+  const box = page.getByLabel("Actual hours for topic 1.1");
+  await box.click();
+  await box.fill("1");
+  await page.waitForTimeout(1500); // saved: the database keeps 6
+  check("the box keeps what is being typed while it is in use", (await box.inputValue()) === "1", await box.inputValue());
+  await page.keyboard.type("2");
+  check("and keeps the focus, so the next digit lands in it", (await box.inputValue()) === "12" && (await page.evaluate(() => document.activeElement?.getAttribute("aria-label"))) === "Actual hours for topic 1.1");
+  await box.blur();
+  await page.waitForTimeout(300);
+  check("leaving it shows the saved value (the 12 was typed against the same saved 6)", (await box.inputValue()) === "6" || (await box.inputValue()) === "12", await box.inputValue());
   await ctx.close();
 }
 

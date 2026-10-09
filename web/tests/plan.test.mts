@@ -142,3 +142,27 @@ test("a course for a missing skill starts this Monday and ends on the nearest la
   assert.deepEqual(skillCourseDates("2026-10-08", undefined, 4), { start: "2026-10-05", target: "2026-11-01" });
   assert.deepEqual(skillCourseDates("2026-10-05", undefined, 1), { start: "2026-10-05", target: "2026-10-11" });
 });
+
+test("topics that stay in their weeks (finished) count in the plan, and what is done this week leaves less of it to fill", () => {
+  const short: PlanCourse = { start_date: "2026-01-05", target_date: "2026-02-01", weekly_plan: [3, 0, 3, 0] }; // 4 weeks
+  const topics = [
+    topic({ id: "d1", status: "done", est_hours: 3, planned_week: 1 }),
+    topic({ id: "d3", status: "done", est_hours: 3, planned_week: 3 }),
+    topic({ id: "a", position: 1 }), topic({ id: "b", position: 2 }), topic({ id: "c", position: 3 }),
+  ];
+  const plan = autoPlan(short, topics, 5, "2026-01-05");
+  assert.deepEqual(plan.assignments, [{ id: "a", week: 1 }, { id: "b", week: 2 }, { id: "c", week: 2 }], "3h are done in week 1 already: only one more topic fits");
+  assert.deepEqual(plan.weekly_plan, [5, 4, 3, 0], "week 3 keeps its finished topic's 3h");
+});
+
+test("a course that ends exactly 156 weeks after it starts is planned in 156 weeks", () => {
+  const start = "2026-10-05";
+  const last: PlanCourse = { start_date: start, target_date: addDays(start, 156 * 7 - 1), weekly_plan: [] };
+  const plan = autoPlan(last, [topic({ id: "a" })], 5, start);
+  assert.equal(plan.weekly_plan.length, 156);
+  // An older course saved with one day more (157 weeks) is still planned within 156.
+  const odd = autoPlan({ ...last, target_date: addDays(start, 156 * 7) }, [topic({ id: "a" })], 5, start);
+  assert.equal(odd.weekly_plan.length, 156);
+  assert.ok(odd.assignments.every((a) => a.week <= 156));
+  assert.ok(carryOver({ ...last, target_date: addDays(start, 156 * 7) }, [topic({ id: "a", planned_week: 1 })], addDays(start, 156 * 7)).weekly_plan.length === 156);
+});

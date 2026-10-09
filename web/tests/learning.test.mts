@@ -104,8 +104,10 @@ test("course dates: the target comes after the start, the start snaps to a Monda
   assert.throws(() => checkDates({ start_date: "2026-09-14", target_date: "2026-09-14" }), bad(400));
   assert.throws(() => checkDates({ start_date: "2026-09-14", target_date: "2026-09-01" }), bad(400));
   assert.throws(() => checkDates({ start_date: "2026-09-14", target_date: "2206-12-31" }), bad(400)); // a year typo
-  const lastDay = new Date(Date.UTC(2026, 8, 14) + MAX_COURSE_WEEKS * 7 * 86400000).toISOString().slice(0, 10);
+  // The last day a course may end on is the last day of its 156th week: that is exactly 156 weeks, never 157.
+  const lastDay = new Date(Date.UTC(2026, 8, 14) + (MAX_COURSE_WEEKS * 7 - 1) * 86400000).toISOString().slice(0, 10);
   assert.doesNotThrow(() => checkDates({ start_date: "2026-09-14", target_date: lastDay }));
+  assert.equal(courseWeeks({ start_date: "2026-09-14", target_date: lastDay, weekly_plan: [] }), MAX_COURSE_WEEKS);
   assert.throws(() => checkDates({ start_date: "2026-09-14", target_date: new Date(Date.parse(lastDay) + 86400000).toISOString().slice(0, 10) }), bad(400));
 });
 

@@ -187,7 +187,7 @@ export type Database = {
           created_at: string;
           updated_at: string;
           completed_at: string | null;
-          manual_hours: number;
+          manual_hours: number | null;
         };
         Insert: {
           id?: string;

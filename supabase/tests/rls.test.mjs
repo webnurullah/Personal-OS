@@ -503,10 +503,68 @@ check('deleting the practice project keeps the item', (await one('select practic
   const before = await topic(t2);
   await qb(`insert into study_blocks (week_start, weekday, hours, activity, done, topic_id) values ('2026-10-05', 1, 5, 'Sneaky', true, $1)`, [t2]);
   check("a session of another user cannot change my topic's hours", JSON.stringify(await topic(t2)) === JSON.stringify(before));
-  const theirs = await one(`insert into study_blocks (week_start, weekday, hours, activity, done, topic_ref) values ('2026-10-05', 1, 7, 'Theirs', true, $1) returning id`, [t1]);
-  void theirs;
-  const mineAgain = (await qb(`select count(*)::int n from study_blocks where topic_id is not null`))[0].n;
-  check("another user's sessions are not attached to my topics", mineAgain === 1);
+  const wanted = '99999999-9999-4999-8999-999999999999';
+  const bSession = (await qb(`insert into study_blocks (week_start, weekday, hours, activity, done, topic_ref) values ('2026-10-05', 1, 7, 'B session', true, $1) returning id`, [wanted]))[0].id;
+  await qa(`insert into course_topics (id, course_id, unit_id, code, title, est_hours) values ($1, $2, $3, '9.9', 'Takes sessions back', 4)`, [wanted, sc, su]);
+  check("a topic of mine that is added does not take another user's sessions", (await qb('select topic_id from study_blocks where id = $1', [bSession]))[0].topic_id === null && (await hours(wanted)) === 0);
+
+  // Old Archive copies (made before manual_hours and topic_ref existed) can still be brought back, and their hours are hand-typed.
+  const stripNew = (id) => db.exec(`update archive_items set data = jsonb_set(data, '{row}', (data -> 'row') - 'manual_hours' - 'completed_at' - 'revision_step') where id = '${id}'`);
+  const stripChildren = (id) => db.exec(`update archive_items set data = jsonb_set(data, '{children,course_topics}', (select coalesce(jsonb_agg(c - 'manual_hours' - 'completed_at' - 'revision_step'), '[]'::jsonb) from jsonb_array_elements(data -> 'children' -> 'course_topics') c)) where id = '${id}'`);
+  const oc = (await one(`insert into courses (title, start_date, target_date) values ('Old copies', '2026-10-05', '2026-12-28') returning id`)).id;
+  const ou = (await one(`insert into course_units (course_id, code, title) values ($1, '1', 'U') returning id`, [oc])).id;
+  const ot = (await one(`insert into course_topics (course_id, unit_id, code, title, est_hours, actual_hours) values ($1, $2, '1.1', 'Old', 4, 2.5) returning id`, [oc, ou])).id;
+  const aOldTopic = await arch('topic', ot);
+  await stripNew(aOldTopic);
+  await restore(aOldTopic);
+  check('an old Archive copy of a topic is brought back, its hours hand-typed', JSON.stringify(await topic(ot)) === JSON.stringify({ h: 2.5, m: 2.5, status: 'not-started', stamped: false }), JSON.stringify(await topic(ot)));
+  const aOldUnit = await arch('unit', ou);
+  await stripChildren(aOldUnit);
+  await restore(aOldUnit);
+  check('an old Archive copy of a unit brings its topics back', (await topic(ot)).h === 2.5 && (await topic(ot)).m === 2.5);
+  const aOldCourse = await arch('course', oc);
+  await stripChildren(aOldCourse);
+  await restore(aOldCourse);
+  check('an old Archive copy of a course brings its topics back', (await topic(ot)).h === 2.5 && (await topic(ot)).m === 2.5);
+
+  // Hours are right after a topic comes back, whatever happened to its sessions meanwhile.
+  const mk = async (code, manual) => (await one(`insert into course_topics (course_id, unit_id, code, title, est_hours, actual_hours) values ($1, $2, $3, 'Restore probe', 9, $4) returning id`, [sc, su, code, manual])).id;
+  const sess = (topicId, h = 2) => one(`insert into study_blocks (week_start, weekday, hours, activity, done, topic_id) values ('2026-10-05', 4, $1, 'Probe', true, $2) returning id`, [h, topicId]);
+  // (a) the session was un-ticked while the topic was archived
+  const pa = await mk('8.1', 0); const sa = await sess(pa);
+  const apa = await arch('topic', pa);
+  await qa('update study_blocks set done = false where id = $1', [sa.id]);
+  await restore(apa);
+  check('a topic brought back counts the session as it is now (un-ticked: nothing)', JSON.stringify([(await topic(pa)).h, (await topic(pa)).m]) === JSON.stringify([0, 0]), JSON.stringify(await topic(pa)));
+  await qa('update study_blocks set done = true where id = $1', [sa.id]);
+  check('and ticking it again gives its hours once', (await hours(pa)) === 2);
+  // (b) the session was deleted while the topic was archived
+  const pb = await mk('8.2', 1); const sb = await sess(pb);
+  const apb = await arch('topic', pb);
+  await qa('delete from study_blocks where id = $1', [sb.id]);
+  await restore(apb);
+  check('a topic brought back after its session was deleted keeps only the hand-typed hours', JSON.stringify([(await topic(pb)).h, (await topic(pb)).m]) === JSON.stringify([1, 1]), JSON.stringify(await topic(pb)));
+  // (c) the session was moved to another topic while the topic was archived
+  const pc = await mk('8.3', 1); const pd = await mk('8.4', 0); const sc3 = await sess(pc);
+  const apc = await arch('topic', pc);
+  await qa('update study_blocks set topic_id = $1 where id = $2', [pd, sc3.id]);
+  await restore(apc);
+  check('a session moved to another topic is not counted twice', (await hours(pd)) === 2 && (await hours(pc)) === 1, JSON.stringify([await topic(pc), await topic(pd)]));
+  // (d) topic and session both archived, the topic comes back first, then the session
+  const pe = await mk('8.5', 1); const se = await sess(pe);
+  const ape = await arch('topic', pe);
+  const ase = await arch('study_block', se.id);
+  await restore(ape);
+  check('with the session still archived the topic has only its hand-typed hours', (await hours(pe)) === 1);
+  await restore(ase);
+  check('then the session comes back to the topic that exists, and counts', (await one('select topic_id from study_blocks where id = $1', [se.id])).topic_id === pe && (await hours(pe)) === 3, JSON.stringify(await topic(pe)));
+  // (e) the session comes back first, then the topic
+  const pf = await mk('8.6', 1); const sf = await sess(pf);
+  const asf0 = await arch('study_block', sf.id);
+  const apf = await arch('topic', pf);
+  await restore(asf0);
+  await restore(apf);
+  check('a session that came back first finds its topic when it comes back', (await one('select topic_id from study_blocks where id = $1', [sf.id])).topic_id === pf && (await hours(pf)) === 3, JSON.stringify(await topic(pf)));
 }
 
 // Faster setup: an outline in one go, and the weeks of many topics in one go (20261011000000_course_planning.sql)
@@ -546,6 +604,10 @@ check('deleting the practice project keeps the item', (await one('select practic
   await expectError('more than 80 hours in a week is refused', () => qa('select plan_course($1, $2::jsonb, $3::numeric[])', [pc, '[]', '{81}']), 'out of range');
   await expectError("another person's course is not found", () => qb('select plan_course($1, $2::jsonb, $3::numeric[])', [pc, weeks, '{1}']), 'Not found');
   check('a refused plan changed nothing', (await qa('select string_agg(planned_week::text, \',\' order by code) w from course_topics where course_id = $1', [pc]))[0].w === '3,3,5');
+  await expectError('an entry without a week is refused', () => qa('select plan_course($1, $2::jsonb, $3::numeric[])', [pc, JSON.stringify([{ id: ids[0] }]), '{1}']), 'between 1 and 156');
+  await expectError('an empty hole in the weekly plan is refused', () => qa('select plan_course($1, $2::jsonb, $3::numeric[])', [pc, '[]', '{1,NULL,3}']), 'out of range');
+  await expectError('a weekly plan with no value at all is refused', () => qa('select plan_course($1, $2::jsonb, $3::numeric[])', [pc, '[]', null]), 'out of range');
+  await expectError('a table of hours instead of a list is refused', () => qa('select plan_course($1, $2::jsonb, $3::numeric[])', [pc, '[]', '{{1,2},{3,4}}']), 'out of range');
   await expectError('a signed-out visitor cannot call it', () => qanon('select plan_course($1, $2::jsonb, $3::numeric[])', [pc, weeks, '{1}']), 'permission denied');
 }
 }

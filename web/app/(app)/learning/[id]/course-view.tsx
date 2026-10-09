@@ -1,7 +1,7 @@
 "use client";
 
 import { toArchive } from "@/lib/archive";
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
@@ -39,29 +39,29 @@ type TopicModal = { unitId: string; topic?: Topic };
 const clampHours = (value: number, max: number) => Math.min(max, Math.max(0, value));
 
 /**
- * A number box for hours that saves as you type. When you leave it, it shows the value that was really saved
- * (the limits applied), so what is on screen is never different from what is stored.
+ * A number box for hours that saves as you type. While you are typing it shows what you typed; when you leave it, it shows
+ * the value that is saved (the limits applied, or the number the database kept instead, for example a total that cannot
+ * be lower than the study sessions), so what is on screen is never different from what is stored.
  */
 function HoursBox({ value, max, label, className, onValue }: { value: number; max: number; label: string; className: string; onValue: (hours: number) => void }) {
-  const read = (input: HTMLInputElement) => (input.value === "" ? 0 : input.valueAsNumber);
+  const [draft, setDraft] = useState<string | null>(null);
   return (
     <input
       type="number"
       min={0}
       max={max}
       step={0.25}
-      defaultValue={value || ""}
+      value={draft ?? (value ? String(value) : "")}
       placeholder="–"
       className={className}
       aria-label={label}
+      onFocus={() => setDraft(value ? String(value) : "")}
       onChange={(e) => {
-        const hours = read(e.target);
+        setDraft(e.target.value);
+        const hours = e.target.value === "" ? 0 : e.target.valueAsNumber;
         if (!Number.isNaN(hours)) onValue(clampHours(hours, max));
       }}
-      onBlur={(e) => {
-        const hours = read(e.target);
-        if (!Number.isNaN(hours)) e.target.value = String(clampHours(hours, max) || "");
-      }}
+      onBlur={() => setDraft(null)}
     />
   );
 }
@@ -72,7 +72,9 @@ export function CourseView({ id }: { id: string }) {
   const { toast, confirm } = useFeedback();
   const saveLater = useSaveLater();
   const wide = useMedia("(min-width: 40rem)"); // one layout of the topics at a time: cards on a phone, the table from tablet up
-  const [syncKey, setSyncKey] = useState(0); // changes after a failed save so the number boxes show the real values again
+  const [syncKey, setSyncKey] = useState(0); // changes after a failed save so the number boxes start again from the real values
+  // What a topic's fields were before a series of unsaved changes (typing a number sends many): a failed save goes back to these.
+  const baseline = useRef(new Map<string, Record<string, unknown>>());
   const [editingCourse, setEditingCourse] = useState(false);
   const [unitModal, setUnitModal] = useState<Unit | "new" | null>(null);
   const [topicModal, setTopicModal] = useState<TopicModal | null>(null);
@@ -109,19 +111,22 @@ export function CourseView({ id }: { id: string }) {
     setSyncKey((k) => k + 1);
   };
 
-  /** Puts a topic's values back to what they were before a change that could not be saved. */
-  const revertTopic = (topic: Topic, keys: string[]) =>
-    mutate(
-      (current) =>
-        current && {
-          ...current,
-          units: current.units.map((u) => (u.id !== topic.unit_id ? u : { ...u, topics: u.topics.map((t) => (t.id === topic.id ? { ...t, ...Object.fromEntries(keys.map((k) => [k, topic[k as keyof Topic]])) } : t)) })),
-        },
+  /** Puts a topic's values back to what they were before the changes that could not be saved. */
+  const revertTopic = (topic: Topic, keys: string[]) => {
+    const was = baseline.current.get(topic.id) ?? {};
+    const back = Object.fromEntries(keys.map((k) => [k, k in was ? was[k] : topic[k as keyof Topic]]));
+    for (const k of keys) delete was[k];
+    return mutate(
+      (current) => current && { ...current, units: current.units.map((u) => (u.id !== topic.unit_id ? u : { ...u, topics: u.topics.map((t) => (t.id === topic.id ? { ...t, ...back } : t)) })) },
       { revalidate: false },
     );
+  };
 
   /** Shows the change at once, then saves it (straight away, or once typing stops). */
   const changeTopic = (topic: Topic, changes: Partial<Pick<Topic, "status" | "actual_hours">>, later = false) => {
+    const was = baseline.current.get(topic.id) ?? {};
+    for (const k of Object.keys(changes)) if (!(k in was)) was[k] = topic[k as keyof Topic]; // the saved value, before the first of these changes
+    baseline.current.set(topic.id, was);
     mutate(
       (current) =>
         current && {
@@ -133,10 +138,11 @@ export function CourseView({ id }: { id: string }) {
     const save = () => {
       api<Topic>(`/topics/${topic.id}`, { method: "PATCH", body: changes }).then(
         (saved) => {
-          // The database sets the Spent total: it cannot be lower than the study sessions on the topic. Show what it kept.
+          for (const k of Object.keys(changes)) delete baseline.current.get(topic.id)?.[k];
+          // The database sets the Spent total: it cannot be lower than the study sessions on the topic. Show what it kept
+          // (the box follows the data: the one being typed in keeps what is typed until it is left).
           if ("actual_hours" in changes && Math.abs(Number(saved.actual_hours) - Number(changes.actual_hours)) > 0.001) {
             mutate((current) => current && { ...current, units: current.units.map((u) => (u.id !== topic.unit_id ? u : { ...u, topics: u.topics.map((t) => (t.id === topic.id ? { ...t, actual_hours: saved.actual_hours } : t)) })) }, { revalidate: false });
-            setSyncKey((k) => k + 1);
           }
           return refresh("/learning");
         },
@@ -172,7 +178,6 @@ export function CourseView({ id }: { id: string }) {
         },
       { revalidate: false },
     );
-    setSyncKey((k) => k + 1); // the "Spent" boxes show the new total
     try {
       await api("/learning/blocks", { method: "POST", body: { week_start: mondayOf(today), weekday: weekdayIndex(today), hours, activity: sessionLabel(topic), topic_id: topic.id, done: true } });
       toast(`${hm(hours)} added to ${topic.code}`);

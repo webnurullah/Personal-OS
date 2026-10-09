@@ -63,8 +63,9 @@ for (const width of [390, 320]) {
 // ---------- Plan the weeks ----------
 {
   const ctx = await newPhone(browser, 390);
-  await apiMock(ctx, { "/courses/c1": full({ late: true }) });
-  const calls = await recordPosts(ctx, /\/api\/courses\/c1\/plan$/, { changed: 3, firstWeek: 4, lastWeek: 6, overflow: 2, weeks: 12 });
+  let planned = false;
+  await apiMock(ctx, { "/courses/c1": () => { const d = full({ late: true }); return planned ? { ...d, course: { ...d.course, weekly_plan: [0, 0, 0, 7, 3] } } : d; } });
+  const calls = await recordPosts(ctx, /\/api\/courses\/c1\/plan$/, () => { planned = true; return { changed: 3, firstWeek: 4, lastWeek: 6, overflow: 2, weeks: 12 }; });
   const page = await ctx.newPage();
   await page.goto(`${BASE}/learning/c1`);
   await page.getByRole("button", { name: "Plan weeks" }).click();
@@ -77,6 +78,7 @@ for (const width of [390, 320]) {
   await page.waitForTimeout(700);
   check("planning sends the mode and the weekly hours", calls[0]?.body?.mode === "plan" && calls[0].body.weekly_hours === 4, JSON.stringify(calls[0]?.body));
   check("it says what was planned and warns about hours that do not fit", (await page.getByText("Planned 3 topics for weeks 4–6.").count()) === 1 && (await page.getByText(/2h do not fit before the target date/).count()) === 1);
+  check("the Planned Hours boxes show the new plan", (await page.getByLabel("Planned hours for week 4", { exact: true }).inputValue()) === "7" && (await page.getByLabel("Planned hours for week 1", { exact: true }).inputValue()) === "", `${await page.getByLabel("Planned hours for week 4", { exact: true }).inputValue()} / ${await page.getByLabel("Planned hours for week 1", { exact: true }).inputValue()}`);
   await page.getByRole("button", { name: "Plan weeks" }).click();
   await page.getByRole("dialog").getByRole("button", { name: /Carry over/ }).click();
   await page.waitForTimeout(700);
@@ -111,6 +113,15 @@ for (const width of [390, 320]) {
   check("and the outline is in the box", (await dialog.locator("#course-outline").inputValue()).includes("VLOOKUP"));
   const m = await measure(page, 390);
   check("the New course dialog does not overflow", !m.zoomedOut && m.mainClipped === 0 && m.offenders.length === 0, JSON.stringify(m));
+  // Another template replaces what the first one filled in; words you typed yourself stay.
+  await dialog.locator("#course-template").selectOption("web-wordpress");
+  check("another template changes the name and the subtitle too", (await dialog.locator("#course-title").inputValue()) === "Web basics and WordPress" && (await dialog.locator("#course-subtitle").inputValue()) === "Build and publish a real website");
+  await dialog.locator("#course-template").selectOption("");
+  check("a blank course clears what the template filled in", (await dialog.locator("#course-title").inputValue()) === "" && (await dialog.locator("#course-outline").inputValue()) === "");
+  await dialog.locator("#course-title").fill("My own name");
+  await dialog.locator("#course-template").selectOption("excel");
+  check("a name you typed yourself is kept", (await dialog.locator("#course-title").inputValue()) === "My own name" && (await dialog.locator("#course-subtitle").inputValue()) === "Spreadsheets you can use at a job");
+  await dialog.locator("#course-title").fill("Excel for work");
   await target.fill("2027-03-01");
   await dialog.locator("#course-start").fill("2026-10-05");
   check("a date you chose yourself is kept", (await target.inputValue()) === "2027-03-01");
@@ -126,7 +137,7 @@ for (const width of [390, 320]) {
 // ---------- Job Apply: a course for a missing skill ----------
 {
   const ctx = await newPhone(browser, 390);
-  const job = { id: "j1", url: "https://example.com/j1", title: "Data analyst", company: "Acme", location: "Dhaka", deadline: "2026-10-30", status: "saved", applied_on: null, summary: "", requirements: [], skills: ["SQL"], notes: "", created_at: "2026-10-01T00:00:00Z" };
+  const job = { id: "j1", url: "https://example.com/j1", title: "Data analyst " + "x".repeat(260).slice(0, 190), company: "Acme", location: "Dhaka", deadline: "2026-10-30", status: "saved", applied_on: null, summary: "", requirements: [], skills: ["SQL"], notes: "", created_at: "2026-10-01T00:00:00Z" };
   await apiMock(ctx, { "/jobs": { items: [job], today: TODAY } });
   const calls = await recordPosts(ctx, /\/api\/courses\/from-skill$/, { id: "c9", existing: false, plan: { overflow: 0 } });
   const page = await ctx.newPage();
@@ -136,7 +147,7 @@ for (const width of [390, 320]) {
   check("Job Apply does not overflow with the extra button", !m.zoomedOut && m.mainClipped === 0, JSON.stringify(m));
   await page.getByRole("button", { name: "Course", exact: true }).click();
   await page.waitForTimeout(700);
-  check("Course sends the skill, the jobs and the nearest last date", calls[0]?.body?.skill === "SQL" && calls[0].body.by === "2026-10-30" && calls[0].body.jobs?.[0] === "Data analyst", JSON.stringify(calls[0]?.body));
+  check("Course sends the skill, the jobs and the nearest last date", calls[0]?.body?.skill === "SQL" && calls[0].body.by === "2026-10-30" && calls[0].body.jobs?.[0]?.length <= 200 && calls[0].body.jobs[0].startsWith("Data analyst"), JSON.stringify(calls[0]?.body));
   check("then it offers to open the course", (await page.getByRole("link", { name: "Open course" }).getAttribute("href")) === "/learning/c9");
   await ctx.close();
 }

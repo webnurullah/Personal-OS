@@ -17,97 +17,129 @@ const MAX_HOURS = 500;
 
 const round4th = (n: number) => Math.round(n * 4) / 4;
 const clampHours = (n: number) => Math.min(MAX_HOURS, Math.max(MIN_HOURS, round4th(n)));
-const SEPARATORS = " |:-–—,.";
-/** Collapses spaces and trims separators ("- ", "| ", ":") from both ends. A loop, not a regex: a long run of separators in a pasted text must not take quadratic time. */
+const LEADING = " |:-–—,";
+const TRAILING = " |:-–—,.";
+/** Collapses spaces and trims separators ("- ", "| ", ":") from both ends (a title may start with a dot: ".NET"). A loop, not a regex: a long run of separators in a pasted text must not take quadratic time. */
 function tidy(s: string) {
   const text = s.replace(/\s+/g, " ");
   let from = 0;
   let to = text.length;
-  while (from < to && SEPARATORS.includes(text[from])) from += 1;
-  while (to > from && SEPARATORS.includes(text[to - 1])) to -= 1;
+  while (from < to && LEADING.includes(text[from])) from += 1;
+  while (to > from && TRAILING.includes(text[to - 1])) to -= 1;
   return text.slice(from, to);
 }
 
-// "2h", "1.5 hours", "90 min", "(2h)", "| 2h", "- 2h" at the very end of a line (with the separator in front of it).
-const TRAILING_DURATION = /(?:^|[\s|(:\-–—,])(\d+(?:[.,]\d+)?)\s*(hours?|hrs?|h|minutes?|mins?|m)\s*\)?\.?\s*$/i;
+const NUMBER = "(\\d+(?:[.,]\\d+)?)";
+const SEP = "(?:^|[\\s|(:\\-–—,~≈])";
+// "2h", "1.5 hours", "90 min", "(2h)", "| 2h", "- 2h", "~2h" at the very end of a line (with the separator in front of it).
+const TRAILING_DURATION = new RegExp(`${SEP}${NUMBER}\\s*(hours?|hrs?|h|minutes?|mins?|m)\\s*\\)?\\.?\\s*$`, "i");
+// "1h30m", "1h 30 min": hours and minutes written together.
+const COMPOUND_DURATION = new RegExp(`${SEP}${NUMBER}\\s*h(?:ours?|rs?)?\\s*(\\d+)\\s*m(?:in(?:ute)?s?)?\\s*\\)?\\.?\\s*$`, "i");
+// "2-3h", "(2–3 hours)": the longer is taken.
+const RANGE_DURATION = new RegExp(`${SEP}${NUMBER}\\s*[-–]\\s*${NUMBER}\\s*(hours?|hrs?|h|minutes?|mins?|m)\\s*\\)?\\.?\\s*$`, "i");
 // "| 2" (a bare number after a bar).
 const TRAILING_BAR_NUMBER = /\|\s*(\d+(?:[.,]\d+)?)\s*$/;
+// "Docker in 1 hour": after these words the number is part of the title, not the hours of the topic.
+const TITLE_WORDS = /\b(?:in|for|about|of|takes?|within|under|over|around|approx\.?)$/i;
+
+const num = (text: string) => Number(text.replace(",", "."));
 
 /** Takes the hours off the end of a line: "Keyword research 1h 30m" → { text: "Keyword research", hours: 1.5 }. */
 export function takeHours(line: string): { text: string; hours: number | null } {
-  let text = line.trim();
-  let hours: number | null = null;
-  // Up to two parts, but only "…h 30m": minutes first, then the hours in front of them.
-  for (let i = 0; i < 2; i++) {
-    const m = text.match(TRAILING_DURATION);
-    if (!m) break;
-    const minutes = /^m/i.test(m[2]);
-    hours = (hours ?? 0) + (minutes ? Number(m[1].replace(",", ".")) / 60 : Number(m[1].replace(",", ".")));
-    text = text.slice(0, m.index).trimEnd();
-    if (!minutes) break;
+  const text = line.trim();
+  const found = (m: RegExpMatchArray, hours: number) => ({ text: tidy(text.slice(0, m.index)), hours });
+  // The hours belong to the line only after a separator ("| 2h", "(2h)", "- 2h"): after plain spaces the number may be a
+  // part of the title ("Docker in 1 hour").
+  const afterWords = (m: RegExpMatchArray) => /^\s/.test(m[0]) && TITLE_WORDS.test(text.slice(0, m.index).trimEnd());
+
+  const compound = text.match(COMPOUND_DURATION);
+  if (compound && !afterWords(compound)) return found(compound, num(compound[1]) + Number(compound[2]) / 60);
+  const range = text.match(RANGE_DURATION);
+  if (range && !afterWords(range)) {
+    const upper = Math.max(num(range[1]), num(range[2]));
+    return found(range, /^m/i.test(range[3]) ? upper / 60 : upper);
   }
-  if (hours === null) {
-    const bar = text.match(TRAILING_BAR_NUMBER);
-    if (bar) {
-      hours = Number(bar[1].replace(",", "."));
-      text = text.slice(0, bar.index).trimEnd();
+  const single = text.match(TRAILING_DURATION);
+  if (single && !afterWords(single)) {
+    const minutes = /^m/i.test(single[2]);
+    let hours = minutes ? num(single[1]) / 60 : num(single[1]);
+    let rest = text.slice(0, single.index).trimEnd();
+    // "1h 30m": the minutes were taken first, the hours in front of them are added.
+    if (minutes) {
+      const before = rest.match(TRAILING_DURATION);
+      if (before && !/^m/i.test(before[2]) && !afterWords(before)) {
+        hours += num(before[1]);
+        rest = rest.slice(0, before.index).trimEnd();
+      }
     }
+    return { text: tidy(rest), hours };
   }
-  return { text: tidy(text), hours };
+  const bar = text.match(TRAILING_BAR_NUMBER);
+  if (bar) return { text: tidy(text.slice(0, bar.index)), hours: num(bar[1]) };
+  return { text: tidy(text), hours: null };
 }
 
 // A bullet, or a number with two levels ("1.2", "2.3.1"), or a letter ("a)"), or a single number ("3.") in front of the text.
 const BULLET = /^(\s*)(?:[-*•·▪◦–]|\d+(?:\.\d+)+[.)]?|[a-z][.)]|\d+[.)])\s+(.*)$/i;
 const SINGLE_NUMBER = /^(\s*)\d+[.)]\s+(.*)$/;
 const TWO_LEVEL = /^\s*\d+(?:\.\d+)+[.)]?\s+/;
-// "Unit 2: Ads", "Module III - Ads", "Chapter 4. Ads", "Part: Ads"; a plain word like "Modules in Python" is not a heading prefix.
-const HEADING_WORD = /^(?:unit|module|chapter|section|part)\s*(?:(?:\d+|[ivx]+)\b\s*[:.\-–—]?|[:\-–—])\s*(.*)$/i;
+// "Unit 2: Ads", "Module III - Ads", "Chapter 4. Ads", "Part: Ads", "Unit - Ads". Not "Modules in Python", "Part of speech",
+// "Part-time work", "Unit-testing", "Part I will teach" or "Module 1.1 Intro": those are ordinary titles.
+const HEADING_WORD = /^(?:unit|module|chapter|section|part)(?:\s+(?:\d+(?![\d.]*\d)|[ivx]{1,6}(?=\s*[:.\-–—]|\s*$))\s*[:.\-–—]?|\s*:|\s+[-–—])\s*(.*)$/i;
 const MARKDOWN_HEADING = /^#{1,6}\s*(.*)$/;
 
-type Line = { kind: "unit" | "topic"; text: string };
+/** `explicit`: the line says it is a unit (a heading word, "#", a colon or a number); a plain line at the left edge only is one by position. */
+type Line = { kind: "unit" | "topic"; text: string; explicit: boolean };
 
-function classify(raw: string): Line | null {
+/** In a text with "Unit 1: …" style headings, numbered lines under them are topics; without such headings a single number is a unit. */
+const hasWordHeadings = (raw: string[]) => raw.some((l) => HEADING_WORD.test(l.trim()) || MARKDOWN_HEADING.test(l.trim()));
+
+function classify(raw: string, numbersAreTopics: boolean): Line | null {
   const line = raw.replace(/\t/g, "    ").trimEnd();
   if (!line.trim() || /^[\s\-_=*#]{3,}$/.test(line)) return null;
   const indent = line.length - line.trimStart().length;
   const trimmed = line.trim();
 
   const md = trimmed.match(MARKDOWN_HEADING);
-  if (md) return { kind: "unit", text: md[1] };
+  if (md) return { kind: "unit", text: md[1], explicit: true };
 
   const bullet = line.match(BULLET);
   if (bullet) {
     // A single number at the left edge ("2. Paid ads") is a unit; indented, or with two levels ("2.1"), it is a topic.
     const single = line.match(SINGLE_NUMBER);
-    if (single && !TWO_LEVEL.test(line) && indent === 0) return { kind: "unit", text: single[2] };
-    return { kind: "topic", text: bullet[2] };
+    if (single && !TWO_LEVEL.test(line) && indent === 0 && !numbersAreTopics) return { kind: "unit", text: single[2], explicit: true };
+    return { kind: "topic", text: bullet[2], explicit: true };
   }
 
   const word = trimmed.match(HEADING_WORD);
-  if (word) return { kind: "unit", text: word[1] || trimmed };
-  if (/:$/.test(trimmed)) return { kind: "unit", text: trimmed.slice(0, -1) };
+  if (word) return { kind: "unit", text: word[1] || trimmed, explicit: true };
+  if (/:$/.test(trimmed)) return { kind: "unit", text: trimmed.slice(0, -1), explicit: true };
   // Indented text is a topic of the unit above; text at the left edge starts a unit.
-  return { kind: indent >= 2 ? "topic" : "unit", text: trimmed };
+  return indent >= 2 ? { kind: "topic", text: trimmed, explicit: true } : { kind: "unit", text: trimmed, explicit: false };
 }
 
 /**
  * Reads the outline. Limits: 30 units and 300 topics (the rest is left out, and the warnings say so).
- * Topics before the first unit go into a unit called `fallbackUnit`; a list in which every line is a one-line "unit"
- * (no bullets, no indents) is a flat list of topics and becomes one unit called `fallbackUnit` too.
+ * Topics before the first unit go into a unit called `fallbackUnit`. A list in which every line is plain text at the left
+ * edge (no bullets, no indents, no "Unit 1:" headings) is a flat list of topics: one unit called `fallbackUnit`.
  */
 export function parseOutline(text: string, defaultHours = DEFAULT_TOPIC_HOURS, fallbackUnit = "Topics"): Outline {
   const hoursDefault = clampHours(defaultHours);
   const hoursOf = (taken: number | null) => (taken === null ? hoursDefault : clampHours(taken));
+  const rawLines = text.slice(0, OUTLINE_LIMITS.text).split(/\r?\n/);
+  const numbersAreTopics = hasWordHeadings(rawLines);
+  let lines = rawLines.map((l) => classify(l, numbersAreTopics)).filter((l): l is Line => l !== null);
+  // Nothing but plain lines: all of them are topics.
+  if (lines.length > 1 && lines.every((l) => l.kind === "unit" && !l.explicit)) lines = lines.map((l) => ({ ...l, kind: "topic" as const }));
+
   const units: OutlineUnit[] = [];
-  const hints: (number | null)[] = []; // hours written at the end of a unit line (used only when the list turns out to be flat)
   let topicCount = 0;
   let cutUnits = 0;
   let cutTopics = 0;
   let longTitles = 0;
   let skipping = false; // inside a unit that was left out
 
-  for (const line of text.slice(0, OUTLINE_LIMITS.text).split(/\r?\n/).map(classify)) {
-    if (!line) continue;
+  for (const line of lines) {
     const taken = takeHours(line.text);
     if (!taken.text) continue;
     if (line.kind === "unit") {
@@ -118,7 +150,7 @@ export function parseOutline(text: string, defaultHours = DEFAULT_TOPIC_HOURS, f
       }
       if (taken.text.length > OUTLINE_LIMITS.unitTitle) longTitles += 1;
       units.push({ title: taken.text.slice(0, OUTLINE_LIMITS.unitTitle), topics: [] });
-      hints.push(taken.hours);
+      skipping = false;
       continue;
     }
     if (skipping || topicCount >= OUTLINE_LIMITS.topics) {
@@ -126,20 +158,9 @@ export function parseOutline(text: string, defaultHours = DEFAULT_TOPIC_HOURS, f
       continue;
     }
     if (taken.text.length > OUTLINE_LIMITS.topicTitle) longTitles += 1;
-    if (!units.length) {
-      units.push({ title: fallbackUnit, topics: [] });
-      hints.push(null);
-    }
+    if (!units.length) units.push({ title: fallbackUnit, topics: [] });
     units.at(-1)!.topics.push({ title: taken.text.slice(0, OUTLINE_LIMITS.topicTitle), hours: hoursOf(taken.hours) });
     topicCount += 1;
-  }
-
-  // Only one-line units: it was a flat list of topics.
-  if (!cutUnits && units.length > 1 && units.every((u) => u.topics.length === 0)) {
-    const topics = units.slice(0, OUTLINE_LIMITS.topics).map((u, i) => ({ title: u.title, hours: hoursOf(hints[i]) }));
-    cutTopics += units.length - topics.length;
-    units.splice(0, units.length, { title: fallbackUnit, topics });
-    topicCount = topics.length;
   }
 
   const warnings: string[] = [];

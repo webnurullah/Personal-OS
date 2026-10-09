@@ -45,13 +45,14 @@ begin
   if jsonb_typeof(p_weeks) is distinct from 'array' then
     raise exception 'The weeks must be a list.' using errcode = 'P0001';
   end if;
-  if coalesce(array_length(p_weekly_plan, 1), 0) > 156 or exists (select 1 from unnest(p_weekly_plan) h where h < 0 or h > 80) then
+  if p_weekly_plan is null or coalesce(array_ndims(p_weekly_plan), 1) <> 1 or coalesce(array_length(p_weekly_plan, 1), 0) > 156
+     or exists (select 1 from unnest(p_weekly_plan) h where h is null or h < 0 or h > 80) then
     raise exception 'The weekly plan is out of range.' using errcode = 'P0001';
   end if;
-  if exists (select 1 from jsonb_array_elements(p_weeks) w where (w ->> 'week')::integer not between 1 and 156) then
+  if exists (select 1 from jsonb_array_elements(p_weeks) w where coalesce((w ->> 'week')::integer, 0) not between 1 and 156 or (w ->> 'id') is null) then
     raise exception 'A week must be between 1 and 156.' using errcode = 'P0001';
   end if;
-  update public.courses set weekly_plan = coalesce(p_weekly_plan, '{}') where id = p_course;
+  update public.courses set weekly_plan = p_weekly_plan where id = p_course;
   if not found then
     raise exception 'Not found.' using errcode = 'P0002';
   end if;

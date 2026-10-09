@@ -12,7 +12,7 @@ import { COURSE_TEMPLATES, templateWeeks } from "@/lib/course-templates";
 import { timeLeft } from "@/lib/course";
 import { hm, num, pct, plural } from "@/lib/format";
 import { useNewAction } from "@/lib/new-action";
-import { parseOutline } from "@/lib/outline";
+import { OUTLINE_LIMITS, parseOutline } from "@/lib/outline";
 import { useProfile } from "@/lib/profile";
 import { forecastText } from "@/lib/study";
 import type { LearningWeek, StudyBlock, StudyNextItem } from "@/lib/types";
@@ -434,8 +434,12 @@ export function CourseForm({ today, onClose, course }: { today: string; onClose:
   const weeklyGoal = Number(profile?.weekly_study_goal ?? 5);
   const [busy, setBusy] = useState(false);
   // New course only: a template (or a pasted outline) fills the title, the dates and the units and topics.
+  const DEFAULT_SUBTITLE = "Personal Learning Progress Tracker";
   const [title, setTitle] = useState(course?.title ?? "");
-  const [subtitle, setSubtitle] = useState(course?.subtitle ?? "Personal Learning Progress Tracker");
+  const [subtitle, setSubtitle] = useState(course?.subtitle ?? DEFAULT_SUBTITLE);
+  // Words you typed yourself are kept when another template is picked; the ones a template filled in are replaced.
+  const [titleTyped, setTitleTyped] = useState(false);
+  const [subtitleTyped, setSubtitleTyped] = useState(false);
   const [start, setStart] = useState(course?.start_date ?? today);
   const [target, setTarget] = useState(course?.target_date ?? addDays(today, 112));
   const [targetTouched, setTargetTouched] = useState(false);
@@ -444,20 +448,17 @@ export function CourseForm({ today, onClose, course }: { today: string; onClose:
   const template = COURSE_TEMPLATES.find((t) => t.key === templateKey);
   const parsed = useMemo(() => parseOutline(outline), [outline]);
   const weeks = useMemo(() => (outline.trim() && parsed.topicCount ? templateWeeks({ outline, weeklyHours: weeklyGoal }, weeklyGoal, parsed) : 0), [outline, parsed, weeklyGoal]);
-  // The target date follows the outline (weeks at your weekly goal) until you choose a date yourself.
-  const suggested = weeks ? addDays(mondayOf(start), weeks * 7 - 1) : null;
+  // The target date follows the outline (weeks at your weekly goal, counted from this week when the start date is in the past,
+  // because that is where the weeks are planned from) until you choose a date yourself.
+  const suggested = weeks ? addDays(mondayOf(start > today ? start : today), weeks * 7 - 1) : null;
   const shownTarget = !course && suggested && !targetTouched ? suggested : target;
 
   const chooseTemplate = (key: string) => {
     setTemplateKey(key);
     const t = COURSE_TEMPLATES.find((x) => x.key === key);
-    if (!t) {
-      setOutline("");
-      return;
-    }
-    setOutline(t.outline);
-    if (!title.trim()) setTitle(t.title);
-    if (subtitle === "Personal Learning Progress Tracker") setSubtitle(t.subtitle);
+    setOutline(t ? t.outline : "");
+    if (!titleTyped) setTitle(t ? t.title : "");
+    if (!subtitleTyped) setSubtitle(t ? t.subtitle : DEFAULT_SUBTITLE);
   };
 
   const submit = async (e: FormEvent<HTMLFormElement>) => {
@@ -475,7 +476,9 @@ export function CourseForm({ today, onClose, course }: { today: string; onClose:
       const saved = await api<{ id: string }>(course ? `/courses/${course.id}` : "/courses", { method: course ? "PATCH" : "POST", body });
       if (!course && outline.trim() && parsed.topicCount) {
         try {
-          await api(`/courses/${saved.id}/outline`, { method: "POST", body: { text: outline, plan: true, weekly_hours: weeklyGoal } });
+          const added = await api<{ plan: { overflow: number } | null; plan_error: string | null }>(`/courses/${saved.id}/outline`, { method: "POST", body: { text: outline.slice(0, OUTLINE_LIMITS.text), plan: true, weekly_hours: weeklyGoal } });
+          if (added.plan_error) toast(`The outline was added, but the weeks could not be planned: ${added.plan_error}`, "error");
+          else if (added.plan && added.plan.overflow > 0) toast(`${hm(added.plan.overflow)} do not fit before the target date. Raise the weekly hours or move the target date.`, "error");
         } catch (error) {
           toast(`The course was created, but its outline could not be added: ${errorMessage(error)}`, "error");
         }
@@ -504,10 +507,10 @@ export function CourseForm({ today, onClose, course }: { today: string; onClose:
         </Field>
       )}
       <Field label="Course name" htmlFor="course-title">
-        <input id="course-title" name="title" className="input" required maxLength={300} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Level 4 Award in IQA" autoComplete="off" autoFocus />
+        <input id="course-title" name="title" className="input" required maxLength={300} value={title} onChange={(e) => { setTitle(e.target.value); setTitleTyped(true); }} placeholder="e.g. Level 4 Award in IQA" autoComplete="off" autoFocus />
       </Field>
       <Field label="Subtitle" htmlFor="course-subtitle">
-        <input id="course-subtitle" name="subtitle" className="input" maxLength={120} value={subtitle} onChange={(e) => setSubtitle(e.target.value)} />
+        <input id="course-subtitle" name="subtitle" className="input" maxLength={120} value={subtitle} onChange={(e) => { setSubtitle(e.target.value); setSubtitleTyped(true); }} />
       </Field>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Start date" htmlFor="course-start" hint="Week 1 starts on that week's Monday.">

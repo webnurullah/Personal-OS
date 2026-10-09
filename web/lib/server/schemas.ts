@@ -167,11 +167,11 @@ export const OutlineInput = z.object({
   default_hours: z.number().min(0.25).max(500).optional(),
   /** Also give the new topics their weeks (spread over the weeks left at `weekly_hours` a week). */
   plan: z.boolean().optional(),
-  weekly_hours: z.number().min(0.5).max(80).optional(),
+  weekly_hours: z.number().min(0.5).max(100).optional(), // as many as the weekly study goal may be; a week is planned with at most 80
 }).strict();
-export const PlanInput = z.object({ mode: z.enum(["plan", "carry"]), weekly_hours: z.number().min(0.5).max(80).optional() }).strict();
+export const PlanInput = z.object({ mode: z.enum(["plan", "carry"]), weekly_hours: z.number().min(0.5).max(100).optional() }).strict();
 /** A course for one missing skill (Job Apply): `by` is the last date among the jobs that ask for it. */
-export const SkillCourseInput = z.object({ skill: s.text(60), by: s.date.optional(), jobs: z.array(s.text(100)).max(10).optional() }).strict();
+export const SkillCourseInput = z.object({ skill: s.text(60), by: s.date.optional(), jobs: z.array(s.text(200)).max(10).optional() }).strict();
 
 /**
  * Week 1 always starts on a Monday, the target must come after the start, and a course lasts at most 3 years.
@@ -183,7 +183,8 @@ export function checkDates<T extends { start_date?: string; target_date?: string
   const target = c.target_date ?? existing?.target_date;
   if (start && target) {
     if (target <= start) throw new HttpError(400, "The target date must be after the start date.");
-    if (daysBetween(start, target) > MAX_COURSE_WEEKS * 7) throw new HttpError(400, "A course can last at most 3 years. Check the target date.");
+    // 156 weeks at most (counting the target day itself: a course that ends on the last day of week 156 is allowed).
+    if (daysBetween(start, target) + 1 > MAX_COURSE_WEEKS * 7) throw new HttpError(400, "A course can last at most 3 years. Check the target date.");
   }
   return c;
 }

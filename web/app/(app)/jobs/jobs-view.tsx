@@ -125,7 +125,7 @@ export function JobsView() {
   const makeCourse = async (item: { skill: string; jobs: string[]; by: string | null }) => {
     setCoursing((set) => new Set(set).add(item.skill));
     try {
-      const made = await api<{ id: string; existing: boolean; plan: { overflow: number } | null }>("/courses/from-skill", { method: "POST", body: { skill: item.skill, jobs: item.jobs.slice(0, 10), ...(item.by ? { by: item.by } : {}) } });
+      const made = await api<{ id: string; existing: boolean; plan: { overflow: number } | null }>("/courses/from-skill", { method: "POST", body: { skill: item.skill, jobs: item.jobs.slice(0, 10).map((j) => j.slice(0, 200)), ...(item.by ? { by: item.by } : {}) } });
       setCourses((map) => new Map(map).set(item.skill, made.id));
       await refresh("/courses", "/learning");
       toast(made.existing ? `You already have a course for ${item.skill}.` : `Course made for ${item.skill}${item.by ? `, due ${formatDate(item.by, "short")}` : ""}. Open it in Learning.`);

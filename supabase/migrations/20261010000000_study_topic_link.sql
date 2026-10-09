@@ -19,16 +19,17 @@ create index if not exists study_blocks_topic_ref_idx on public.study_blocks (to
 create index if not exists study_blocks_resource_idx on public.study_blocks (resource_id) where resource_id is not null;
 
 alter table public.course_topics
-  add column if not exists manual_hours numeric(6, 2) not null default 0 check (manual_hours >= 0),
+  -- Empty only for a moment: a new row arrives with it empty and the trigger below fills it in (see course_topic_new_hours).
+  add column if not exists manual_hours numeric(6, 2) check (manual_hours >= 0),
   -- When a topic was finished (for the weekly review and revision). Topics finished before this existed stay empty,
   -- also when one of them is brought back from the Archive (an older copy has no time: it is not stamped with today).
   add column if not exists completed_at timestamptz;
 
 -- Every hour typed so far was typed by hand (no session was linked to a topic before this). Safe to run twice: only
--- topics that have no hand-typed share yet and no session are filled.
-update public.course_topics t set manual_hours = t.actual_hours
- where t.manual_hours = 0 and t.actual_hours > 0
-   and not exists (select 1 from public.study_blocks b where b.topic_id = t.id and b.done);
+-- topics that have no hand-typed share yet are filled.
+update public.course_topics t
+   set manual_hours = greatest(0, t.actual_hours - coalesce((select sum(b.hours) from public.study_blocks b where b.topic_id = t.id and b.done), 0))
+ where t.manual_hours is null;
 
 -- ---------- Topics ----------
 
@@ -54,15 +55,22 @@ create trigger course_topics_completed_at
   before insert or update of status on public.course_topics
   for each row execute function public.course_topic_completed_at();
 
--- A new topic that comes with hours (typed, or from the sample data, or an older Archive copy) has them as hand-typed hours,
--- unless it is a topic coming back whose sessions are still there: those give the hours again.
+-- Every new topic gets its Spent hours worked out when it is added, so they are right whatever the row came with:
+--  * a topic brought back from the Archive: its sessions (the ones that are still about it, even though they lost the link)
+--    give its session hours; the hand-typed share is what the copy says, whatever happened to the sessions meanwhile.
+--  * a topic added with hours (typed, the sample data) or brought back from a copy made before this existed: the row has no
+--    hand-typed share (it arrives empty), and all of its hours were typed by hand.
+-- (The share arrives empty, not 0, in those cases; this runs before a row is checked, so nothing is ever stored empty.)
 create or replace function public.course_topic_new_hours() returns trigger
 language plpgsql set search_path = '' as $$
+declare
+  logged numeric;
 begin
-  if new.manual_hours = 0 and new.actual_hours > 0
-     and not exists (select 1 from public.study_blocks b where b.topic_ref = new.id and b.done) then
-    new.manual_hours := new.actual_hours;
+  select coalesce(sum(b.hours), 0) into logged from public.study_blocks b where b.topic_ref = new.id and b.done;
+  if new.manual_hours is null then
+    new.manual_hours := greatest(0, coalesce(new.actual_hours, 0) - logged);
   end if;
+  new.actual_hours := new.manual_hours + logged;
   return new;
 end $$;
 
@@ -107,9 +115,15 @@ create trigger course_topics_take_sessions_back
 -- ---------- Sessions ----------
 
 -- While a session names a topic, that is the topic it is "about", also after the topic is deleted.
+-- A session that is added (or brought back from the Archive) with no topic, but that was about a topic that exists, goes
+-- back to it. (Only when it is added: taking the topic off a session later keeps it off.)
 create or replace function public.study_block_topic_ref() returns trigger
 language plpgsql set search_path = '' as $$
 begin
+  if tg_op = 'INSERT' and new.topic_id is null and new.topic_ref is not null
+     and exists (select 1 from public.course_topics t where t.id = new.topic_ref) then
+    new.topic_id := new.topic_ref;
+  end if;
   if new.topic_id is not null then
     new.topic_ref := new.topic_id;
   end if;
@@ -135,7 +149,7 @@ begin
     return coalesce(new, old);
   end if;
   update public.course_topics t
-     set actual_hours = t.manual_hours + coalesce((select sum(b.hours) from public.study_blocks b where b.topic_id = t.id and b.done), 0),
+     set actual_hours = coalesce(t.manual_hours, 0) + coalesce((select sum(b.hours) from public.study_blocks b where b.topic_id = t.id and b.done), 0),
          status = case when t.status = 'not-started' and exists (select 1 from public.study_blocks b where b.topic_id = t.id and b.done) then 'in-progress' else t.status end
    where t.id in (old_topic, new_topic);
   if tg_op = 'DELETE' then return old; end if;

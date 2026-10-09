@@ -4,7 +4,7 @@ import { useMemo, useState, type FormEvent } from "react";
 import { api, errorMessage, refresh } from "@/lib/api";
 import { COURSE_TEMPLATES } from "@/lib/course-templates";
 import { hm, num, plural } from "@/lib/format";
-import { parseOutline } from "@/lib/outline";
+import { OUTLINE_LIMITS, parseOutline } from "@/lib/outline";
 import { neededPace, planningWeek, type PlanTopic } from "@/lib/plan";
 import { hoursLeft } from "@/lib/study";
 import type { Course, Topic } from "@/lib/types";
@@ -32,10 +32,11 @@ export function OutlineDialog({ course, hasPlan, weeklyGoal, onClose, onDone }: 
     e.preventDefault();
     setBusy(true);
     try {
-      const added = await api<{ units: number; topics: number; hours: number; warnings: string[]; plan: PlanResult | null }>(`/courses/${course.id}/outline`, { method: "POST", body: { text, plan, weekly_hours: weeklyGoal } });
+      const added = await api<{ units: number; topics: number; hours: number; warnings: string[]; plan: PlanResult | null; plan_error: string | null }>(`/courses/${course.id}/outline`, { method: "POST", body: { text: text.slice(0, OUTLINE_LIMITS.text), plan, weekly_hours: weeklyGoal } });
       await refresh("/learning", "/courses");
       toast(`Added ${plural(added.units, "unit")} and ${plural(added.topics, "topic")} (${hm(added.hours)}).`);
-      if (added.plan) {
+      if (added.plan_error) toast(`The weeks could not be planned: ${added.plan_error}. You can plan them with “Plan weeks”.`, "error");
+      else if (added.plan) {
         const said = planToasts(added.plan);
         toast(said.warn ?? said.done, said.warn ? "error" : undefined);
       }
