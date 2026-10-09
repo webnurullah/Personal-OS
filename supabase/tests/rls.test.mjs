@@ -644,6 +644,16 @@ check('deleting the practice project keeps the item', (await one('select practic
     await restore(aItem);
     check('an old Archive copy of a library item is brought back at step 0', (await step(ri, 'learning_resources')) === 0);
 
+    // The hand-typed share of a topic's hours cannot be emptied or left out of step with Spent.
+    const hm = (await one(`insert into course_topics (course_id, unit_id, code, title, est_hours, actual_hours) values ($1, $2, '1.9', 'Typed share', 8, 5) returning id`, [rc, ru])).id;
+    const hmRow = async () => await one('select actual_hours::float h, manual_hours::float m from course_topics where id = $1', [hm]);
+    await qa('update course_topics set manual_hours = null where id = $1', [hm]);
+    check('the hand-typed hours cannot be emptied', JSON.stringify(await hmRow()) === JSON.stringify({ h: 5, m: 5 }), JSON.stringify(await hmRow()));
+    await qa(`insert into study_blocks (week_start, weekday, hours, activity, done, topic_id) values ('2026-10-05', 2, 1, 'Typed share session', true, $1)`, [hm]);
+    check('a session adds to the hand-typed hours', JSON.stringify(await hmRow()) === JSON.stringify({ h: 6, m: 5 }));
+    await qa('update course_topics set manual_hours = 9 where id = $1', [hm]);
+    check('changing the hand-typed share sets Spent from it plus the sessions', JSON.stringify(await hmRow()) === JSON.stringify({ h: 10, m: 9 }), JSON.stringify(await hmRow()));
+
     // The weekly review: one line of up to 500 characters.
     await qa(`insert into study_weeks (week_start, reflection) values ('2026-10-12', 'Good week.')`);
     check('a week keeps its reflection', (await one(`select reflection r from study_weeks where week_start = '2026-10-12'`)).r === 'Good week.');

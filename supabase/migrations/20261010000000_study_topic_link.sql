@@ -81,14 +81,21 @@ create trigger course_topics_new_hours
 
 -- Typing a number into "Spent" sets the total. The sessions are part of it; the rest is the hand-typed share.
 -- (When the sessions themselves change the total, this works out the same hand-typed share again.)
+-- Changing the hand-typed share itself (only possible by calling the database directly) sets the total from it; it can
+-- never be emptied.
 create or replace function public.course_topic_typed_hours() returns trigger
 language plpgsql set search_path = '' as $$
 declare
   logged numeric;
 begin
+  select coalesce(sum(b.hours), 0) into logged from public.study_blocks b where b.topic_id = new.id and b.done;
+  if new.manual_hours is null then
+    new.manual_hours := old.manual_hours;
+  end if;
   if new.actual_hours is distinct from old.actual_hours then
-    select coalesce(sum(b.hours), 0) into logged from public.study_blocks b where b.topic_id = new.id and b.done;
     new.manual_hours := greatest(0, new.actual_hours - logged);
+    new.actual_hours := new.manual_hours + logged;
+  elsif new.manual_hours is distinct from old.manual_hours then
     new.actual_hours := new.manual_hours + logged;
   end if;
   return new;
@@ -96,7 +103,7 @@ end $$;
 
 drop trigger if exists course_topics_typed_hours on public.course_topics;
 create trigger course_topics_typed_hours
-  before update of actual_hours on public.course_topics
+  before update of actual_hours, manual_hours on public.course_topics
   for each row execute function public.course_topic_typed_hours();
 
 -- A topic that is back (from the Archive) takes its sessions back: the ones that were about it and lost the link.
