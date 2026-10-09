@@ -58,10 +58,16 @@ function HoursBox({ value, max, label, className, onValue }: { value: number; ma
       onFocus={() => setDraft(value ? String(value) : "")}
       onChange={(e) => {
         setDraft(e.target.value);
+        // A half-typed number ("-", "1e", ".") reads as empty: nothing is saved until it is a number (or really empty).
+        if (e.target.value === "" && e.target.validity.badInput) return;
         const hours = e.target.value === "" ? 0 : e.target.valueAsNumber;
         if (!Number.isNaN(hours)) onValue(clampHours(hours, max));
       }}
-      onBlur={() => setDraft(null)}
+      onBlur={(e) => {
+        setDraft(null);
+        // Leftover junk text is cleared, so the box shows the saved value (or nothing) again.
+        if (e.currentTarget.validity.badInput) e.currentTarget.value = "";
+      }}
     />
   );
 }
@@ -75,6 +81,8 @@ export function CourseView({ id }: { id: string }) {
   const [syncKey, setSyncKey] = useState(0); // changes after a failed save so the number boxes start again from the real values
   // What a topic's fields were before a series of unsaved changes (typing a number sends many): a failed save goes back to these.
   const baseline = useRef(new Map<string, Record<string, unknown>>());
+  // The newest change made to each topic: an answer to an older save must not undo a newer one.
+  const newest = useRef(new Map<string, number>());
   const [editingCourse, setEditingCourse] = useState(false);
   const [unitModal, setUnitModal] = useState<Unit | "new" | null>(null);
   const [topicModal, setTopicModal] = useState<TopicModal | null>(null);
@@ -127,6 +135,8 @@ export function CourseView({ id }: { id: string }) {
     const was = baseline.current.get(topic.id) ?? {};
     for (const k of Object.keys(changes)) if (!(k in was)) was[k] = topic[k as keyof Topic]; // the saved value, before the first of these changes
     baseline.current.set(topic.id, was);
+    const version = (newest.current.get(topic.id) ?? 0) + 1;
+    newest.current.set(topic.id, version);
     mutate(
       (current) =>
         current && {
@@ -135,20 +145,24 @@ export function CourseView({ id }: { id: string }) {
         },
       { revalidate: false },
     );
-    const save = () => {
+    const save = () =>
       api<Topic>(`/topics/${topic.id}`, { method: "PATCH", body: changes }).then(
         (saved) => {
           for (const k of Object.keys(changes)) delete baseline.current.get(topic.id)?.[k];
-          // The database sets the Spent total: it cannot be lower than the study sessions on the topic. Show what it kept
-          // (the box follows the data: the one being typed in keeps what is typed until it is left).
-          if ("actual_hours" in changes && Math.abs(Number(saved.actual_hours) - Number(changes.actual_hours)) > 0.001) {
-            mutate((current) => current && { ...current, units: current.units.map((u) => (u.id !== topic.unit_id ? u : { ...u, topics: u.topics.map((t) => (t.id === topic.id ? { ...t, actual_hours: saved.actual_hours } : t)) })) }, { revalidate: false });
+          // Only the newest change shows the answer: an older save that comes back late must not put its answer over what was typed since.
+          if ("actual_hours" in changes && newest.current.get(topic.id) === version) {
+            // The database sets the Spent total: it cannot be lower than the study sessions on the topic. Show what it kept
+            // (the box follows the data: the one being typed in keeps what is typed until it is left).
+            if (Math.abs(Number(saved.actual_hours) - Number(changes.actual_hours)) > 0.001) {
+              mutate((current) => current && { ...current, units: current.units.map((u) => (u.id !== topic.unit_id ? u : { ...u, topics: u.topics.map((t) => (t.id === topic.id ? { ...t, actual_hours: saved.actual_hours } : t)) })) }, { revalidate: false });
+            }
+            // And ask again, so a copy that was refreshed while this save was waiting cannot stay on screen.
+            mutate().catch(() => undefined);
           }
           return refresh("/learning");
         },
         (e) => failed(e, () => revertTopic(topic, Object.keys(changes))),
       );
-    };
     if (later) saveLater(`topic-${topic.id}`, save);
     else save();
   };
@@ -166,6 +180,8 @@ export function CourseView({ id }: { id: string }) {
    * page, the week's hours and the topic's Spent hours all agree (the database adds the hours to the topic).
    */
   const logTime = async (topic: Topic, hours: number) => {
+    // A number typed in the Spent box and still waiting to be saved goes first, so the session is added on top of it.
+    await saveLater.flush(`topic-${topic.id}`);
     mutate(
       (current) =>
         current && {
@@ -186,7 +202,7 @@ export function CourseView({ id }: { id: string }) {
       // Take this tap's hours off again (other taps that are still on their way keep theirs).
       await failed(e, () =>
         mutate(
-          (current) => current && { ...current, units: current.units.map((u) => (u.id !== topic.unit_id ? u : { ...u, topics: u.topics.map((t) => (t.id === topic.id ? { ...t, actual_hours: Math.max(0, Number(t.actual_hours) - hours) } : t)) })) },
+          (current) => current && { ...current, units: current.units.map((u) => (u.id !== topic.unit_id ? u : { ...u, topics: u.topics.map((t) => (t.id === topic.id ? (() => { const left = Math.max(0, Number(t.actual_hours) - hours); return { ...t, actual_hours: left, status: topic.status === "not-started" && t.status === "in-progress" && left === 0 ? "not-started" : t.status }; })() : t)) })) },
           { revalidate: false },
         ),
       );

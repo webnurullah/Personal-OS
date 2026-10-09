@@ -174,13 +174,19 @@ for (const width of [390, 320]) {
 // ---------- Two taps that both fail, and a typed total that the database raises ----------
 {
   const ctx = await newPhone(browser, 390);
-  await apiMock(ctx, { "/courses/c1": detail });
+  let kept = 1.25; // the stand-in database keeps what it was given, but never less than the sessions (3h)
+  const served = () => ({ ...detail, units: [{ ...detail.units[0], topics: detail.units[0].topics.map((t) => (t.id === "a" ? { ...t, actual_hours: kept } : t)) }] });
+  await apiMock(ctx, { "/courses/c1": () => served() });
   await ctx.route(/\/api\/learning\/blocks$/, async (route) => {
     await new Promise((r) => setTimeout(r, 150));
     return route.fulfill({ status: 500, json: { error: { message: "The database is down" } } });
   });
   // Spent cannot be lower than the sessions: typing 1 is kept as 3.
-  await ctx.route(/\/api\/topics\/a$/, (route) => route.fulfill({ json: { ...detail.units[0].topics[0], actual_hours: 3 } }));
+  await ctx.route(/\/api\/topics\/a$/, (route) => {
+    if (route.request().method() === "GET") return route.fallback();
+    kept = 3;
+    return route.fulfill({ json: { ...detail.units[0].topics[0], actual_hours: 3 } });
+  });
   const page = await ctx.newPage();
   await page.goto(`${BASE}/learning/c1`);
   await page.getByText("Topic 1.1").first().waitFor();
@@ -235,6 +241,60 @@ for (const width of [390, 320]) {
   await page.getByRole("dialog").getByRole("button", { name: "Add block" }).click();
   await page.waitForTimeout(600);
   check("Log time on Study next goes into today's week, not the week on screen", calls[0]?.week_start === "2026-10-05" && calls[0].weekday === 1 && calls[0].done === true, JSON.stringify(calls[0]));
+  await ctx.close();
+}
+
+// ---------- A half-typed number is not saved as 0; a typed total goes first, and a failed tap restores the status ----------
+{
+  const ctx = await newPhone(browser, 390);
+  const calls = [];
+  await apiMock(ctx, { "/courses/c1": detail });
+  await ctx.route(/\/api\/topics\/[^/]+$/, (route) => {
+    const req = route.request();
+    if (req.method() === "GET") return route.fallback();
+    calls.push({ kind: "topic", method: req.method(), body: req.postDataJSON() });
+    return route.fulfill({ json: { ...detail.units[0].topics[0], ...req.postDataJSON() } });
+  });
+  await ctx.route(/\/api\/learning\/blocks$/, (route) => {
+    calls.push({ kind: "block", method: route.request().method(), body: route.request().postDataJSON() });
+    return route.fulfill({ json: { ok: true } });
+  });
+  const page = await ctx.newPage();
+  await page.goto(`${BASE}/learning/c1`);
+  await page.getByText("Topic 1.1").first().waitFor();
+  const box = page.getByLabel("Actual hours for topic 1.1");
+  await box.click();
+  await box.press("Control+a");
+  await box.pressSequentially("1e");
+  await page.waitForTimeout(1000);
+  await box.blur();
+  await page.waitForTimeout(500);
+  check("a half-typed number ('1e') is not saved as 0", !calls.some((c) => c.kind === "topic" && c.body.actual_hours === 0), JSON.stringify(calls));
+  check("and leaving the box shows the saved hours again", (await box.inputValue()) === "1.25", await box.inputValue());
+
+  calls.length = 0;
+  await box.click();
+  await box.press("Control+a");
+  await box.pressSequentially("3");
+  await page.getByRole("button", { name: "Add 30m to topic 1.1" }).click(); // within the 0.7 s wait
+  await page.waitForTimeout(1200);
+  const order = calls.map((c) => `${c.kind}:${c.body.actual_hours ?? c.body.hours}`).join(" ");
+  check("a typed total that is still waiting is saved before the +30m session", order === "topic:3 block:0.5", order);
+  await ctx.close();
+}
+
+{
+  const ctx = await newPhone(browser, 390);
+  const fresh = { ...detail, units: [{ ...detail.units[0], topics: [{ ...detail.units[0].topics[0], status: "not-started", actual_hours: 0 }] }] };
+  await apiMock(ctx, { "/courses/c1": fresh });
+  await ctx.route(/\/api\/learning\/blocks$/, (route) => route.abort());
+  const page = await ctx.newPage();
+  await page.goto(`${BASE}/learning/c1`);
+  await page.getByText("Topic 1.1").first().waitFor();
+  await page.getByRole("button", { name: "Add 30m to topic 1.1" }).click();
+  await page.waitForTimeout(1200);
+  const status = await page.getByLabel("Status of topic 1.1").first().inputValue();
+  check("a +30m that fails (no connection) puts the status back to Not Started", status === "not-started", status);
   await ctx.close();
 }
 

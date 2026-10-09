@@ -7,7 +7,7 @@ import { useEffect, useRef } from "react";
  * switch tab or close the browser (not only after the wait), so the last edit is not lost.
  */
 export function useSaveLater(delay = 700) {
-  const pending = useRef(new Map<string, { timer: ReturnType<typeof setTimeout>; save: () => void }>());
+  const pending = useRef(new Map<string, { timer: ReturnType<typeof setTimeout>; save: () => unknown }>());
 
   useEffect(() => {
     const waiting = pending.current;
@@ -31,7 +31,7 @@ export function useSaveLater(delay = 700) {
     };
   }, []);
 
-  return (key: string, save: () => void) => {
+  const later = (key: string, save: () => unknown) => {
     const waiting = pending.current;
     const old = waiting.get(key);
     if (old) clearTimeout(old.timer);
@@ -41,4 +41,14 @@ export function useSaveLater(delay = 700) {
     }, delay);
     waiting.set(key, { timer, save });
   };
+  /** Saves what is waiting under `key` now (nothing happens when nothing is waiting). Gives back what the save returns. */
+  later.flush = (key: string) => {
+    const waiting = pending.current;
+    const entry = waiting.get(key);
+    if (!entry) return undefined;
+    clearTimeout(entry.timer);
+    waiting.delete(key);
+    return entry.save();
+  };
+  return later;
 }

@@ -516,7 +516,7 @@ export function CourseForm({ today, onClose, course }: { today: string; onClose:
     setBusy(true);
     try {
       const saved = await api<{ id: string }>(course ? `/courses/${course.id}` : "/courses", { method: course ? "PATCH" : "POST", body });
-      if (!course && outline.trim() && parsed.topicCount) {
+      if (!course && outline.trim() && (parsed.topicCount || parsed.units.length)) {
         try {
           const added = await api<{ plan: { overflow: number } | null; plan_error: string | null }>(`/courses/${saved.id}/outline`, { method: "POST", body: { text: outline.slice(0, OUTLINE_LIMITS.text), plan: true, weekly_hours: weeklyGoal } });
           if (added.plan_error) toast(`The outline was added, but the weeks could not be planned: ${added.plan_error}`, "error");
@@ -549,10 +549,10 @@ export function CourseForm({ today, onClose, course }: { today: string; onClose:
         </Field>
       )}
       <Field label="Course name" htmlFor="course-title">
-        <input id="course-title" name="title" className="input" required maxLength={300} value={title} onChange={(e) => { setTitle(e.target.value); setTitleTyped(true); }} placeholder="e.g. Level 4 Award in IQA" autoComplete="off" autoFocus />
+        <input id="course-title" name="title" className="input" required maxLength={300} value={title} onChange={(e) => { setTitle(e.target.value); setTitleTyped(e.target.value.trim() !== ""); }} placeholder="e.g. Level 4 Award in IQA" autoComplete="off" autoFocus />
       </Field>
       <Field label="Subtitle" htmlFor="course-subtitle">
-        <input id="course-subtitle" name="subtitle" className="input" maxLength={120} value={subtitle} onChange={(e) => { setSubtitle(e.target.value); setSubtitleTyped(true); }} />
+        <input id="course-subtitle" name="subtitle" className="input" maxLength={120} value={subtitle} onChange={(e) => { setSubtitle(e.target.value); setSubtitleTyped(e.target.value.trim() !== ""); }} />
       </Field>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Start date" htmlFor="course-start" hint="Week 1 starts on that week's Monday.">
@@ -592,6 +592,14 @@ export function CourseForm({ today, onClose, course }: { today: string; onClose:
             spellCheck={false}
           />
           <p className="mt-2 text-xs text-slate-500">One unit per line, its topics under it starting with “-”, hours at the end (2h, 90m). The weeks are planned for you.</p>
+          {outline.trim() && (
+            <p className="mt-1 text-xs font-medium text-slate-700" aria-live="polite">
+              {parsed.units.length || parsed.topicCount ? `${plural(parsed.units.length, "unit")} · ${plural(parsed.topicCount, "topic")} · ${hm(parsed.hours)}` : "Nothing read yet."}
+            </p>
+          )}
+          {parsed.warnings.map((w) => (
+            <p key={w} className="mt-1 text-xs text-amber-700">{w}</p>
+          ))}
         </details>
       )}
       <ModalActions onCancel={onClose} submitLabel={course ? "Save course" : "Create course"} busy={busy} />
