@@ -340,7 +340,7 @@ function SummaryCard({ label, icon: IconComponent, tile, value, note, valueClass
           <IconComponent className="size-4.5" />
         </span>
       </div>
-      <p className={`mt-2 whitespace-nowrap text-xl font-bold sm:text-2xl ${valueClass}`}>{value}</p>
+      <p className={`mt-2 truncate whitespace-nowrap text-lg font-bold min-[380px]:text-xl sm:text-2xl ${valueClass}`} title={typeof value === "string" ? value : undefined}>{value}</p>
       <p className="text-xs text-slate-500">{note}</p>
     </div>
   );

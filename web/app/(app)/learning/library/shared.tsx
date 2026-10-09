@@ -126,7 +126,12 @@ export function useResourceActions() {
 }
 
 function Chip({ children, tone = "bg-slate-100 text-slate-600" }: { children: ReactNode; tone?: string }) {
-  return <span className={`badge max-w-full shrink-0 whitespace-nowrap ${tone}`}>{children}</span>;
+  // overflow-hidden: a very long name is cut at the edge of the card instead of widening the page.
+  return (
+    <span className={`badge max-w-full min-w-0 shrink-0 overflow-hidden whitespace-nowrap ${tone}`} title={typeof children === "string" ? children : undefined}>
+      {typeof children === "string" ? <span className="min-w-0 truncate">{children}</span> : children}
+    </span>
+  );
 }
 
 /** One item in a list: what it is, how far you are, and the next step as a button. */

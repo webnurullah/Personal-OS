@@ -14,7 +14,7 @@
 //   WIDTHS=320,360,390,450   phone widths in CSS pixels (default as shown)
 //   ONLY=tasks,finance       only these pages (ids are listed at the bottom of this file, in UNITS)
 //   POOL=4                   how many phones are open at the same time
-//   SHOTS=/some/folder       also save a picture of every failing state (ALL=1: of every state)
+//   SHOTS=/some/folder       also save a picture of every failing state (ALL=1: of every state, FULL=1: whole page, not just the screen)
 //   OUT=/some/file.json      where the full result is written (default /tmp/claude-0/audit/phone-audit.json)
 // Exit code 0 = everything clean, 1 = something overflows (the failures are listed at the end).
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -1039,7 +1039,7 @@ async function runUnit(browser, u, width) {
       if (!SHOTS) return;
       mkdirSync(SHOTS, { recursive: true });
       const modal = (await page.locator("dialog[open]").count()) > 0;
-      await page.screenshot({ path: `${SHOTS}/${name.replace(/[^a-z0-9]+/gi, "-")}.png`, fullPage: !modal }).catch(() => undefined);
+      await page.screenshot({ path: `${SHOTS}/${name.replace(/[^a-z0-9]+/gi, "-")}.png`, fullPage: Boolean(process.env.FULL) && !modal }).catch(() => undefined);
     };
 
     // The page itself.

@@ -341,7 +341,7 @@ function BarChart({ days, today, values, goal, max, done, notDone, format }: {
         <div className="pointer-events-none absolute inset-x-0 z-10 border-t-2 border-dashed border-slate-300" style={{ bottom: `${(goal / max) * 100}%` }}>
           <span className="absolute -top-5 right-0 rounded bg-white px-1 text-[10px] font-medium text-slate-500">Goal {format(goal)}</span>
         </div>
-        <div className="grid h-full grid-cols-7 items-end gap-2 sm:gap-4">
+        <div className="grid h-full grid-cols-7 items-end gap-1 sm:gap-4">
           {values.map((value, i) => {
             const label = days[i] === today ? "Today" : formatDate(days[i], "long");
             return value === null ? (
@@ -357,9 +357,9 @@ function BarChart({ days, today, values, goal, max, done, notDone, format }: {
           })}
         </div>
       </div>
-      <div className="mt-2 grid grid-cols-7 gap-2 text-center text-[11px] text-slate-500 sm:gap-4">
+      <div className="mt-2 grid grid-cols-7 gap-1 text-center text-[11px] text-slate-500 sm:gap-4">
         {days.map((day) => (
-          <span key={day} className={day === today ? "font-semibold text-blue-600" : ""}>
+          <span key={day} className={`whitespace-nowrap ${day === today ? "font-semibold text-blue-600" : ""}`}>
             {day === today ? "Today" : formatDate(day, "weekday")}
           </span>
         ))}

@@ -25,7 +25,7 @@ function Stat({ label, value, tone = "text-slate-800" }: { label: string; value:
   return (
     <div className="card px-4 py-3">
       <p className="text-xs font-medium text-slate-500">{label}</p>
-      <p className={`mt-0.5 text-2xl font-bold ${tone}`}>{value}</p>
+      <p className={`mt-0.5 truncate text-xl font-bold sm:text-2xl ${tone}`} title={String(value)}>{value}</p>
     </div>
   );
 }
@@ -282,10 +282,10 @@ export function LibraryView() {
                       {ladder.map((x) => (
                         <li
                           key={x.skill}
-                          className={`badge max-w-full whitespace-nowrap px-2.5 py-1 ${x.level === "proven" ? "bg-emerald-100 text-emerald-800" : x.level === "practised" ? "bg-violet-100 text-violet-800" : "bg-slate-100 text-slate-600"}`}
+                          className={`badge min-w-0 max-w-full overflow-hidden whitespace-nowrap px-2.5 py-1 ${x.level === "proven" ? "bg-emerald-100 text-emerald-800" : x.level === "practised" ? "bg-violet-100 text-violet-800" : "bg-slate-100 text-slate-600"}`}
                           title={LEVELS.find((l) => l.value === x.level)?.hint}
                         >
-                          {x.skill} · {x.level}
+                          <span className="min-w-0 truncate">{x.skill} · {x.level}</span>
                           {mySkills.has(skillKey(x.skill)) && <Check className="size-3" aria-label="in your skills" />}
                         </li>
                       ))}

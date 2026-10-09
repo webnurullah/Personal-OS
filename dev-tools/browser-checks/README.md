@@ -16,4 +16,5 @@ lines to your own Playwright/Chromium install before running. Not part of `npm t
 - `practice-e2e.mjs`: the hands-on part of the library (Practise it, practice progress chips, the skill ladder, the "Make it count" practice step).
 - `study-e2e.mjs`: Learning "Study next" (the card, Log time, the topic picker in the session form, Done, and +30m/+1h on the course page) at 390 and 320 px; `SHOTS=<folder>` also saves pictures.
 - `plan-e2e.mjs`: Learning faster setup (paste an outline, plan the weeks and carry over, New course from a template, Job Apply's Course button) at 390 and 320 px.
+- `phone-audit.mjs`: the phone-layout audit with hostile data (very long names, huge amounts, many items) on every page, its dialogs, the menu, the bell, search and Quick Add at 320/360/390/450 px; prints only what overflows (`ONLY=goals,finance` to pick pages). Exit code 1 when something overflows.
 - `step6-e2e.mjs`: Learning connected to the rest (the focus timer and its form, "Time to revise" with Revised, the week in review and its saved line, a goal that follows a course or certificates, study sessions on the Calendar, a course's week as tasks) at 390 and 320 px.

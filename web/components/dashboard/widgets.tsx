@@ -307,7 +307,7 @@ export function HealthWidget({ data }: Props) {
     <div className={`rounded-xl p-2.5 ${bg}`}>
       {icon}
       <p className="mt-2 text-[11px] text-slate-500">{label}</p>
-      <p className="text-base font-bold leading-tight text-slate-900">{value}</p>
+      <p className="whitespace-nowrap text-sm font-bold leading-tight text-slate-900 min-[360px]:text-base">{value}</p>
       <p className="text-[11px] text-slate-500">{sub}</p>
       {bar}
     </div>

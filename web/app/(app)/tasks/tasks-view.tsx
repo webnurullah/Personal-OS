@@ -269,8 +269,8 @@ export function TasksView() {
 
 function Summary({ icon, tile, label, value }: { icon: ReactNode; tile: string; label: string; value: ReactNode }) {
   return (
-    <div className="card flex items-center gap-3 p-3 sm:gap-4 sm:p-4">
-      <span className={`icon-tile size-11 shrink-0 ${tile}`}>{icon}</span>
+    <div className="card flex items-center gap-2.5 p-3 sm:gap-4 sm:p-4">
+      <span className={`icon-tile size-9 shrink-0 sm:size-11 ${tile}`}>{icon}</span>
       <div className="min-w-0">
         <p className="text-sm text-slate-500 [overflow-wrap:normal]">{label}</p>
         <p className="text-xl font-bold text-slate-900">{value}</p>
