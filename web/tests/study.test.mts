@@ -2,7 +2,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { addDays as addDaysIso, formatDate } from "../lib/dates.ts";
-import { blockDate, courseHealth, forecastFinish, forecastText, weekNumber, hoursByWeek, hoursLeft, pickNext, rankTopics, reasonText, recentWeeks, sessionLabel, topicReason, weekStreak, weeklyPace, type DoneBlock, type StudyCourse, type StudyTopic } from "../lib/study.ts";
+import { blockDate, courseHealth, forecastFinish, forecastText, isActiveCourse, weekNumber, hoursByWeek, hoursLeft, pickNext, rankTopics, reasonText, recentWeeks, sessionLabel, topicReason, weekStreak, weeklyPace, type DoneBlock, type StudyCourse, type StudyTopic } from "../lib/study.ts";
 
 const TODAY = "2026-10-08"; // a Thursday
 const A: StudyCourse = { id: "A", title: "Digital Marketing", start_date: "2026-09-14", target_date: "2026-12-06" }; // 12 weeks; today is in week 4
@@ -302,6 +302,22 @@ test("the overview: what to study next, the topics to pick from, behind or not, 
   // Weeks: Sep 7 (1h), Sep 21 (1h), Sep 28 (2h), Oct 5 (2h): a gap before Sep 21, then three in a row.
   assert.equal(o.stats.streak, 3);
   assert.deepEqual(o.stats.weeks.map((w) => w.hours), [0, 0, 0, 1, 0, 1, 2, 2]);
+});
+
+test("a paused or finished course is left out of Study next and the session picker (its numbers still show)", async () => {
+  const withStatus = (status: string) => courseRows.map((c) => (c.id === "A" ? { ...c, status } : { ...c, status: "active" }));
+  for (const status of ["paused", "done"]) {
+    const db = fakeDb({ courses: withStatus(status), course_topics: topicRows, course_units: unitRows, study_blocks: [], learning_resources: [] });
+    const o = await studyOverview(db, TODAY);
+    assert.deepEqual(o.study_next.map((i) => i.topic_id), ["b1"], `${status}: only the other course is suggested`);
+    assert.deepEqual(o.open_topics.map((t) => t.id), ["b1"]);
+    assert.equal(o.courses.length, 2, "both courses are still listed");
+    assert.equal(o.courses[0].status, status);
+    assert.equal(o.late, 0, "its late topics are not counted either");
+  }
+  assert.equal(isActiveCourse({ status: "active" }), true);
+  assert.equal(isActiveCourse({}), true);
+  assert.equal(isActiveCourse({ status: "paused" }), false);
 });
 
 test("a course's numbers say whether it is behind", () => {

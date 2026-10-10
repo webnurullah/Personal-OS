@@ -123,10 +123,14 @@ export type HabitsResponse = {
 
 export type StudyBlock = { id: string; week_start: string; weekday: number; hours: number; activity: string; done: boolean; created_at: string; topic_id: string | null; resource_id: string | null };
 
+export type CourseStatus = "active" | "paused" | "done";
 export type CourseSummary = {
   id: string;
   title: string;
   subtitle: string;
+  /** Written by you ("Digital Marketing" over "Google Ads" and "Meta Ads"); empty = no category. */
+  category: string;
+  status: CourseStatus;
   start_date: string;
   target_date: string;
   color: ColorName;
@@ -202,6 +206,8 @@ export type Course = {
   id: string;
   title: string;
   subtitle: string;
+  category: string;
+  status: CourseStatus;
   quote: string;
   start_date: string;
   target_date: string;

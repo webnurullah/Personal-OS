@@ -4,6 +4,7 @@ import { habitBoard } from "@/lib/server/habits";
 import { must } from "@/lib/server/http";
 import { courseSummaries, loadHabits } from "@/lib/server/queries";
 import { EXPIRY_WARNING_DAYS } from "@/lib/library";
+import { isActiveCourse } from "@/lib/study";
 import { byTime, occurrences } from "@/lib/server/recurrence";
 import { hm } from "@/lib/format";
 import { isOnDay, isOverdue } from "@/lib/tasks";
@@ -124,7 +125,7 @@ export const GET = handle(async ({ db, profile: getProfile }) => {
   }
 
   // A course with something planned for an earlier week still open (the two furthest behind).
-  const behind = courses.filter((c) => c.state === "behind").sort((a, b) => b.weeks_behind - a.weeks_behind || b.behind_hours - a.behind_hours).slice(0, 2);
+  const behind = courses.filter((c) => c.state === "behind" && isActiveCourse(c)).sort((a, b) => b.weeks_behind - a.weeks_behind || b.behind_hours - a.behind_hours).slice(0, 2);
   for (const course of behind) {
     const how = course.weeks_behind > 0 ? `${plural(course.weeks_behind, "week")} behind` : "behind";
     items.push({ id: `behind-${course.id}`, icon: "graduation-cap", tone: "amber", title: `${course.title} is ${how}: ${hm(course.behind_hours)} to catch up`, meta: "Learning", href: `/learning/${course.id}` });

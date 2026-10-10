@@ -22,7 +22,7 @@ const round3 = (n: number) => Math.round(n * 1000) / 1000;
 export async function loadCourseFacts(db: Db) {
   // Past 1,000 topics Supabase would cut the list short, so topics and units are read page by page.
   const [courses, topics, units] = await Promise.all([
-    db.from("courses").select("id, title, subtitle, start_date, target_date, color").order("created_at").then(must),
+    db.from("courses").select("id, title, subtitle, start_date, target_date, color, category, status").order("created_at").then(must),
     fetchAll(() => db.from("course_topics").select("id, course_id, unit_id, code, title, est_hours, actual_hours, status, planned_week, position").order("id")),
     fetchAll(() => db.from("course_units").select("id, course_id, position").order("id")),
   ]);

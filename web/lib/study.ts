@@ -54,6 +54,9 @@ export const byOrder = (a: StudyTopic, b: StudyTopic) => a.unit_position - b.uni
  * Every unfinished topic of the courses that have started, best first: what is behind comes first (the most weeks late first),
  * then this week's plan (what you already started before the rest), then what you started, then the rest in course order.
  */
+/** A course you are working on: the ones you paused or finished are left out of "Study next" and the reminders. */
+export const isActiveCourse = (course: { status?: string }) => course.status !== "paused" && course.status !== "done";
+
 export function rankTopics(courses: StudyCourse[], topics: StudyTopic[], today: string): NextTopic[] {
   const list: NextTopic[] = [];
   for (const course of courses) {

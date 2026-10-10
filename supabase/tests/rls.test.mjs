@@ -654,6 +654,24 @@ check('deleting the practice project keeps the item', (await one('select practic
     await qa('update course_topics set manual_hours = 9 where id = $1', [hm]);
     check('changing the hand-typed share sets Spent from it plus the sessions', JSON.stringify(await hmRow()) === JSON.stringify({ h: 10, m: 9 }), JSON.stringify(await hmRow()));
 
+    // Courses have a category (any words) and a status (active, paused, done).
+    const cs = await one(`insert into courses (title, start_date, target_date) values ('Category course', '2026-10-05', '2026-12-28') returning id, category, status`);
+    check('a course starts active, without a category', cs.category === '' && cs.status === 'active');
+    await qa(`update courses set category = 'Digital Marketing', status = 'paused' where id = $1`, [cs.id]);
+    check('and can be given both', JSON.stringify(await one('select category, status from courses where id = $1', [cs.id])) === JSON.stringify({ category: 'Digital Marketing', status: 'paused' }));
+    await expectError('a status other than active, paused or done is refused', () => qa(`update courses set status = 'finished' where id = $1`, [cs.id]), 'check constraint');
+    await expectError('a category over 60 characters is refused', () => qa('update courses set category = $1 where id = $2', ['x'.repeat(61), cs.id]), 'check constraint');
+    const aCs = await arch('course', cs.id);
+    await db.exec(`update archive_items set data = jsonb_set(data, '{row}', (data -> 'row') - 'category' - 'status') where id = '${aCs}'`);
+    await restore(aCs);
+    check('an old Archive copy of a course (no category or status) is brought back active, without a category', JSON.stringify(await one('select category, status from courses where id = $1', [cs.id])) === JSON.stringify({ category: '', status: 'active' }));
+    const aCs2 = await arch('course', cs.id);
+    await restore(aCs2);
+    await qa(`update courses set category = 'Design', status = 'done' where id = $1`, [cs.id]);
+    const aCs3 = await arch('course', cs.id);
+    await restore(aCs3);
+    check('a new Archive copy keeps the category and the status', JSON.stringify(await one('select category, status from courses where id = $1', [cs.id])) === JSON.stringify({ category: 'Design', status: 'done' }));
+
     // The weekly review: one line of up to 500 characters.
     await qa(`insert into study_weeks (week_start, reflection) values ('2026-10-12', 'Good week.')`);
     check('a week keeps its reflection', (await one(`select reflection r from study_weeks where week_start = '2026-10-12'`)).r === 'Good week.');

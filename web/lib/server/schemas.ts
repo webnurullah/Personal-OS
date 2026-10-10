@@ -152,6 +152,9 @@ export const CourseFields = z.object({
   target_date: s.date,
   weekly_plan: z.array(z.number().min(0).max(80)).max(156).optional(),
   color: s.color.optional(),
+  // The category is any words (up to 60 letters, spaces inside collapsed); the status is active, paused or done.
+  category: s.optionalText(60).transform((v) => v.replace(/\s+/g, " ")).optional(),
+  status: z.enum(["active", "paused", "done"]).optional(),
 }).strict();
 
 export const UnitFields = z.object({

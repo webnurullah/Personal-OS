@@ -294,6 +294,8 @@ export type Database = {
           title: string;
           subtitle: string;
           quote: string;
+          category: string;
+          status: string;
           start_date: string;
           target_date: string;
           weekly_plan: number[];
@@ -307,6 +309,8 @@ export type Database = {
           title: string;
           subtitle?: string;
           quote?: string;
+          category?: string;
+          status?: string;
           start_date: string;
           target_date: string;
           weekly_plan?: number[];
@@ -320,6 +324,8 @@ export type Database = {
           title?: string;
           subtitle?: string;
           quote?: string;
+          category?: string;
+          status?: string;
           start_date?: string;
           target_date?: string;
           weekly_plan?: number[];

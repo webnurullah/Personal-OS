@@ -137,6 +137,13 @@ test("learning requests: strict and bounded", () => {
   assert.equal(CourseFields.safeParse({ ...ok, extra: 1 }).success, false);
   assert.equal(CourseFields.safeParse({ ...ok, weekly_plan: Array.from({ length: 157 }, () => 1) }).success, false);
   assert.equal(CourseFields.safeParse({ ...ok, weekly_plan: [81] }).success, false);
+  // category: any words up to 60 letters (spaces tidied); status: active, paused or done
+  assert.deepEqual(CourseFields.parse({ ...ok, category: "  Digital   Marketing " }).category, "Digital Marketing");
+  assert.equal(CourseFields.safeParse({ ...ok, category: "x".repeat(61) }).success, false);
+  assert.equal(CourseFields.safeParse({ ...ok, category: "" }).success, true, "no category is allowed");
+  assert.equal(CourseFields.safeParse({ ...ok, status: "paused" }).success, true);
+  assert.equal(CourseFields.safeParse({ ...ok, status: "finished" }).success, false);
+  assert.equal(CourseFields.partial().safeParse({ status: "done" }).success, true, "a status alone can be sent");
   assert.equal(UnitFields.safeParse({ code: "1" }).success, true);
   assert.equal(UnitFields.safeParse({ code: "12345678901" }).success, false);
   const id = "11111111-1111-4111-8111-111111111111";

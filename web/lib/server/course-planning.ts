@@ -56,7 +56,7 @@ export async function courseForSkill(db: Db, input: { skill: string; by?: string
   // Due by the nearest last date of the jobs that ask for it, or when the plan ends at your weekly hours.
   const { start, target } = skillCourseDates(today, input.by, templateWeeks({ outline: text, weeklyHours }, weeklyHours));
   const subtitle = input.jobs?.length ? `Needed for: ${input.jobs.join(", ")}`.slice(0, 120) : template ? template.subtitle : "Learn a skill for a job";
-  const course = must(await db.from("courses").insert({ title, subtitle, start_date: start, target_date: target, weekly_plan: [] }).select().single());
+  const course = must(await db.from("courses").insert({ title, subtitle, category: "Job skills", start_date: start, target_date: target, weekly_plan: [] }).select().single());
   try {
     await addOutline(db, course.id, text);
     const plan = await planCourse(db, course.id, "plan", weeklyHours, today);

@@ -9,16 +9,16 @@ import { CalendarCheck, CalendarDays, ChevronLeft, ClipboardPaste, Clock, Gradua
 import { api, ApiError, errorMessage, refresh } from "@/lib/api";
 import { cacheMutate } from "@/lib/cache";
 import { colorOf } from "@/lib/colors";
-import { courseStats, doneHours, nextNumber, timeLeft } from "@/lib/course";
+import { COURSE_STATUSES, courseStats, doneHours, nextNumber, timeLeft } from "@/lib/course";
 import { addDays, formatDate, mondayOf, weekdayIndex } from "@/lib/dates";
 import { hm, num, pct, plural } from "@/lib/format";
 import { sessionLabel } from "@/lib/study";
-import type { CourseDetail, Topic, TopicStatus, Unit } from "@/lib/types";
+import type { CourseDetail, CourseStatus, Topic, TopicStatus, Unit } from "@/lib/types";
 import { useProfile } from "@/lib/profile";
 import { useMedia } from "@/lib/use-media";
 import { useSaveLater } from "@/lib/use-save-later";
 import { Donut, Progress } from "@/components/ui/charts";
-import { ColorPicker, Field } from "@/components/ui/controls";
+import { ColorPicker, Field, Segmented } from "@/components/ui/controls";
 import { useFeedback } from "@/components/ui/feedback";
 import { Modal, ModalActions } from "@/components/ui/modal";
 import { EmptyState, LoadError, PageSkeleton } from "@/components/ui/states";
@@ -223,6 +223,18 @@ export function CourseView({ id }: { id: string }) {
   const toggleDone = (topic: Topic) =>
     changeTopic(topic, { status: topic.status === "done" ? (Number(topic.actual_hours) > 0 ? "in-progress" : "not-started") : "done" });
 
+  /** Active, paused or done: shown at once, saved right away (paused and done courses are left out of "Study next"). */
+  const setStatus = async (status: CourseStatus) => {
+    mutate((current) => current && { ...current, course: { ...current.course, status } }, { revalidate: false });
+    try {
+      await api(`/courses/${course.id}`, { method: "PATCH", body: { status } });
+      toast(status === "done" ? "Course marked as done. Well done!" : status === "paused" ? "Course paused. It is left out of Study next." : "Course is active again.");
+      await refresh("/learning", "/courses");
+    } catch (e) {
+      await failed(e);
+    }
+  };
+
   const removeCourse = async () => {
     const ok = await confirm({ title: "Delete this course?", message: toArchive(`“${course.title}” and all its units, topics and logged hours`), action: "Delete course" });
     if (!ok) return;
@@ -265,6 +277,10 @@ export function CourseView({ id }: { id: string }) {
             <h1 className="text-2xl font-bold leading-tight tracking-tight text-[#12305a] sm:text-[1.65rem]">{course.title}</h1>
             {course.subtitle && <p className="mt-1 text-lg text-slate-700">{course.subtitle}</p>}
             {course.quote && <p className="font-hand text-2xl text-slate-600">“{course.quote}”</p>}
+            {course.category && <span className="badge mt-2 max-w-full bg-indigo-50 text-indigo-700"><span className="truncate">{course.category}</span></span>}
+            <div className="mt-3 max-w-full overflow-x-auto">
+              <Segmented label="Course status" value={course.status ?? "active"} onChange={setStatus} options={COURSE_STATUSES.map((x) => ({ value: x.value, label: x.label }))} />
+            </div>
             <div className="mt-2 flex gap-1">
               <button type="button" className="btn btn-ghost btn-sm" onClick={() => setEditingCourse(true)}>
                 <Pencil className="size-4" /> Edit course

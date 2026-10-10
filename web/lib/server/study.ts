@@ -1,5 +1,5 @@
 // Learning → what to study next, worked out from the courses and the finished study sessions.
-import { forecastFinish, hoursByWeek, pickNext, rankTopics, recentWeeks, sessionLabel, weekStreak, weeklyPace, hoursLeft, type StudyTopic } from "../study.ts";
+import { forecastFinish, hoursByWeek, isActiveCourse, pickNext, rankTopics, recentWeeks, sessionLabel, weekStreak, weeklyPace, hoursLeft, type StudyTopic } from "../study.ts";
 import { revisionDue, type RevisionCandidate } from "../revision.ts";
 import type { OpenTopic, StudyNextItem } from "../types.ts";
 import { addDays, dateIn, mondayOf, startOfDayUtc } from "./dates.ts";
@@ -46,7 +46,7 @@ export async function studyOverview(db: Db, today: string, zone = "UTC") {
     unit_position: unitPosition.get(t.unit_id) ?? 0,
     position: t.position,
   }));
-  const ranked = rankTopics(facts.courses, topics, today);
+  const ranked = rankTopics(facts.courses.filter(isActiveCourse), topics, today);
   let byWeek = hoursByWeek(blocks);
   if (weekStreak(byWeek, thisWeek) >= LOOK_BACK_DAYS / 7) {
     // Every week in the window had study: the streak may go on beyond it, so read the older sessions too.

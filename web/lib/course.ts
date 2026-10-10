@@ -1,5 +1,6 @@
 // Course tracker numbers, worked out from the topics (the facts).
 // Runs in the browser so the page updates while you type.
+import type { CourseStatus } from "./types.ts";
 
 type TopicFacts = { status: string; est_hours: number; actual_hours: number; planned_week: number | null };
 type UnitFacts<T extends TopicFacts> = { id: string; topics: T[] };
@@ -10,6 +11,13 @@ const toMs = (iso: string) => Date.UTC(Number(iso.slice(0, 4)), Number(iso.slice
 const daysBetween = (a: string, b: string) => Math.round((toMs(b) - toMs(a)) / DAY_MS);
 const sum = <T,>(list: T[], value: (item: T) => number) => list.reduce((total, item) => total + value(item), 0);
 const percent = (part: number, whole: number) => (whole ? Math.round((part / whole) * 100) : 0);
+
+/** The states a course can be in (the Learning page lists them as tabs). */
+export const COURSE_STATUSES: { value: CourseStatus; label: string }[] = [
+  { value: "active", label: "Active" },
+  { value: "paused", label: "Paused" },
+  { value: "done", label: "Done" },
+];
 
 /** A course can be at most this many weeks long (3 years): longer means a typo in the target date. */
 export const MAX_COURSE_WEEKS = 156;
