@@ -532,7 +532,7 @@ export function CourseForm({ today, onClose, course }: { today: string; onClose:
         </datalist>
       </Field>
       {course && (
-        <Field label="Status" htmlFor="course-status" hint="Paused and finished courses are left out of “Study next” and the reminders.">
+        <Field label="Status" htmlFor="course-status" hint="A course is marked done by itself when all its topics are done. Paused and finished courses are left out of “Study next” and the reminders.">
           <select id="course-status" className="select select-lg" value={status} onChange={(e) => setStatus(e.target.value as CourseStatus)}>
             {COURSE_STATUSES.map((x) => (
               <option key={x.value} value={x.value}>{x.label}</option>

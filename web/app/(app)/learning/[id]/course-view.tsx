@@ -159,6 +159,16 @@ export function CourseView({ id }: { id: string }) {
             // And ask again, so a copy that was refreshed while this save was waiting cannot stay on screen.
             mutate().catch(() => undefined);
           }
+          if ("status" in changes) {
+            // The database moves the course to Done when its last topic is finished, and back to Active when one is opened again.
+            const before = course.status ?? "active";
+            mutate()
+              .then((fresh) => {
+                const after = fresh?.course.status ?? before;
+                if (after !== before) toast(after === "done" ? "All topics are finished: the course is marked as done. Well done!" : "A topic is open again: the course is active again.");
+              })
+              .catch(() => undefined);
+          }
           return refresh("/learning");
         },
         (e) => failed(e, () => revertTopic(topic, Object.keys(changes))),

@@ -174,6 +174,33 @@ const browser = await launch();
   await ctx.close();
 }
 
+// ---------- Course page: finishing the last topic marks the course done (the database does it; the page says so) ----------
+{
+  const ctx = await newPhone(browser, 390);
+  const topic = (id, code, over = {}) => ({ id, unit_id: "u1", course_id: "c1", code, title: `Topic ${code}`, short_title: "", outcome: "", est_hours: 2, planned_week: 4, status: "not-started", actual_hours: 0, notes: "", position: 0, ...over });
+  let finished = false; // the stand-in database: once the last topic is done, the course is done
+  const served = () => ({
+    today: TODAY,
+    course: { id: "c1", title: "Digital Marketing", subtitle: "", quote: "", category: "", status: finished ? "done" : "active", start_date: "2026-09-14", target_date: "2026-12-06", weekly_plan: [4, 4, 4, 4], color: "blue" },
+    units: [{ id: "u1", course_id: "c1", code: "1", title: "SEO", color: "blue", position: 0, topics: [topic("a", "1.1", { status: finished ? "done" : "in-progress", actual_hours: 1 }), topic("b", "1.2", { status: "done", actual_hours: 2 })] }],
+  });
+  await apiMock(ctx, { "/courses/c1": () => served() });
+  await ctx.route(/\/api\/topics\/a$/, (route) => {
+    if (route.request().method() === "GET") return route.fallback();
+    finished = true;
+    return route.fulfill({ json: { ...topic("a", "1.1"), status: "done" } });
+  });
+  const page = await ctx.newPage();
+  await page.goto(`${BASE}/learning/c1`);
+  await page.getByText("Topic 1.1").first().waitFor();
+  const statusTabs = page.getByRole("tablist", { name: "Course status" });
+  check("an unfinished course is active", (await statusTabs.getByRole("tab", { name: "Active" }).getAttribute("aria-selected")) === "true");
+  await page.getByLabel("Status of topic 1.1").first().selectOption("done");
+  await page.waitForTimeout(800);
+  check("finishing the last topic marks the course done, and the page says so", (await page.getByText(/All topics are finished: the course is marked as done/).count()) >= 1 && (await statusTabs.getByRole("tab", { name: "Done" }).getAttribute("aria-selected")) === "true");
+  await ctx.close();
+}
+
 // ---------- Learning page: week arrows ----------
 {
   const ctx = await newPhone(browser, 390);

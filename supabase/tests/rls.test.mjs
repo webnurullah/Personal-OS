@@ -672,6 +672,52 @@ check('deleting the practice project keeps the item', (await one('select practic
     await restore(aCs3);
     check('a new Archive copy keeps the category and the status', JSON.stringify(await one('select category, status from courses where id = $1', [cs.id])) === JSON.stringify({ category: 'Design', status: 'done' }));
 
+    // A course is done by itself when all of its topics are done, and active again when a topic is added or reopened.
+    {
+      const ac = (await one(`insert into courses (title, start_date, target_date) values ('Auto done', '2026-10-05', '2026-12-28') returning id`)).id;
+      const au = (await one(`insert into course_units (course_id, code, title) values ($1, '1', 'U') returning id`, [ac])).id;
+      const status = async () => (await one('select status from courses where id = $1', [ac])).status;
+      const topicIn = async (code, st = 'not-started') => (await one(`insert into course_topics (course_id, unit_id, code, title, est_hours, status) values ($1, $2, $3, 'T', 1, $4) returning id`, [ac, au, code, st])).id;
+      check('a course with no topics stays active', (await status()) === 'active');
+      const t1 = await topicIn('1.1');
+      const t2 = await topicIn('1.2');
+      await qa(`update course_topics set status = 'done' where id = $1`, [t1]);
+      check('one topic of two done: still active', (await status()) === 'active');
+      await qa(`update course_topics set status = 'in-progress' where id = $1`, [t2]);
+      check('a topic started: still active', (await status()) === 'active');
+      await qa(`update course_topics set status = 'done' where id = $1`, [t2]);
+      check('every topic done: the course is done', (await status()) === 'done');
+      await qa(`update course_topics set status = 'in-progress' where id = $1`, [t2]);
+      check('a done topic reopened: the course is active again', (await status()) === 'active');
+      await qa(`update course_topics set status = 'done' where id = $1`, [t2]);
+      const t3 = await topicIn('1.3');
+      check('a topic added to a done course: active again', (await status()) === 'active');
+      await qa(`delete from course_topics where id = $1`, [t3]);
+      check('the last open topic deleted: done', (await status()) === 'done');
+      // A course marked done by hand with topics left stays done when another topic is ticked or hours are logged.
+      const ec = (await one(`insert into courses (title, start_date, target_date, status) values ('Done by hand', '2026-10-05', '2026-12-28', 'done') returning id`)).id;
+      const eu = (await one(`insert into course_units (course_id, code, title) values ($1, '1', 'U') returning id`, [ec])).id;
+      const e1 = (await one(`insert into course_topics (course_id, unit_id, code, title, est_hours) values ($1, $2, '1.1', 'T', 1) returning id`, [ec, eu])).id;
+      check('a topic added to a course marked done by hand: active again', (await one('select status from courses where id = $1', [ec])).status === 'active');
+      await qa(`update courses set status = 'done' where id = $1`, [ec]);
+      const e2 = (await one(`insert into course_topics (course_id, unit_id, code, title, est_hours, status) values ($1, $2, '1.2', 'T', 1, 'done') returning id`, [ec, eu])).id;
+      await qa(`update course_topics set status = 'in-progress' where id = $1`, [e2]);
+      check('a done topic reopened in a course marked done by hand: active again', (await one('select status from courses where id = $1', [ec])).status === 'active');
+      await qa(`update courses set status = 'done' where id = $1`, [ec]);
+      await qa(`update course_topics set actual_hours = 0.5 where id = $1`, [e1]);
+      check('hours on a topic do not reopen it', (await one('select status from courses where id = $1', [ec])).status === 'done');
+      await qa(`update course_topics set status = 'in-progress' where id = $1`, [e1]);
+      check('a topic that is not done changing to another not done status does not reopen it', (await one('select status from courses where id = $1', [ec])).status === 'done');
+      // A paused course is never changed.
+      const pc = (await one(`insert into courses (title, start_date, target_date, status) values ('Paused auto', '2026-10-05', '2026-12-28', 'paused') returning id`)).id;
+      const pu = (await one(`insert into course_units (course_id, code, title) values ($1, '1', 'U') returning id`, [pc])).id;
+      await qa(`insert into course_topics (course_id, unit_id, code, title, est_hours, status) values ($1, $2, '1.1', 'T', 1, 'done')`, [pc, pu]);
+      check('a paused course stays paused when all its topics are done', (await one('select status from courses where id = $1', [pc])).status === 'paused');
+      // Deleting a course (and its topics) does not fail.
+      await arch('course', ac);
+      check('a course with topics can still be deleted (and goes to the Archive)', (await one('select count(*)::int n from courses where id = $1', [ac])).n === 0);
+    }
+
     // The weekly review: one line of up to 500 characters.
     await qa(`insert into study_weeks (week_start, reflection) values ('2026-10-12', 'Good week.')`);
     check('a week keeps its reflection', (await one(`select reflection r from study_weeks where week_start = '2026-10-12'`)).r === 'Good week.');
