@@ -146,20 +146,17 @@ const browser = await launch();
   check("course card words: date passed", (await page.getByText("date passed").count()) >= 1);
   check("the old Learning Progress card (weekly goal, topic, planned blocks) is gone", (await page.getByText("Learning Progress").count()) === 0 && (await page.getByText("Planned Learning Blocks").count()) === 0 && (await page.getByLabel("Half an hour more").count()) === 0);
 
-  asked.length = 0;
-  const next = page.getByLabel("Next week");
-  await next.click();
-  await next.click();
-  await page.waitForTimeout(1500);
-  check("two quick clicks on Next go two weeks ahead", asked.includes("2026-10-19"), JSON.stringify(asked));
+  check("the week arrows are gone (the page is always this week)", (await page.getByLabel("Next week").count()) === 0 && (await page.getByText("Week in review").count()) === 0);
 
-  // session dialog: a day still to come is not 'already done'; it names the week
+  // session dialog: a day still to come is not 'already done'
   await page.getByRole("button", { name: "Log Study Session" }).click();
   await page.locator("#session-day").waitFor();
   const done = page.getByLabel(/Already done/);
-  const desc = await page.getByText(/It is added to the week of/).count();
-  check("the dialog names the week when it is not this week", desc === 1);
-  check("a future week's day is not marked done by default", !(await done.isChecked()));
+  check("the dialog says it adds to this week", (await page.getByText("It is added as a block for this week.").count()) === 1);
+  await page.locator("#session-day").selectOption("6"); // Sunday: still to come
+  check("a day still to come is not marked done by default", !(await done.isChecked()));
+  await page.locator("#session-day").selectOption("0"); // Monday: already gone
+  check("a day gone by is marked done by default", await done.isChecked());
   await ctx.close();
 }
 

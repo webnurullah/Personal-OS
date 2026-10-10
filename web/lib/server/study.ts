@@ -1,7 +1,7 @@
 // Learning → what to study next, worked out from the courses and the finished study sessions.
 import { forecastFinish, hoursByWeek, pickNext, rankTopics, recentWeeks, sessionLabel, weekStreak, weeklyPace, hoursLeft, type StudyTopic } from "../study.ts";
 import { revisionDue, type RevisionCandidate } from "../revision.ts";
-import type { OpenTopic, StudyNextItem, WeekReview } from "../types.ts";
+import type { OpenTopic, StudyNextItem } from "../types.ts";
 import { addDays, dateIn, mondayOf, startOfDayUtc } from "./dates.ts";
 import { dbError, HttpError, must } from "./http.ts";
 import { fetchAll } from "./paging.ts";
@@ -101,22 +101,6 @@ export async function studyOverview(db: Db, today: string, zone = "UTC") {
     revision: revisionDue(candidates, today).slice(0, 5),
     /** Unfinished topics planned for an earlier week. */
     late: ranked.filter((i) => i.reason === "overdue").length,
-  };
-}
-
-/** The week in review: what was finished in it and what you wrote about it. */
-export async function weekReview(db: Db, weekStart: string, zone: string, late: number): Promise<WeekReview> {
-  const [topics, items, week] = await Promise.all([
-    db.from("course_topics").select("id, course_id, code, title").eq("status", "done").gte("completed_at", startOfDayUtc(weekStart, zone)).lt("completed_at", startOfDayUtc(addDays(weekStart, 7), zone)).order("completed_at").then(must),
-    db.from("learning_resources").select("id, title").eq("status", "completed").gte("completed_on", weekStart).lte("completed_on", addDays(weekStart, 6)).order("completed_on").then(must),
-    db.from("study_weeks").select("reflection").eq("week_start", weekStart).maybeSingle(),
-  ]);
-  if (week.error) throw dbError(week.error);
-  return {
-    topics_done: topics.map((t) => ({ id: t.id, course_id: t.course_id, code: t.code, title: t.title })),
-    items_done: items.map((r) => ({ id: r.id, title: r.title })),
-    late,
-    reflection: week.data?.reflection ?? "",
   };
 }
 

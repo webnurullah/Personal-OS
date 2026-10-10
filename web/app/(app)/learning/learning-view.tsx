@@ -5,7 +5,7 @@ import { useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
-import { ArrowUpRight, ChevronLeft, ChevronRight, GraduationCap, Hourglass, Plus, Sparkles, Timer, Trash2 } from "lucide-react";
+import { ArrowUpRight, GraduationCap, Hourglass, Plus, Sparkles, Timer, Trash2 } from "lucide-react";
 import { api, errorMessage, refresh } from "@/lib/api";
 import { addDays, formatDate, mondayOf, weekdayIndex } from "@/lib/dates";
 import { COURSE_TEMPLATES, templateWeeks } from "@/lib/course-templates";
@@ -26,13 +26,11 @@ import { Modal, ModalActions } from "@/components/ui/modal";
 import { LoadError, PageHeader, PageSkeleton } from "@/components/ui/states";
 import { LearningTabs } from "./learning-tabs";
 import { StudyNext } from "./study-next";
-import { WeekReview } from "./week-review";
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
 export function LearningView() {
-  const [week, setWeek] = useState<string | null>(null); // Monday of the week on screen; null = this week
-  const { data, error, mutate } = useSWR<LearningWeek>(week ? `/learning/week?start=${week}` : "/learning/week");
+  const { data, error, mutate } = useSWR<LearningWeek>("/learning/week");
   const { toast, confirm } = useFeedback();
   const [logging, setLogging] = useState(false);
   const [logChoice, setLogChoice] = useState(""); // what the session form starts on: "t:<topic id>", "r:<library item id>" or nothing
@@ -169,25 +167,6 @@ export function LearningView() {
           <p className="mt-4 text-sm text-slate-500">Track a course unit by unit. Add one with “New”.</p>
         )}
       </section>
-
-      <div className="mt-5 flex flex-wrap items-center gap-2">
-        <button type="button" className="btn btn-ghost btn-sm btn-icon" onClick={() => setWeek(addDays(week ?? thisWeek, -7))} aria-label="Previous week">
-          <ChevronLeft className="size-4" />
-        </button>
-        <p className="min-w-52 text-center text-sm font-semibold text-slate-700">
-          {isThisWeek ? "This week" : "Week of"} · {formatDate(data.week_start, "short")} – {formatDate(addDays(data.week_start, 6), "short")}
-        </p>
-        <button type="button" className="btn btn-ghost btn-sm btn-icon" onClick={() => setWeek(addDays(week ?? thisWeek, 7))} aria-label="Next week">
-          <ChevronRight className="size-4" />
-        </button>
-        {!isThisWeek && (
-          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setWeek(null)}>
-            This week
-          </button>
-        )}
-      </div>
-
-      <WeekReview key={data.week_start} data={data} />
 
       {data.blocks.length > 0 && (
         <details className="card mt-5 p-5">

@@ -223,7 +223,7 @@ for (const width of [390, 320]) {
   await ctx.close();
 }
 
-// ---------- Study next while another week is on screen ----------
+// ---------- Log time on Study next goes into today's week ----------
 {
   const ctx = await newPhone(browser, 390);
   const calls = [];
@@ -235,12 +235,10 @@ for (const width of [390, 320]) {
   const page = await ctx.newPage();
   await page.goto(`${BASE}/learning`);
   await page.getByRole("heading", { name: "Study next" }).waitFor();
-  await page.getByRole("button", { name: "Previous week" }).click();
-  await page.getByText(/Week of · Sep 28/).waitFor();
   await page.locator("section[aria-labelledby='next-title']").getByRole("button", { name: "Log time" }).first().click();
   await page.getByRole("dialog").getByRole("button", { name: "Add block" }).click();
   await page.waitForTimeout(600);
-  check("Log time on Study next goes into today's week, not the week on screen", calls[0]?.week_start === "2026-10-05" && calls[0].weekday === 1 && calls[0].done === true, JSON.stringify(calls[0]));
+  check("Log time on Study next goes into today's week", calls[0]?.week_start === "2026-10-05" && calls[0].weekday === 1 && calls[0].done === true, JSON.stringify(calls[0]));
   await ctx.close();
 }
 

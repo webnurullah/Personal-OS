@@ -802,13 +802,6 @@ unit("project", "/projects/p1", (p) => p.locator("main h1").first().waitFor({ ti
 unit("project-archived", "/projects/p2", (p) => p.locator("main h1").first().waitFor({ timeout: 12000 }), () => ({ "/projects/p2": projectDetail(2, { archived_at: iso(D(-3)), archived_on: D(-3) }) }), []);
 
 unit("learning", "/learning", heading, () => ({ "/learning/week": (_m, url) => ({ ...learningWeek, week_start: url.searchParams.get("start") ?? learningWeek.week_start }), "/courses": coursesResponse, "/resources": resources }), [
-  scene("study next + review", async (page, snap) => {
-    await page.locator("#week-reflection").fill(H(0, 500));
-    await snap("reflection typed");
-    await press(page.getByRole("button", { name: "Previous week" }));
-    await settle(page, 400);
-    await snap("previous week");
-  }),
   scene("This week's study sessions", async (page, snap) => {
     await press(page.locator("details", { hasText: "Study sessions this week" }).locator("summary"));
     await snap("sessions list open");

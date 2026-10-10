@@ -229,7 +229,7 @@ test("the text a session gets from its topic", () => {
 
 // ---------- The server side: the overview the Learning page is given, and the checks on a session's links ----------
 import { HttpError } from "../lib/server/http.ts";
-import { checkBlockLinks, studyOverview, weekReview } from "../lib/server/study.ts";
+import { checkBlockLinks, studyOverview } from "../lib/server/study.ts";
 import { summariseCourses } from "../lib/server/queries.ts";
 import { BlockCreate } from "../lib/server/schemas.ts";
 import type { Db } from "../lib/server/supabase.ts";
@@ -367,20 +367,4 @@ test("revision: finished topics and library items that are due to be looked at a
   assert.equal(o.revision.find((r) => r.id === "a2")?.label, "Digital Marketing");
   assert.equal(o.revision.find((r) => r.id === "r9")?.href, "/learning/library");
   assert.equal(o.revision.find((r) => r.id === "x1")?.href, "/learning/A");
-});
-
-test("the week in review: what was finished in it, how many are late, and the note", async () => {
-  const db = fakeDb({
-    course_topics: [
-      { id: "t1", course_id: "A", code: "1.1", title: "Joins", status: "done", completed_at: "2026-10-06T08:00:00+00:00" },
-      { id: "t2", course_id: "A", code: "1.2", title: "Old", status: "done", completed_at: "2026-09-28T08:00:00+00:00" },
-      { id: "t3", course_id: "A", code: "1.3", title: "Open", status: "in-progress", completed_at: null },
-    ],
-    learning_resources: [{ id: "r1", title: "SEO", status: "completed", completed_on: "2026-10-07" }, { id: "r2", title: "Old", status: "completed", completed_on: "2026-09-20" }],
-    study_weeks: [{ week_start: "2026-10-05", reflection: "Good week, SQL clicked." }],
-  });
-  const review = await weekReview(db, "2026-10-05", "UTC", 3);
-  assert.deepEqual(review, { topics_done: [{ id: "t1", course_id: "A", code: "1.1", title: "Joins" }], items_done: [{ id: "r1", title: "SEO" }], late: 3, reflection: "Good week, SQL clicked." });
-  const quiet = await weekReview(db, "2026-10-12", "UTC", 0);
-  assert.deepEqual(quiet, { topics_done: [], items_done: [], late: 0, reflection: "" });
 });

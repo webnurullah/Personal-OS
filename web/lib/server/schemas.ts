@@ -130,7 +130,7 @@ export const HabitUpdate = HabitCreate.partial().extend({ archived: z.boolean().
 // ---------- Learning ----------
 export const monday = s.date.refine((d) => weekdayIndex(d) === 0, "The week must start on a Monday");
 
-export const WeekUpdate = z.object({ topic: s.optionalText(120), goal_hours: z.number().positive().max(100), reflection: s.optionalText(500) }).partial().strict();
+export const WeekUpdate = z.object({ topic: s.optionalText(120), goal_hours: z.number().positive().max(100) }).partial().strict();
 
 export const BlockCreate = z.object({
   week_start: monday,

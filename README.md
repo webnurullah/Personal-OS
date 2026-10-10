@@ -41,7 +41,7 @@ Frontend and backend are **one Vercel project**. Every push to GitHub `main` put
    12. `20261009000100_archive_fixes.sql` (fixes to the Archive: a restored transaction re-links its bill; a library item's unit always belongs to its course)
    13. `20261010000000_study_topic_link.sql` (Learning: a study session can name a topic or a library item; a topic's Spent hours are its hand-typed hours plus its finished sessions, worked out again every time; when a topic was finished)
    14. `20261011000000_course_planning.sql` (Learning: add a whole outline to a course, and set the weeks of many topics, each in one all-or-nothing step)
-   15. `20261012000000_study_review_revision.sql` (Learning: one line of reflection on a study week; how many look-backs of a finished topic or library item are done; a goal that follows a course or the certificates you earn)
+   15. `20261012000000_study_review_revision.sql` (Learning: a reflection column on a study week (no longer used by the app); how many look-backs of a finished topic or library item are done; a goal that follows a course or the certificates you earn)
 
    Already set up? Only run the files you have not run yet. Each new file is listed here when it is added.
 3. **Authentication → URL Configuration**
