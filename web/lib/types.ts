@@ -303,6 +303,8 @@ export type JobApplication = {
   notes: string;
   /** The address of the picture saved with the job (a screenshot of the post), or null. */
   image_url: string | null;
+  /** Starred jobs are listed first. */
+  favourite: boolean;
   created_at: string;
 };
 

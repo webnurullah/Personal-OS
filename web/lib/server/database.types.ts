@@ -664,6 +664,7 @@ export type Database = {
           skills: string[];
           notes: string;
           image_path: string | null;
+          favourite: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -682,6 +683,7 @@ export type Database = {
           skills?: string[];
           notes?: string;
           image_path?: string | null;
+          favourite?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -700,6 +702,7 @@ export type Database = {
           skills?: string[];
           notes?: string;
           image_path?: string | null;
+          favourite?: boolean;
           created_at?: string;
           updated_at?: string;
         };

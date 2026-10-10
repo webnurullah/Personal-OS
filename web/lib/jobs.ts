@@ -72,3 +72,27 @@ export function deadlineLabel(deadline: string | null, today: string) {
   if (days === 0) return "Last day today";
   return days === -1 ? "Closed yesterday" : `Closed ${-days} days ago`;
 }
+
+/** The stages of a job in the order of the list: waiting to be applied for first, then the ones you already sent. */
+const STAGE: Record<string, number> = { saved: 0, applied: 1, interview: 2, offer: 3, rejected: 4 };
+
+type Listed = { favourite?: boolean; status: string; deadline: string | null; applied_on?: string | null; created_at: string };
+
+// A missing date always goes last: soonest first (`earliest`) or latest first (`latest`).
+const earliest = (a?: string | null, b?: string | null) => (a && b ? (a < b ? -1 : a > b ? 1 : 0) : a ? -1 : b ? 1 : 0);
+const latest = (a?: string | null, b?: string | null) => (a && b ? (a > b ? -1 : a < b ? 1 : 0) : a ? -1 : b ? 1 : 0);
+
+/**
+ * The order of the job list: starred jobs first; then saved jobs (still to apply for), then applied, interviews, offers and rejected;
+ * inside a stage the nearest last date first (saved) or the latest applied first (the others), then the newest saved.
+ */
+export function compareJobs(a: Listed, b: Listed) {
+  if (Boolean(a.favourite) !== Boolean(b.favourite)) return a.favourite ? -1 : 1;
+  const stage = (STAGE[a.status] ?? 9) - (STAGE[b.status] ?? 9);
+  if (stage) return stage;
+  const byDate = a.status === "saved" ? earliest(a.deadline, b.deadline) : latest(a.applied_on, b.applied_on);
+  if (byDate) return byDate;
+  return a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0;
+}
+
+export const sortJobs = <T extends Listed>(jobs: T[]) => [...jobs].sort(compareJobs);

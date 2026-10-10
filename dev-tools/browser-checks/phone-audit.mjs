@@ -204,7 +204,7 @@ const job = (i, over = {}) => ({
   id: `j${i}`, url: cut(LINK, 500), title: H(i, 200), company: H(i + 1, 200), location: H(i + 2, 200), deadline: i === 6 ? null : D(i * 2 - 3),
   status: ["saved", "saved", "applied", "interview", "offer", "rejected", "saved", "saved"][i], applied_on: i === 2 || i === 3 ? D(-4) : null,
   summary: `${H(i + 3, 2000)} ${SENT} ${SENT}`, requirements: [H(i), H(i + 1), H(i + 2), WORD], skills: ["React", "TypeScript", cut(WORD, 60), cut(BN, 60), cut(LINK, 60), "Communication", cut(EMO, 40)],
-  notes: H(i, 500), image_url: i % 2 === 0 ? PIC : null, created_at: iso("2026-10-01"), ...over,
+  notes: H(i, 500), image_url: i % 2 === 0 ? PIC : null, favourite: i === 1 || i === 4, created_at: iso("2026-10-01"), ...over,
 });
 const jobs = { today: TODAY, items: range(8).map((i) => job(i)) };
 // The company list: very long names and links, some without links, matching some of the jobs' companies.

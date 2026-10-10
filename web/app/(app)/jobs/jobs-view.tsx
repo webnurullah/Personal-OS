@@ -4,14 +4,14 @@ import { toArchive } from "@/lib/archive";
 import { useEffect, useRef, useState, type DragEvent, type FormEvent } from "react";
 import Link from "next/link";
 import useSWR from "swr";
-import { Building2, BriefcaseBusiness, CalendarClock, Check, ChevronDown, Download, ExternalLink, GraduationCap, LayoutGrid, Link2, List as ListIcon, Loader2, MapPin, Pencil, Plus, Sparkles, Trash2, X } from "lucide-react";
+import { Building2, BriefcaseBusiness, CalendarClock, Check, ChevronDown, Download, ExternalLink, GraduationCap, LayoutGrid, Link2, List as ListIcon, Loader2, MapPin, Pencil, Plus, Sparkles, Star, Trash2, X } from "lucide-react";
 import { api, errorMessage, refresh } from "@/lib/api";
 import { daysBetween, formatDate } from "@/lib/dates";
 import { hm } from "@/lib/format";
 import { companyKey } from "@/lib/companies";
 import { fixLink } from "@/lib/job-actions";
 import { prepareJobImage, PictureError } from "@/lib/job-image";
-import { deadlineLabel, isOpen, matchPercent, mergeSkills, skillKey, skillMatch, skillsToLearn } from "@/lib/jobs";
+import { compareJobs, deadlineLabel, isOpen, matchPercent, mergeSkills, skillKey, skillMatch, skillsToLearn, sortJobs } from "@/lib/jobs";
 import { useNewAction } from "@/lib/new-action";
 import type { Company, JobAnalysis, JobApplication, JobStatus, LearningResource, List, Profile } from "@/lib/types";
 import { Progress } from "@/components/ui/charts";
@@ -37,8 +37,8 @@ const words = (text: string) => text.split(/[,;\n]/).map((s) => s.trim()).filter
 /** A spreadsheet (CSV) of the jobs, with a byte-order mark so Excel shows Bangla correctly. */
 function downloadCsv(jobs: JobApplication[], mySkills: string[], today: string) {
   const cell = (value: string | number | null) => `"${String(value ?? "").replace(/"/g, '""')}"`;
-  const head = ["Title", "Company", "Location", "Status", "Last date to apply", "Applied on", "Match %", "Skills", "Missing skills", "Link", "Notes"];
-  const rows = jobs.map((j) => [j.title, j.company, j.location, j.status, j.deadline, j.applied_on, matchPercent(j.skills, mySkills), j.skills.join("; "), skillMatch(j.skills, mySkills).missing.join("; "), j.url, j.notes]);
+  const head = ["Title", "Company", "Location", "Status", "Last date to apply", "Applied on", "Match %", "Skills", "Missing skills", "Link", "Notes", "Favourite"];
+  const rows = jobs.map((j) => [j.title, j.company, j.location, j.status, j.deadline, j.applied_on, matchPercent(j.skills, mySkills), j.skills.join("; "), skillMatch(j.skills, mySkills).missing.join("; "), j.url, j.notes, j.favourite ? "yes" : ""]);
   const csv = `﻿${[head, ...rows].map((r) => r.map(cell).join(",")).join("\r\n")}`;
   const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
   Object.assign(document.createElement("a"), { href: url, download: `job-applications-${today}.csv` }).click();
@@ -68,8 +68,9 @@ export function JobsView() {
   const jobs = data.items;
   const mySkills = profile.skills ?? [];
   const toLearn = skillsToLearn(jobs, mySkills, today);
-  const open = jobs.filter((j) => isOpen(j, today));
-  const closed = jobs.filter((j) => !isOpen(j, today));
+  // Starred jobs first, then saved ones (still to apply for), then the ones you applied for.
+  const open = sortJobs(jobs.filter((j) => isOpen(j, today)));
+  const closed = sortJobs(jobs.filter((j) => !isOpen(j, today)));
   const count = (status: JobStatus) => jobs.filter((j) => j.status === status).length;
   const closingSoon = jobs.filter((j) => j.status === "saved" && j.deadline && j.deadline >= today && daysBetween(today, j.deadline) <= 7).length;
 
@@ -91,6 +92,7 @@ export function JobsView() {
     } catch (e) {
       toast(errorMessage(e), "error");
     }
+    if (changes.favourite !== undefined) toast(changes.favourite ? "Added to your favourites. Favourites are listed first." : "Removed from your favourites.");
     await refresh("/jobs", "/events");
   };
 
@@ -230,7 +232,7 @@ export function JobsView() {
               )}
             </>
           ) : (
-            <Board jobs={jobs} today={today} mySkills={mySkills} listed={listed} onAddCompany={setAddingCompany} onMove={(job, status) => update(job, { status })} onOpen={setEditing} />
+            <Board jobs={jobs} today={today} mySkills={mySkills} listed={listed} onAddCompany={setAddingCompany} onMove={(job, status) => update(job, { status })} onChange={update} onOpen={setEditing} />
           )}
         </div>
 
@@ -323,6 +325,22 @@ function StatusSelect({ status, onChange }: { status: JobStatus; onChange: (stat
   );
 }
 
+/** The favourite star of a job: starred jobs are listed first. */
+function FavouriteStar({ job, onChange, className = "" }: { job: JobApplication; onChange: (changes: Partial<JobApplication>) => void; className?: string }) {
+  return (
+    <button
+      type="button"
+      className={`btn btn-ghost btn-sm btn-icon ${job.favourite ? "text-amber-500 hover:text-amber-600" : "text-slate-400 hover:text-amber-500"} ${className}`}
+      aria-pressed={Boolean(job.favourite)}
+      aria-label={`Favourite: ${job.title}`}
+      title={job.favourite ? "Favourite: listed first. Tap to remove." : "Mark as a favourite to list it first"}
+      onClick={() => onChange({ favourite: !job.favourite })}
+    >
+      <Star className={`size-5 ${job.favourite ? "fill-amber-400" : ""}`} aria-hidden />
+    </button>
+  );
+}
+
 function JobCard({ job, today, mySkills, listed, onAddCompany, onChange, onEdit, onDelete, onLearned }: {
   job: JobApplication; today: string; mySkills: string[]; listed?: Company; onAddCompany: () => void;
   onChange: (changes: Partial<JobApplication>) => void; onEdit: () => void; onDelete: () => void; onLearned: (skill: string) => void;
@@ -352,6 +370,7 @@ function JobCard({ job, today, mySkills, listed, onAddCompany, onChange, onEdit,
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <FavouriteStar job={job} onChange={onChange} className="-my-1" />
           {job.company.trim() &&
             (listed ? (
               <Link href="/jobs/companies" className="badge whitespace-nowrap bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100" title={`${listed.name} is in your company list`}>
@@ -447,9 +466,9 @@ function JobCard({ job, today, mySkills, listed, onAddCompany, onChange, onEdit,
 }
 
 /** The five stages side by side. Drag a card to another column (or use its menu on a phone). */
-function Board({ jobs, today, mySkills, listed, onAddCompany, onMove, onOpen }: {
+function Board({ jobs, today, mySkills, listed, onAddCompany, onMove, onChange, onOpen }: {
   jobs: JobApplication[]; today: string; mySkills: string[]; listed: Map<string, Company>; onAddCompany: (company: string) => void;
-  onMove: (job: JobApplication, status: JobStatus) => void; onOpen: (job: JobApplication) => void;
+  onMove: (job: JobApplication, status: JobStatus) => void; onChange: (job: JobApplication, changes: Partial<JobApplication>) => void; onOpen: (job: JobApplication) => void;
 }) {
   const [over, setOver] = useState<JobStatus | null>(null);
 
@@ -463,7 +482,7 @@ function Board({ jobs, today, mySkills, listed, onAddCompany, onMove, onOpen }: 
   return (
     <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
       {STATUSES.map((column) => {
-        const items = jobs.filter((j) => j.status === column.value);
+        const items = jobs.filter((j) => j.status === column.value).sort(compareJobs); // starred ones first
         return (
           <section
             key={column.value}
@@ -488,10 +507,13 @@ function Board({ jobs, today, mySkills, listed, onAddCompany, onMove, onOpen }: 
                       onDragStart={(e) => e.dataTransfer.setData("text/plain", job.id)}
                       className={`cursor-grab rounded-xl bg-white p-3 text-left shadow-sm ring-1 ring-slate-200/70 active:cursor-grabbing ${closed ? "opacity-60" : ""}`}
                     >
-                      <button type="button" className="block w-full text-left" onClick={() => onOpen(job)}>
-                        <span className="block text-sm font-semibold text-slate-900">{job.title}</span>
-                        {job.company && <span className="block truncate text-xs text-slate-500">{job.company}</span>}
-                      </button>
+                      <div className="flex items-start gap-1">
+                        <button type="button" className="block min-w-0 flex-1 text-left" onClick={() => onOpen(job)}>
+                          <span className="block text-sm font-semibold text-slate-900">{job.title}</span>
+                          {job.company && <span className="block truncate text-xs text-slate-500">{job.company}</span>}
+                        </button>
+                        <FavouriteStar job={job} onChange={(changes) => onChange(job, changes)} className="-mr-1.5 -mt-1.5 shrink-0" />
+                      </div>
                       <div className="mt-2 flex flex-wrap items-center gap-1.5">
                         {job.deadline && job.status === "saved" && <span className={`badge ${daysTone(job.deadline, today)}`}>{job.deadline < today ? "Closed" : deadlineLabel(job.deadline, today)}</span>}
                         {job.skills.length > 0 && <span className="badge bg-slate-100 text-slate-600">{percent}% match</span>}

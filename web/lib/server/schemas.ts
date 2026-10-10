@@ -374,6 +374,7 @@ export const JobFields = z.object({
   requirements: z.array(z.string().trim().min(1).max(500)).max(60),
   skills: z.array(z.string().trim().min(1).max(60)).max(60),
   notes: s.optionalText(5000),
+  favourite: z.boolean(),
 }).partial().strict();
 
 /** A new job: the title is the only thing that must be there. */

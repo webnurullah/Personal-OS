@@ -171,6 +171,23 @@ check('you can remove your own job picture', (await qa(`delete from storage.obje
 check('a job can forget its picture', (await qa('update job_applications set image_path = null where id = $1 returning image_path', [jimg.id]))[0].image_path === null);
 await db.exec(`delete from job_applications where id = '${jimg.id}'`);
 
+// Job favourite star (20261017000000_job_favourite.sql)
+{
+  const jf = (await qa(`insert into job_applications (url, title) values ('', 'Starred job') returning id, favourite`))[0];
+  check('a saved job starts without a star', jf.favourite === false);
+  check('a job can be starred and unstarred', (await qa('update job_applications set favourite = true where id = $1 returning favourite', [jf.id]))[0].favourite === true && (await qa('update job_applications set favourite = false where id = $1 returning favourite', [jf.id]))[0].favourite === false);
+  await expectError('a star cannot be empty', () => qa('update job_applications set favourite = null where id = $1', [jf.id]), 'not-null');
+  await qa('update job_applications set favourite = true where id = $1', [jf.id]);
+  const entryId = (await qa('select archive_delete($1, $2) as id', ['job', jf.id]))[0].id;
+  await qa('select archive_restore($1)', [entryId]);
+  check('the star travels with the job into the Archive and back', (await qa('select favourite from job_applications where id = $1', [jf.id]))[0].favourite === true);
+  const entry2 = (await qa('select archive_delete($1, $2) as id', ['job', jf.id]))[0].id;
+  await db.exec(`update archive_items set data = jsonb_set(data, '{row}', (data -> 'row') - 'favourite') where id = '${entry2}'`);
+  await qa('select archive_restore($1)', [entry2]);
+  check('an old Archive copy of a job (no star) is brought back without a star', (await qa('select favourite from job_applications where id = $1', [jf.id]))[0].favourite === false);
+  await db.exec(`delete from job_applications where id = '${jf.id}'`);
+}
+
 // The file pasted into the Supabase SQL Editor (supabase/archive-step-2.sql) runs on a migrated database, twice, and changes nothing that the tests below rely on.
 {
   const paste = readFileSync(new URL('../archive-step-2.sql', import.meta.url), 'utf8');
