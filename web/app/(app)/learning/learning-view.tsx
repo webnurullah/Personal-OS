@@ -5,12 +5,12 @@ import { useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
-import { ArrowUpRight, BookOpen, ChartColumn, ChevronLeft, ChevronRight, Clock, GraduationCap, Hourglass, Lightbulb, Minus, Pencil, Plus, Sparkles, Target, Timer, Trash2 } from "lucide-react";
+import { ArrowUpRight, ChevronLeft, ChevronRight, GraduationCap, Hourglass, Plus, Sparkles, Timer, Trash2 } from "lucide-react";
 import { api, errorMessage, refresh } from "@/lib/api";
 import { addDays, formatDate, mondayOf, weekdayIndex } from "@/lib/dates";
 import { COURSE_TEMPLATES, templateWeeks } from "@/lib/course-templates";
 import { timeLeft } from "@/lib/course";
-import { hm, num, pct, plural } from "@/lib/format";
+import { hm, num, plural } from "@/lib/format";
 import { useNewAction } from "@/lib/new-action";
 import { OUTLINE_LIMITS, parseOutline } from "@/lib/outline";
 import { useProfile } from "@/lib/profile";
@@ -19,7 +19,6 @@ import { REVISION_DAYS } from "@/lib/revision";
 import { forecastText } from "@/lib/study";
 import { useFocus } from "@/lib/use-focus";
 import type { LearningWeek, RevisionDue, StudyBlock, StudyNextItem } from "@/lib/types";
-import { useSaveLater } from "@/lib/use-save-later";
 import { Progress } from "@/components/ui/charts";
 import { Field } from "@/components/ui/controls";
 import { useFeedback } from "@/components/ui/feedback";
@@ -35,14 +34,12 @@ export function LearningView() {
   const [week, setWeek] = useState<string | null>(null); // Monday of the week on screen; null = this week
   const { data, error, mutate } = useSWR<LearningWeek>(week ? `/learning/week?start=${week}` : "/learning/week");
   const { toast, confirm } = useFeedback();
-  const saveLater = useSaveLater(500);
   const [logging, setLogging] = useState(false);
   const [logChoice, setLogChoice] = useState(""); // what the session form starts on: "t:<topic id>", "r:<library item id>" or nothing
   const [logNow, setLogNow] = useState(false); // from "Study next" (always about today): this week, even when another week is on screen
   const [logHours, setLogHours] = useState<number | undefined>(undefined); // from the focus timer: the time on the clock
   const focus = useFocus();
   const [newCourse, setNewCourse] = useState(false);
-  const [editingTopic, setEditingTopic] = useState(false);
   const openLog = (choice = "", now = false, hours?: number) => {
     setLogChoice(choice);
     setLogNow(now);
@@ -58,9 +55,6 @@ export function LearningView() {
   const isThisWeek = data.week_start === thisWeek;
   const done = data.blocks.filter((b) => b.done).reduce((sum, b) => sum + Number(b.hours), 0);
   const planned = data.blocks.reduce((sum, b) => sum + Number(b.hours), 0);
-  const goal = Number(data.goal_hours);
-  const left = Math.max(goal - done, 0);
-  const share = Math.min(100, pct(done, goal));
 
   const run = async (work: () => Promise<unknown>, message?: string) => {
     try {
@@ -73,21 +67,6 @@ export function LearningView() {
     await refresh("/learning", "/courses");
   };
 
-  // Shown at once, saved once the clicking stops: fast clicks add up instead of each starting from the old value.
-  const setGoal = (hours: number) => {
-    const goal_hours = Math.min(100, Math.max(0.5, hours));
-    const weekStart = data.week_start;
-    mutate({ ...data, goal_hours }, { revalidate: false });
-    saveLater(`goal-${weekStart}`, () => {
-      run(() => api(`/learning/week/${weekStart}`, { method: "PUT", body: { goal_hours } }));
-    });
-  };
-  const saveTopic = (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const topic = String(new FormData(e.currentTarget).get("topic")).trim();
-    setEditingTopic(false);
-    run(() => api(`/learning/week/${data.week_start}`, { method: "PUT", body: { topic } }));
-  };
   const toggle = async (block: StudyBlock) => {
     await mutate({ ...data, blocks: data.blocks.map((b) => (b.id === block.id ? { ...b, done: !b.done } : b)) }, { revalidate: false });
     run(() => api(`/learning/blocks/${block.id}`, { method: "PATCH", body: { done: !block.done } }));
@@ -145,6 +124,52 @@ export function LearningView() {
 
       <StudyNext data={data} onLog={(topicId) => openLog(`t:${topicId}`, true)} onFinish={finishTopic} onFocus={(topicId) => focus.start(`t:${topicId}`)} onRevised={markRevised} />
 
+      <section className="card mt-5 p-5" aria-labelledby="courses-title">
+        <div className="flex items-center justify-between">
+          <h2 id="courses-title" className="card-title">My courses</h2>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setNewCourse(true)}>
+            <Plus className="size-4" /> New
+          </button>
+        </div>
+        {data.courses.length ? (
+          <ul className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {data.courses.map((course) => (
+              <li key={course.id}>
+                <Link href={`/learning/${course.id}`} className="group block h-full rounded-2xl border border-slate-200 p-4 transition hover:border-blue-200 hover:bg-blue-50/40">
+                  <div className="flex items-start gap-3">
+                    <span className="icon-tile size-10 bg-[#12305a] text-white">
+                      <GraduationCap className="size-5" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="line-clamp-2 font-semibold leading-snug text-slate-900">{course.title}</p>
+                      <p className="text-xs text-slate-500">
+                        {plural(course.unit_count, "unit")} · {plural(course.topic_count, "topic")} · due {formatDate(course.target_date, "date")}
+                      </p>
+                    </div>
+                    <ArrowUpRight className="size-4 shrink-0 text-slate-400 transition group-hover:text-blue-600" />
+                  </div>
+                  <div className="mt-3 flex items-center gap-3">
+                    <Progress value={course.percent} fill="bg-emerald-500" className="h-2 flex-1" />
+                    <span className="text-xs font-semibold text-slate-600">{course.percent}%</span>
+                  </div>
+                  <p className="mt-2 text-xs text-slate-500">
+                    {num(course.done_hours)}h of {num(course.est_hours)}h done · {timeLeft(course.days_left)}
+                  </p>
+                  {course.state === "behind" && (
+                    <p className="mt-1 text-xs font-medium text-amber-700">
+                      Behind: {hm(course.behind_hours)} to catch up{course.weeks_behind > 0 ? ` (${plural(course.weeks_behind, "week")} late)` : ""}
+                    </p>
+                  )}
+                  {course.forecast && course.state !== "done" && <p className="mt-1 text-xs text-slate-500">{forecastText(course.forecast)}</p>}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="mt-4 text-sm text-slate-500">Track a course unit by unit. Add one with “New”.</p>
+        )}
+      </section>
+
       <div className="mt-5 flex flex-wrap items-center gap-2">
         <button type="button" className="btn btn-ghost btn-sm btn-icon" onClick={() => setWeek(addDays(week ?? thisWeek, -7))} aria-label="Previous week">
           <ChevronLeft className="size-4" />
@@ -162,170 +187,40 @@ export function LearningView() {
         )}
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-5 2xl:grid-cols-[minmax(0,1fr)_24rem]">
-        <section className="card p-5 sm:p-7" aria-labelledby="progress-title">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex items-center gap-4 sm:gap-5">
-              <span className="grid size-16 shrink-0 place-items-center rounded-2xl bg-indigo-50 text-indigo-600 sm:size-18">
-                <GraduationCap className="size-8 sm:size-9" />
-              </span>
-              <div>
-                <h2 id="progress-title" className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Learning Progress</h2>
-                <p className="mt-1 text-slate-500">Track your weekly study goal and remaining time.</p>
-              </div>
-            </div>
-            <p className="flex items-center gap-2.5 self-start rounded-full bg-emerald-50 px-5 py-2.5 font-semibold text-emerald-800 ring-1 ring-emerald-100 lg:self-auto">
-              <ChartColumn className="size-5 text-emerald-600" />
-              {share}% of weekly goal completed
-            </p>
-          </div>
-
-          <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div className="flex items-center gap-4 rounded-2xl bg-slate-50 p-5 ring-1 ring-slate-100">
-              <BookOpen className="size-9 shrink-0 fill-blue-100 text-blue-500" />
-              <div className="min-w-0 flex-1">
-                <p className="text-slate-500">Topic This Week:</p>
-                {editingTopic ? (
-                  <form onSubmit={saveTopic} className="mt-1 flex gap-2">
-                    <input name="topic" className="input h-9" defaultValue={data.topic} maxLength={120} autoFocus placeholder="e.g. Data Analytics Basics" />
-                    <button type="submit" className="btn btn-primary btn-sm">Save</button>
-                  </form>
-                ) : (
-                  <button type="button" className="group flex max-w-full items-center gap-2 text-left" onClick={() => setEditingTopic(true)}>
-                    <span className="truncate text-xl font-bold text-slate-900">{data.topic || "Add a topic"}</span>
-                    <Pencil className="reveal size-4 shrink-0 text-slate-400" />
-                  </button>
-                )}
-              </div>
-            </div>
-            <div className="flex items-center gap-4 rounded-2xl bg-slate-50 p-5 ring-1 ring-slate-100">
-              <Target className="size-9 shrink-0 text-violet-500" />
-              <div className="flex-1">
-                <p className="text-slate-500">Weekly Goal:</p>
-                <p className="text-xl font-bold text-slate-900">{num(goal)} hours</p>
-              </div>
-              <div className="flex items-center gap-1" aria-label="Change weekly goal">
-                <button type="button" className="btn btn-secondary btn-sm btn-icon" onClick={() => setGoal(goal - 0.5)} disabled={goal <= 0.5} aria-label="Half an hour less">
-                  <Minus className="size-4" />
-                </button>
-                <button type="button" className="btn btn-secondary btn-sm btn-icon" onClick={() => setGoal(goal + 0.5)} aria-label="Half an hour more">
-                  <Plus className="size-4" />
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_17rem] md:items-center">
-            <div>
-              <div className="flex items-end justify-between gap-3 font-semibold">
-                <p className="text-slate-800"><span className="text-lg">{hm(done)}</span> completed</p>
-                <p className="text-slate-500">{hm(left)} remaining</p>
-              </div>
-              <Progress value={share} fill="bg-linear-to-r from-emerald-500 to-emerald-400" track="bg-slate-100" className="mt-3 h-4" />
-            </div>
-            <div className="flex items-center gap-4 rounded-2xl bg-emerald-50 p-5 ring-1 ring-emerald-100">
-              <Clock className="size-9 shrink-0 text-emerald-600" />
-              <div>
-                <p className="text-sm text-emerald-800">Remaining This Week:</p>
-                <p className="text-2xl font-bold text-slate-900">{left ? hm(left) : "Goal reached!"}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-7 border-t border-slate-100 pt-6">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h3 className="text-lg font-semibold text-slate-900">Planned Learning Blocks</h3>
-              <p className={`text-sm ${planned < goal ? "text-amber-600" : "text-slate-500"}`}>
-                Your blocks cover {hm(planned)} of your {hm(goal)} goal.{planned < goal && ` Plan ${hm(goal - planned)} more.`}
-              </p>
-            </div>
-            {data.blocks.length ? (
-              <ul className="mt-4 space-y-3">
-                {data.blocks.map((block) => (
-                  <li key={block.id} className="group grid grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-x-3 gap-y-2 rounded-2xl border border-slate-200 bg-white px-3 py-3.5 md:grid-cols-[auto_8rem_4rem_minmax(0,1fr)_auto_auto] md:gap-x-6 md:px-4">
-                    <input type="checkbox" className="checkbox checkbox-green checkbox-lg" checked={block.done} onChange={() => toggle(block)} aria-label={`Done: ${DAYS[block.weekday]}, ${block.activity}`} />
-                    <span className="min-w-0 truncate font-semibold text-slate-900">{DAYS[block.weekday]}</span>
-                    <span className="whitespace-nowrap text-slate-600 md:border-l md:border-slate-200 md:pl-6">{num(block.hours)}h</span>
-                    <span className="col-span-2 col-start-2 row-start-2 min-w-0 text-slate-700 md:col-span-1 md:col-start-auto md:row-start-auto md:border-l md:border-slate-200 md:pl-6">{block.activity}</span>
-                    <span className={`col-start-4 row-start-2 justify-self-end badge px-2 py-1 text-xs font-semibold sm:px-3 sm:text-sm md:col-start-auto md:row-start-auto ${block.done ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100" : "bg-slate-100 text-slate-600"}`}>
-                      {block.done ? "Completed" : "Pending"}
-                    </span>
-                    <button type="button" className="btn btn-ghost btn-sm btn-icon reveal col-start-4 row-start-1 justify-self-end md:col-start-auto md:row-start-auto" onClick={() => remove(block)} aria-label="Remove block">
-                      <Trash2 className="size-4" />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="mt-4 rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">
-                No blocks planned for this week.{" "}
-                <button type="button" className="font-medium text-blue-600" onClick={() => openLog()}>Plan a study block</button>
-              </p>
-            )}
-          </div>
-
-          <p className="mt-6 flex items-center gap-3 border-t border-slate-100 pt-5 text-slate-500">
-            <Lightbulb className="size-6 shrink-0 fill-amber-200 text-amber-500" />
-            You can set any weekly hours and mark sessions done as you learn.
-          </p>
-        </section>
-
-        <aside className="space-y-5">
-          <section className="card p-5" aria-labelledby="courses-title">
-            <div className="flex items-center justify-between">
-              <h2 id="courses-title" className="card-title">My courses</h2>
-              <button type="button" className="btn btn-secondary btn-sm" onClick={() => setNewCourse(true)}>
-                <Plus className="size-4" /> New
-              </button>
-            </div>
-            {data.courses.length ? (
-              <ul className="mt-4 space-y-3">
-                {data.courses.map((course) => (
-                  <li key={course.id}>
-                    <Link href={`/learning/${course.id}`} className="group block rounded-2xl border border-slate-200 p-4 transition hover:border-blue-200 hover:bg-blue-50/40">
-                      <div className="flex items-start gap-3">
-                        <span className="icon-tile size-10 bg-[#12305a] text-white">
-                          <GraduationCap className="size-5" />
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <p className="line-clamp-2 font-semibold leading-snug text-slate-900">{course.title}</p>
-                          <p className="text-xs text-slate-500">
-                            {plural(course.unit_count, "unit")} · {plural(course.topic_count, "topic")} · due {formatDate(course.target_date, "date")}
-                          </p>
-                        </div>
-                        <ArrowUpRight className="size-4 shrink-0 text-slate-400 transition group-hover:text-blue-600" />
-                      </div>
-                      <div className="mt-3 flex items-center gap-3">
-                        <Progress value={course.percent} fill="bg-emerald-500" className="h-2 flex-1" />
-                        <span className="text-xs font-semibold text-slate-600">{course.percent}%</span>
-                      </div>
-                      <p className="mt-2 text-xs text-slate-500">
-                        {num(course.done_hours)}h of {num(course.est_hours)}h done · {timeLeft(course.days_left)}
-                      </p>
-                      {course.state === "behind" && (
-                        <p className="mt-1 text-xs font-medium text-amber-700">
-                          Behind: {hm(course.behind_hours)} to catch up{course.weeks_behind > 0 ? ` (${plural(course.weeks_behind, "week")} late)` : ""}
-                        </p>
-                      )}
-                      {course.forecast && course.state !== "done" && <p className="mt-1 text-xs text-slate-500">{forecastText(course.forecast)}</p>}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="mt-4 text-sm text-slate-500">Track a course unit by unit. Add one with “New”.</p>
-            )}
-          </section>
-
-          <section className="rounded-2xl bg-linear-to-br from-indigo-600 to-blue-600 p-5 text-white shadow-lg shadow-indigo-600/20">
-            <Sparkles className="size-6 text-amber-300" />
-            <p className="font-hand mt-3 text-3xl leading-tight">“Small steps every week make big progress.”</p>
-            <p className="mt-2 text-sm text-indigo-100">Two short sessions beat one long one. Your memory likes repeats.</p>
-          </section>
-        </aside>
-      </div>
-
       <WeekReview key={data.week_start} data={data} />
+
+      {data.blocks.length > 0 && (
+        <details className="card mt-5 p-5">
+          <summary className="cursor-pointer text-sm font-semibold text-slate-800">
+            Study sessions this week ({data.blocks.length}) · {hm(done)} done of {hm(planned)} planned
+          </summary>
+          <ul className="mt-3 space-y-2">
+            {data.blocks.map((block) => (
+              <li key={block.id} className="group flex items-start gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-3">
+                <input type="checkbox" className="checkbox checkbox-green checkbox-lg mt-0.5 shrink-0" checked={block.done} onChange={() => toggle(block)} aria-label={`Done: ${DAYS[block.weekday]}, ${block.activity}`} />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-slate-900">
+                    {DAYS[block.weekday]} · {num(block.hours)}h
+                    <span className={`badge ml-2 align-middle text-xs font-semibold ${block.done ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100" : "bg-slate-100 text-slate-600"}`}>{block.done ? "Completed" : "Pending"}</span>
+                  </p>
+                  <p className="mt-0.5 text-sm text-slate-700">{block.activity}</p>
+                </div>
+                <button type="button" className="btn btn-ghost btn-sm btn-icon reveal shrink-0" onClick={() => remove(block)} aria-label="Remove block">
+                  <Trash2 className="size-4" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+
+      <section className="mt-5 flex items-center gap-4 rounded-2xl bg-linear-to-br from-indigo-600 to-blue-600 p-5 text-white shadow-lg shadow-indigo-600/20">
+        <Sparkles className="size-6 shrink-0 text-amber-300" />
+        <div className="min-w-0">
+          <p className="font-hand text-2xl leading-tight sm:text-3xl">“Small steps every week make big progress.”</p>
+          <p className="mt-1 text-sm text-indigo-100">Two short sessions beat one long one. Your memory likes repeats.</p>
+        </div>
+      </section>
 
       <Modal
         open={logging}

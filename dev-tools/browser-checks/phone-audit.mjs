@@ -809,10 +809,9 @@ unit("learning", "/learning", heading, () => ({ "/learning/week": (_m, url) => (
     await settle(page, 400);
     await snap("previous week");
   }),
-  scene("Topic this week", async (page, snap) => {
-    await press(page.locator("main button:has(svg.lucide-pencil)").first());
-    await page.locator("input[name=topic]").fill(WORD);
-    await snap("topic edit with long text");
+  scene("This week's study sessions", async (page, snap) => {
+    await press(page.locator("details", { hasText: "Study sessions this week" }).locator("summary"));
+    await snap("sessions list open");
   }),
   scene("Log study session dialog", async (page, snap) => {
     await openDialog(page, button(page, "Log Study Session"));

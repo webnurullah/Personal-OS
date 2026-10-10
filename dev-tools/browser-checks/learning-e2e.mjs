@@ -89,7 +89,40 @@ const browser = await launch();
   await ctx.close();
 }
 
-// ---------- Learning page: goal clicks and week arrows ----------
+// ---------- Learning page on a wide screen: My courses is full width, two courses in a row ----------
+{
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const { session } = await import("/home/user/Personal-OS/dev-tools/browser-checks/audit-lib.mjs");
+  await ctx.addCookies([{ name: "sb-127-auth-token", value: "base64-" + Buffer.from(JSON.stringify(session)).toString("base64url"), url: BASE }]);
+  const c = (id, title) => ({ id, title, subtitle: "", start_date: "2026-09-14", target_date: "2026-12-31", color: "blue", est_hours: 4, done_hours: 1, spent_hours: 1, percent: 25, topic_count: 2, unit_count: 2, days_left: 80, state: "on-track", behind_hours: 0, weeks_behind: 0, forecast: null });
+  await apiMock(ctx, { "/learning/week": { today: TODAY, week_start: "2026-10-05", topic: "", goal_hours: 6, blocks: [{ id: "b1", week_start: "2026-10-05", weekday: 4, hours: 1, activity: "Google Digital Marketing & E-commerce Certificate", done: false, topic_id: null, resource_id: null }], courses: [c("c1", "Digital Marketing"), c("c2", "SQL"), c("c3", "Excel")] } });
+  const calls = [];
+  await ctx.route(/\/api\/learning\/blocks\/[^/]+$/, (route) => {
+    calls.push({ method: route.request().method(), body: route.request().postDataJSON() });
+    return route.fulfill({ json: { ok: true } });
+  });
+  const page = await ctx.newPage();
+  await page.goto(`${BASE}/learning`);
+  await page.getByRole("heading", { name: "My courses" }).waitFor();
+  const section = page.locator("section[aria-labelledby='courses-title']");
+  const main = await page.locator("main").boundingBox();
+  const box = await section.boundingBox();
+  check("wide: My courses spans the page width", box && main && box.width >= main.width - 70, JSON.stringify({ card: box?.width, main: main?.width }));
+  const links = await section.locator("a").evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return { top: Math.round(r.top), left: Math.round(r.left), width: Math.round(r.width) }; }));
+  check("wide: two courses share the first row", links.length === 3 && links[0].top === links[1].top && links[1].left > links[0].left && links[2].top > links[0].top, JSON.stringify(links));
+  check("wide: both are about the same width (half the card)", Math.abs(links[0].width - links[1].width) <= 2, JSON.stringify(links));
+  if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/learning-wide.png`, fullPage: true });
+  // The week's planned sessions can still be ticked and removed (a closed list under the week in review).
+  const details = page.locator("details", { hasText: "Study sessions this week" });
+  check("a planned session is listed (closed) so it can still be ticked or removed", (await details.count()) === 1 && (await details.getAttribute("open")) === null);
+  await details.locator("summary").click();
+  await details.getByLabel(/Done: Friday/).check();
+  await page.waitForTimeout(500);
+  check("ticking it marks the block done", calls.some((x) => x.method === "PATCH" && x.body.done === true), JSON.stringify(calls));
+  await ctx.close();
+}
+
+// ---------- Learning page: week arrows ----------
 {
   const ctx = await newPhone(browser, 390);
   const puts = [];
@@ -108,17 +141,10 @@ const browser = await launch();
   });
   const page = await ctx.newPage();
   await page.goto(`${BASE}/learning`);
-  await page.getByText("8 hours").first().waitFor();
+  await page.getByText("2 units · 2 topics").first().waitFor();
   check("course card counts units from the units (2 units · 2 topics)", (await page.getByText("2 units · 2 topics").count()) === 1);
   check("course card words: date passed", (await page.getByText("date passed").count()) >= 1);
-
-  const more = page.getByLabel("Half an hour more");
-  await more.click();
-  await more.click();
-  await more.click();
-  check("goal shows the clicks at once", (await page.getByText("9.5 hours").count()) === 1);
-  await page.waitForTimeout(1200);
-  check("fast clicks are saved once from the latest value", puts.length === 1 && puts[0].goal_hours === 9.5, JSON.stringify(puts));
+  check("the old Learning Progress card (weekly goal, topic, planned blocks) is gone", (await page.getByText("Learning Progress").count()) === 0 && (await page.getByText("Planned Learning Blocks").count()) === 0 && (await page.getByLabel("Half an hour more").count()) === 0);
 
   asked.length = 0;
   const next = page.getByLabel("Next week");
