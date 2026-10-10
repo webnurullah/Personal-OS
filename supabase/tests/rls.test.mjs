@@ -146,6 +146,31 @@ await qa(`insert into storage.objects (bucket_id, name, owner_id) values ('avata
 check('nothing in the bucket can be changed in place, so no overwriting (no update policy)', (await qa(`update storage.objects set name = $1 where name = $2 returning id`, [file(A, 'webp'), file(A, 'png')])).length === 0 && (await qb(`update storage.objects set name = $1 returning id`, ['x'])).length === 0 && (await qa(`select name from storage.objects where bucket_id = 'avatars'`))[0].name === file(A, 'png'));
 check('(clean up)', (await qa(`delete from storage.objects where name = $1 returning id`, [file(A, 'png')])).length === 1);
 
+// Job pictures (20261016000000_job_images.sql): same design as the profile photo
+const jbucket = (await db.query(`select public, file_size_limit::int as max, allowed_mime_types from storage.buckets where id = 'job-images'`)).rows[0];
+check('job-images bucket is public, capped at 3 MB, images only', jbucket?.public === true && jbucket.max === 3145728 && jbucket.allowed_mime_types.join() === 'image/jpeg,image/png,image/webp', JSON.stringify(jbucket));
+const jimg = (await qa(`insert into job_applications (url, title) values ('', 'With picture') returning id, image_path`))[0];
+check('a saved job starts without a picture', jimg.image_path === null);
+check('a job can remember its picture path', (await qa('update job_applications set image_path = $1 where id = $2 returning image_path', [file(A), jimg.id]))[0].image_path === file(A));
+for (const [name, bad] of [['a path outside any folder', 'x.jpg'], ['a wrong extension', `${A}/aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee.gif`], ['a path that climbs up', `${A}/../x.jpg`], ['a letter outside hex-dash in the folder', `${A.replace(/.$/, 'z')}/aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee.jpg`]]) {
+  await expectError(`a job rejects a picture path with ${name}`, () => qa('update job_applications set image_path = $1 where id = $2', [bad, jimg.id]), 'job_applications_image_path_check');
+}
+check('you can add a job picture to your own folder', (await qa(`insert into storage.objects (bucket_id, name, owner_id) values ('job-images', $1, $2) returning name`, [file(A), A])).length === 1);
+await expectError("you cannot add a job picture to someone else's folder", () => qb(`insert into storage.objects (bucket_id, name, owner_id) values ('job-images', $1, $2)`, [file(A), B]), 'row-level security');
+await expectError('a signed-out visitor cannot add a job picture', () => qanon(`insert into storage.objects (bucket_id, name) values ('job-images', $1)`, [file(A)]), 'row-level security');
+check("you cannot look up someone else's job pictures", (await qb(`select name from storage.objects where bucket_id = 'job-images'`)).length === 0);
+check('you can look up your own job pictures', (await qa(`select name from storage.objects where bucket_id = 'job-images'`)).length === 1);
+check("you cannot remove someone else's job picture", (await qb(`delete from storage.objects where name = $1 and bucket_id = 'job-images' returning id`, [file(A)])).length === 0);
+check('the picture path travels with the job into the Archive and back', await (async () => {
+  const entryId = (await qa('select archive_delete($1, $2) as id', ['job', jimg.id]))[0].id;
+  const back = (await qa('select archive_restore($1) as r', [entryId]))[0].r;
+  const row = (await qa('select image_path from job_applications where id = $1', [jimg.id]))[0];
+  return back.id === jimg.id && row.image_path === file(A);
+})());
+check('you can remove your own job picture', (await qa(`delete from storage.objects where name = $1 and bucket_id = 'job-images' returning id`, [file(A)])).length === 1);
+check('a job can forget its picture', (await qa('update job_applications set image_path = null where id = $1 returning image_path', [jimg.id]))[0].image_path === null);
+await db.exec(`delete from job_applications where id = '${jimg.id}'`);
+
 // The file pasted into the Supabase SQL Editor (supabase/archive-step-2.sql) runs on a migrated database, twice, and changes nothing that the tests below rely on.
 {
   const paste = readFileSync(new URL('../archive-step-2.sql', import.meta.url), 'utf8');

@@ -663,6 +663,7 @@ export type Database = {
           requirements: string[];
           skills: string[];
           notes: string;
+          image_path: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -680,6 +681,7 @@ export type Database = {
           requirements?: string[];
           skills?: string[];
           notes?: string;
+          image_path?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -697,6 +699,7 @@ export type Database = {
           requirements?: string[];
           skills?: string[];
           notes?: string;
+          image_path?: string | null;
           created_at?: string;
           updated_at?: string;
         };

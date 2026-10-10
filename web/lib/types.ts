@@ -301,6 +301,8 @@ export type JobApplication = {
   requirements: string[];
   skills: string[];
   notes: string;
+  /** The address of the picture saved with the job (a screenshot of the post), or null. */
+  image_url: string | null;
   created_at: string;
 };
 

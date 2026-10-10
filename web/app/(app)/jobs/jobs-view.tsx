@@ -1,7 +1,7 @@
 "use client";
 
 import { toArchive } from "@/lib/archive";
-import { useState, type DragEvent, type FormEvent } from "react";
+import { useEffect, useState, type DragEvent, type FormEvent } from "react";
 import Link from "next/link";
 import useSWR from "swr";
 import { Building2, BriefcaseBusiness, CalendarClock, Check, ChevronDown, Download, ExternalLink, GraduationCap, LayoutGrid, Link2, List as ListIcon, Loader2, MapPin, Pencil, Plus, Sparkles, Trash2, X } from "lucide-react";
@@ -10,6 +10,7 @@ import { daysBetween, formatDate } from "@/lib/dates";
 import { hm } from "@/lib/format";
 import { companyKey } from "@/lib/companies";
 import { fixLink } from "@/lib/job-actions";
+import { prepareJobImage, PictureError } from "@/lib/job-image";
 import { deadlineLabel, isOpen, matchPercent, mergeSkills, skillKey, skillMatch, skillsToLearn } from "@/lib/jobs";
 import { useNewAction } from "@/lib/new-action";
 import type { Company, JobAnalysis, JobApplication, JobStatus, LearningResource, List, Profile } from "@/lib/types";
@@ -19,6 +20,7 @@ import { useFeedback } from "@/components/ui/feedback";
 import { Modal, ModalActions } from "@/components/ui/modal";
 import { EmptyState, LoadError, PageHeader, PageSkeleton } from "@/components/ui/states";
 import { CompanyForm } from "./company-form";
+import { JobPictureField, JobPictureViewer } from "./job-picture";
 import { JobsTabs } from "./jobs-tabs";
 
 const STATUSES: { value: JobStatus; label: string; badge: string; column: string }[] = [
@@ -325,6 +327,7 @@ function JobCard({ job, today, mySkills, listed, onAddCompany, onChange, onEdit,
   onChange: (changes: Partial<JobApplication>) => void; onEdit: () => void; onDelete: () => void; onLearned: (skill: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [viewing, setViewing] = useState(false);
   const { have, percent } = skillMatch(job.skills, mySkills);
   const haveKeys = new Set(have.map(skillKey));
   const label = deadlineLabel(job.deadline, today);
@@ -332,12 +335,20 @@ function JobCard({ job, today, mySkills, listed, onAddCompany, onChange, onEdit,
   return (
     <article className="card p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h3 className="text-base font-semibold text-slate-900">{job.title}</h3>
-          <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-500">
-            {job.company && <span>{job.company}</span>}
-            {job.location && <span className="inline-flex items-center gap-1"><MapPin className="size-3.5" />{job.location}</span>}
-          </p>
+        <div className="flex min-w-0 items-start gap-3">
+          {job.image_url && (
+            <button type="button" className="shrink-0 rounded-lg transition hover:opacity-90" onClick={() => setViewing(true)} aria-label={`View the picture of ${job.title}`} title="View the picture">
+              {/* eslint-disable-next-line @next/next/no-img-element -- a Storage address, not a site image */}
+              <img src={job.image_url} alt="" loading="lazy" className="size-14 rounded-lg bg-slate-50 object-cover ring-1 ring-slate-200 sm:size-16" />
+            </button>
+          )}
+          <div className="min-w-0">
+            <h3 className="text-base font-semibold text-slate-900">{job.title}</h3>
+            <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-500">
+              {job.company && <span>{job.company}</span>}
+              {job.location && <span className="inline-flex items-center gap-1"><MapPin className="size-3.5" />{job.location}</span>}
+            </p>
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {job.company.trim() &&
@@ -429,6 +440,7 @@ function JobCard({ job, today, mySkills, listed, onAddCompany, onChange, onEdit,
           </Field>
         </div>
       )}
+      {job.image_url && <JobPictureViewer open={viewing} onClose={() => setViewing(false)} src={job.image_url} title={job.title} />}
     </article>
   );
 }
@@ -571,6 +583,37 @@ function JobForm({ job, today, onClose }: { job: JobApplication | null; today: s
   });
   const set = (key: keyof typeof f) => (e: { target: { value: string } }) => setF((current) => ({ ...current, [key]: e.target.value }));
 
+  // The picture: a new one chosen here (shown at once, sent after the job is saved), or the saved one, which can be removed.
+  const [picture, setPicture] = useState<{ blob: Blob; url: string } | null>(null);
+  const [removePicture, setRemovePicture] = useState(false);
+  const [preparing, setPreparing] = useState(false);
+  const [pictureError, setPictureError] = useState("");
+  useEffect(() => {
+    const url = picture?.url;
+    return () => {
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [picture]);
+  const shownPicture = picture?.url ?? (removePicture ? null : job?.image_url ?? null);
+  const choosePicture = async (file: File) => {
+    setPreparing(true);
+    setPictureError("");
+    try {
+      const blob = await prepareJobImage(file);
+      setPicture({ blob, url: URL.createObjectURL(blob) });
+      setRemovePicture(false);
+    } catch (err) {
+      setPictureError(err instanceof PictureError ? err.message : "This picture cannot be opened here. Try a JPG or PNG photo.");
+    } finally {
+      setPreparing(false);
+    }
+  };
+  const dropPicture = () => {
+    setPicture(null);
+    setPictureError("");
+    setRemovePicture(true);
+  };
+
   const read = async (source: { url: string } | { text: string }) => {
     setReading(true);
     setError("");
@@ -617,13 +660,20 @@ function JobForm({ job, today, onClose }: { job: JobApplication | null; today: s
       notes: f.notes.trim(),
     };
     try {
-      if (job) {
-        await api(`/jobs/${job.id}`, { method: "PATCH", body });
-      } else {
-        await api("/jobs", { method: "POST", body: { ...body, ...(f.status === "applied" ? { applied_on: today } : {}) } });
+      const saved = job
+        ? await api<JobApplication>(`/jobs/${job.id}`, { method: "PATCH", body })
+        : await api<JobApplication>("/jobs", { method: "POST", body: { ...body, ...(f.status === "applied" ? { applied_on: today } : {}) } });
+      // The picture goes up once the job exists. If only the picture fails, the job is still saved.
+      let pictureProblem = "";
+      try {
+        if (picture) await api(`/jobs/${saved.id}/image`, { method: "POST", file: picture.blob });
+        else if (removePicture && job?.image_url) await api(`/jobs/${saved.id}/image`, { method: "DELETE" });
+      } catch (err) {
+        pictureProblem = errorMessage(err);
       }
       await refresh("/jobs", "/events");
-      toast(job ? "Job updated" : `Saved “${body.title}”${body.deadline ? ` · apply by ${formatDate(body.deadline, "short")}` : ""}`);
+      if (pictureProblem) toast(`The job is saved, but its picture was not: ${pictureProblem} Open the job to try again.`, "error");
+      else toast(job ? "Job updated" : `Saved “${body.title}”${body.deadline ? ` · apply by ${formatDate(body.deadline, "short")}` : ""}`);
       onClose();
     } catch (err) {
       setError(errorMessage(err));
@@ -640,7 +690,7 @@ function JobForm({ job, today, onClose }: { job: JobApplication | null; today: s
 
       {!job && (
         <div className="rounded-xl bg-slate-50 p-3 ring-1 ring-slate-100">
-          <label className="label" htmlFor="job-url">Job link</label>
+          <label className="label" htmlFor="job-url">Job URL</label>
           <div className="flex flex-col gap-2 sm:flex-row">
             <div className="relative min-w-0 flex-1">
               <Link2 className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
@@ -675,7 +725,7 @@ function JobForm({ job, today, onClose }: { job: JobApplication | null; today: s
       )}
 
       {job && (
-        <Field label="Job link" htmlFor="job-url">
+        <Field label="Job URL" htmlFor="job-url">
           <input id="job-url" className="input" value={f.url} onChange={set("url")} placeholder="https://…" />
         </Field>
       )}
@@ -700,6 +750,8 @@ function JobForm({ job, today, onClose }: { job: JobApplication | null; today: s
         </Field>
       </div>
 
+      <JobPictureField shown={shownPicture} preparing={preparing} error={pictureError} onFile={choosePicture} onRemove={dropPicture} />
+
       <Field label="Skills the job asks for" htmlFor="job-skills" hint="Separate with commas. They are compared with your skills.">
         <textarea id="job-skills" className="input min-h-16" value={f.skills} onChange={set("skills")} placeholder="React, TypeScript, SQL, Communication" />
       </Field>
@@ -713,7 +765,7 @@ function JobForm({ job, today, onClose }: { job: JobApplication | null; today: s
         <textarea id="job-notes" className="input min-h-16" value={f.notes} onChange={set("notes")} maxLength={5000} placeholder="Contact person, documents to send, interview date…" />
       </Field>
 
-      <ModalActions onCancel={onClose} submitLabel={job ? "Save changes" : "Add Job"} busy={busy} />
+      <ModalActions onCancel={onClose} submitLabel={job ? "Save changes" : "Add Job"} busy={busy} disabled={preparing} />
     </form>
   );
 }

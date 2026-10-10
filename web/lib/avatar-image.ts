@@ -66,8 +66,14 @@ async function decode(file: File): Promise<{ source: CanvasImageSource; width: n
   }
 }
 
-/** Opens the chosen file as a picture (white behind any see-through parts, big pictures shrunk for speed). */
-export async function loadPicture(file: File): Promise<Picture> {
+/** The size a picture gets when its longest side may be `max` pixels at most (never enlarged). */
+export function fitSize(width: number, height: number, max: number) {
+  const scale = Math.min(1, max / Math.max(width, height));
+  return { width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale)) };
+}
+
+/** Opens the chosen file as a picture (white behind any see-through parts, big pictures shrunk to `maxSize` pixels for speed). */
+export async function loadPicture(file: File, maxSize = WORKING_SIZE): Promise<Picture> {
   if (file.type && (!file.type.startsWith("image/") || file.type === "image/svg+xml")) throw new PictureError("Please choose a picture (JPG, PNG or WebP).");
   if (file.size > MAX_SOURCE_BYTES) throw new PictureError("That picture is too large (over 30 MB). Choose a smaller one.");
   let decoded;
@@ -79,10 +85,10 @@ export async function loadPicture(file: File): Promise<Picture> {
   try {
     const { source, width, height } = decoded;
     if (!width || !height) throw new PictureError("This picture cannot be opened here. Try a JPG or PNG photo.");
-    const scale = Math.min(1, WORKING_SIZE / Math.max(width, height));
+    const size = fitSize(width, height, maxSize);
     const canvas = document.createElement("canvas");
-    canvas.width = Math.max(1, Math.round(width * scale));
-    canvas.height = Math.max(1, Math.round(height * scale));
+    canvas.width = size.width;
+    canvas.height = size.height;
     const context = canvas.getContext("2d");
     if (!context) throw new PictureError("This browser cannot edit pictures.");
     context.fillStyle = "#ffffff";

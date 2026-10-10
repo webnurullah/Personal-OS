@@ -198,11 +198,13 @@ const eventsResponse = (_method, url) => {
   };
 };
 
+// A tiny picture saved with every other job (shown scaled up, so it also shows how the card and the viewer lay out a picture).
+const PIC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
 const job = (i, over = {}) => ({
   id: `j${i}`, url: cut(LINK, 500), title: H(i, 200), company: H(i + 1, 200), location: H(i + 2, 200), deadline: i === 6 ? null : D(i * 2 - 3),
   status: ["saved", "saved", "applied", "interview", "offer", "rejected", "saved", "saved"][i], applied_on: i === 2 || i === 3 ? D(-4) : null,
   summary: `${H(i + 3, 2000)} ${SENT} ${SENT}`, requirements: [H(i), H(i + 1), H(i + 2), WORD], skills: ["React", "TypeScript", cut(WORD, 60), cut(BN, 60), cut(LINK, 60), "Communication", cut(EMO, 40)],
-  notes: H(i, 500), created_at: iso("2026-10-01"), ...over,
+  notes: H(i, 500), image_url: i % 2 === 0 ? PIC : null, created_at: iso("2026-10-01"), ...over,
 });
 const jobs = { today: TODAY, items: range(8).map((i) => job(i)) };
 // The company list: very long names and links, some without links, matching some of the jobs' companies.
@@ -723,7 +725,21 @@ unit("jobs", "/jobs", heading, () => ({ "/jobs": jobs, "/companies": companies, 
   }, { overlays: TOASTS, reload: true }),
   scene("Edit job dialog", async (page, snap) => {
     await openDialog(page, page.getByRole("button", { name: "Edit job" }).first());
-    await snap("edit prefilled");
+    await snap("edit prefilled, with its picture");
+  }),
+  scene("Job picture", async (page, snap) => {
+    await snap("cards with a picture");
+    await openDialog(page, page.getByRole("button", { name: /^View the picture of/ }).first());
+    await snap("picture viewer");
+  }),
+  scene("Add job dialog with a picture", async (page, snap) => {
+    await openDialog(page, button(page, "Add Job"));
+    await dlg(page).locator("#job-picture").setInputFiles({ name: "circular.png", mimeType: "image/png", buffer: makePng(900, 1600) });
+    await dlg(page).getByRole("img", { name: "The picture of this job" }).waitFor({ timeout: 4000 });
+    await snap("tall picture chosen");
+    await dlg(page).locator("#job-picture").setInputFiles({ name: "not-a-picture.png", mimeType: "image/png", buffer: Buffer.from("hello") });
+    await dlg(page).getByRole("alert").waitFor({ timeout: 4000 });
+    await snap("message for a file that is not a picture");
   }),
 ]);
 
