@@ -20,6 +20,9 @@ const KNOWN: Record<string, [number, string]> = {
   "23503": [400, "This refers to something that does not exist."],
   "23514": [400, "Some values are not allowed."],
   "22P02": [400, "Some values are not valid."],
+  // A text with a NUL character (U+0000), which Postgres cannot store.
+  "22021": [400, "Some text has a character that cannot be saved."],
+  "22P05": [400, "Some text has a character that cannot be saved."],
   "22007": [400, "That date is not valid."],
   "22008": [400, "That date is not valid."],
   "42501": [403, "You are not allowed to do that."],

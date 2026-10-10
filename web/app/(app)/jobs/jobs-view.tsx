@@ -227,7 +227,7 @@ export function JobsView() {
               )}
             </>
           ) : (
-            <Board jobs={jobs} today={today} mySkills={mySkills} onMove={(job, status) => update(job, { status })} onOpen={setEditing} />
+            <Board jobs={jobs} today={today} mySkills={mySkills} listed={listed} onAddCompany={setAddingCompany} onMove={(job, status) => update(job, { status })} onOpen={setEditing} />
           )}
         </div>
 
@@ -347,7 +347,7 @@ function JobCard({ job, today, mySkills, listed, onAddCompany, onChange, onEdit,
                 In company list
               </Link>
             ) : (
-              <button type="button" className="btn btn-secondary btn-sm" onClick={onAddCompany} title={`Add ${job.company} to your company list`} aria-label={`Add ${job.company} to the company list`}>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={onAddCompany} title={`Add ${job.company} to your company list`} aria-label={`Add company: ${job.company}`}>
                 <Building2 className="size-3.5" aria-hidden />
                 Add company
               </button>
@@ -434,7 +434,10 @@ function JobCard({ job, today, mySkills, listed, onAddCompany, onChange, onEdit,
 }
 
 /** The five stages side by side. Drag a card to another column (or use its menu on a phone). */
-function Board({ jobs, today, mySkills, onMove, onOpen }: { jobs: JobApplication[]; today: string; mySkills: string[]; onMove: (job: JobApplication, status: JobStatus) => void; onOpen: (job: JobApplication) => void }) {
+function Board({ jobs, today, mySkills, listed, onAddCompany, onMove, onOpen }: {
+  jobs: JobApplication[]; today: string; mySkills: string[]; listed: Map<string, Company>; onAddCompany: (company: string) => void;
+  onMove: (job: JobApplication, status: JobStatus) => void; onOpen: (job: JobApplication) => void;
+}) {
   const [over, setOver] = useState<JobStatus | null>(null);
 
   const drop = (e: DragEvent, status: JobStatus) => {
@@ -479,6 +482,18 @@ function Board({ jobs, today, mySkills, onMove, onOpen }: { jobs: JobApplication
                       <div className="mt-2 flex flex-wrap items-center gap-1.5">
                         {job.deadline && job.status === "saved" && <span className={`badge ${daysTone(job.deadline, today)}`}>{job.deadline < today ? "Closed" : deadlineLabel(job.deadline, today)}</span>}
                         {job.skills.length > 0 && <span className="badge bg-slate-100 text-slate-600">{percent}% match</span>}
+                        {job.company.trim() &&
+                          (listed.has(companyKey(job.company)) ? (
+                            <Link href="/jobs/companies" className="badge whitespace-nowrap bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100" title={`${job.company} is in your company list`}>
+                              <Check className="mr-1 size-3.5" aria-hidden />
+                              In company list
+                            </Link>
+                          ) : (
+                            <button type="button" className="btn btn-secondary btn-sm" onClick={() => onAddCompany(job.company)} title={`Add ${job.company} to your company list`} aria-label={`Add company: ${job.company}`}>
+                              <Building2 className="size-3.5" aria-hidden />
+                              Add company
+                            </button>
+                          ))}
                       </div>
                       <div className="mt-2 md:hidden">
                         <StatusSelect status={job.status} onChange={(status) => onMove(job, status)} />

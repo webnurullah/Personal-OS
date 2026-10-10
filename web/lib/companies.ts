@@ -23,10 +23,14 @@ export function readLink(kind: LinkKind, text: string): { link: string } | { pro
   if (!typed) return { link: "" };
   const { label, hosts } = NETWORKS[kind];
   const bad = { problem: `That does not look like a ${label} link.` };
-  if (/\s/.test(typed)) return bad;
+  // No spaces or control characters (a tab, a line break, NUL …) anywhere in a link.
+  if (/[\s\u0000-\u001f\u007f-\u009f]/.test(typed)) return bad;
   // Only web links: "mailto:", "javascript:", "ftp://" and the like are refused; "example.com:8080" has a port, not a scheme.
   if (/^(mailto|javascript|data|tel|file):/i.test(typed) || (/^[a-z][a-z0-9+.-]*:\/\//i.test(typed) && !/^https?:\/\//i.test(typed))) return bad;
-  const link = /^https?:\/\//i.test(typed) ? typed : `https://${typed}`;
+  // "//example.com" (a link copied without its scheme) is read as "example.com".
+  const bare = typed.replace(/^\/\/+/, "");
+  if (!bare) return bad;
+  const link = /^https?:\/\//i.test(bare) ? bare : `https://${bare}`;
   let url: URL;
   try {
     url = new URL(link);
@@ -34,9 +38,11 @@ export function readLink(kind: LinkKind, text: string): { link: string } | { pro
     return bad;
   }
   const host = url.hostname.toLowerCase();
-  if (!host.includes(".") || host.startsWith(".") || host.endsWith(".")) return bad;
+  // A real host: dotted, no empty part, and its last part is a name (a lone number such as "2026" would be read as an IP address).
+  const parts = host.split(".");
+  if (parts.length < 2 || parts.some((part) => part === "") || !/[a-z]/.test(parts[parts.length - 1])) return bad;
   if (hosts && !hosts.some((h) => host === h || host.endsWith(`.${h}`))) return bad;
-  if (link.length > 500) return { problem: "That link is too long (500 letters at most)." };
+  if (link.length > 500) return { problem: "That link is too long (500 letters at most, with https:// in front)." };
   return { link };
 }
 

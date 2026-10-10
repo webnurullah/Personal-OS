@@ -72,7 +72,7 @@ export function CompaniesView() {
         </div>
       ) : (
         <>
-          {companies.length > 5 && (
+          {(companies.length > 5 || query) && (
             <div className="relative mt-6 max-w-sm">
               <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" aria-hidden />
               <input className="input pl-10" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search companies" aria-label="Search companies" autoComplete="off" />
@@ -117,7 +117,7 @@ export function CompaniesView() {
                     ) : (
                       <p className="mt-4 text-sm text-slate-400">
                         No links yet.{" "}
-                        <button type="button" className="font-medium text-blue-600" onClick={() => setEditing(company)}>Add them</button>
+                        <button type="button" className="font-medium text-blue-600" onClick={() => setEditing(company)} aria-label={`Add links for ${company.name}`}>Add links</button>
                       </p>
                     )}
                     {company.note && <p className="mt-3 line-clamp-3 text-sm text-slate-600">{company.note}</p>}

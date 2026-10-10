@@ -50,13 +50,24 @@ for (const width of [390, 320, 1280]) {
   check(`${width}px: the Applications tab does not overflow (long company name, Add company buttons)`, !m.zoomedOut && m.mainClipped === 0 && m.offenders.length === 0, JSON.stringify(m));
   const tabs = page.getByRole("navigation", { name: "Job Apply sections" });
   check(`${width}px: Job Apply has the tabs Applications and Company list`, JSON.stringify(await tabs.getByRole("link").allInnerTexts()) === JSON.stringify(["Applications", "Company list"]));
-  check(`${width}px: a company not in the list has "Add company"; one that is shows "In company list" (spelled differently)`, (await page.getByRole("button", { name: "Add Markopolo AI INC to the company list" }).count()) === 1 && (await page.getByText("In company list").count()) === 2 && (await page.getByRole("button", { name: /Add acme/i }).count()) === 0, "the 100-letter company is in the list too");
+  check(`${width}px: a company not in the list has "Add company"; one that is shows "In company list" (spelled differently)`, (await page.getByRole("button", { name: "Add company: Markopolo AI INC" }).count()) === 1 && (await page.getByText("In company list").count()) === 2 && (await page.getByRole("button", { name: /Add acme/i }).count()) === 0, "the 100-letter company is in the list too");
   check(`${width}px: a job without a company has neither`, (await page.locator("article", { hasText: "No company" }).getByText(/Add company|In company list/).count()) === 0);
 
-  await page.getByRole("button", { name: "Add Markopolo AI INC to the company list" }).click();
+  await page.getByRole("button", { name: "Add company: Markopolo AI INC" }).click();
   const dialog = page.getByRole("dialog");
   check(`${width}px: the dialog has the company name filled in`, (await dialog.locator("#company-name").inputValue()) === "Markopolo AI INC");
+  await page.waitForTimeout(100);
+  check(`${width}px: with the name filled in, the cursor goes to Website`, await dialog.locator("#company-website").evaluate((el) => el === document.activeElement));
+  // A wrong link is refused on the spot, naming the box, and nothing is sent.
+  await dialog.locator("#company-website").fill("my company site");
+  await dialog.getByRole("button", { name: "Add company" }).click();
+  await page.waitForTimeout(300);
+  check(`${width}px: a link with spaces is refused at once and nothing is sent`, calls.length === 0 && (await page.getByText("Website: That does not look like a website link.").count()) >= 1 && (await dialog.count()) === 1, JSON.stringify(calls));
   await dialog.locator("#company-website").fill("markopolo.ai");
+  await dialog.locator("#company-facebook").fill("linkedin.com/company/x");
+  await dialog.getByRole("button", { name: "Add company" }).click();
+  await page.waitForTimeout(300);
+  check(`${width}px: a LinkedIn link in the Facebook box is refused and says Facebook`, calls.length === 0 && (await page.getByText("Facebook: That does not look like a Facebook link.").count()) >= 1, JSON.stringify(calls));
   await dialog.locator("#company-facebook").fill("facebook.com/markopolo");
   await dialog.locator("#company-linkedin").fill("linkedin.com/company/markopolo");
   m = await measure(page, width);
@@ -64,8 +75,16 @@ for (const width of [390, 320, 1280]) {
   await dialog.getByRole("button", { name: "Add company" }).click();
   await page.waitForTimeout(700);
   const post = calls.find((c) => c.method === "POST");
-  check(`${width}px: it is saved with the name and the three links`, post?.body?.name === "Markopolo AI INC" && post.body.website === "markopolo.ai" && post.body.facebook === "facebook.com/markopolo" && post.body.linkedin === "linkedin.com/company/markopolo", JSON.stringify(post?.body));
-  check(`${width}px: the job's box now says it is in the list`, (await page.getByText("In company list").count()) === 3 && (await page.getByRole("button", { name: "Add Markopolo AI INC to the company list" }).count()) === 0);
+  check(`${width}px: it is saved with the name and the three links (tidied to https://)`, post?.body?.name === "Markopolo AI INC" && post.body.website === "https://markopolo.ai" && post.body.facebook === "https://facebook.com/markopolo" && post.body.linkedin === "https://linkedin.com/company/markopolo", JSON.stringify(post?.body));
+  check(`${width}px: the job's box now says it is in the list`, (await page.getByText("In company list").count()) === 3 && (await page.getByRole("button", { name: "Add company: Markopolo AI INC" }).count()) === 0);
+
+  // ---- the Board view has the same Add company / In company list on its cards
+  await page.getByRole("tab", { name: "Board" }).click();
+  await page.getByText("Sales lead").waitFor();
+  m = await measure(page, width);
+  check(`${width}px: the Board does not overflow`, !m.zoomedOut && m.mainClipped === 0 && m.offenders.length === 0, JSON.stringify(m));
+  check(`${width}px: Board cards show "In company list" for a listed company, and nothing for a job without a company`, (await page.getByText("In company list").count()) === 3 && (await page.locator("article", { hasText: "No company" }).getByText(/Add company|In company list/).count()) === 0);
+  await page.getByRole("tab", { name: "List" }).click().catch(() => {});
 
   // ---- the Company list page
   await page.goto(`${BASE}/jobs/companies`);
@@ -79,6 +98,7 @@ for (const width of [390, 320, 1280]) {
   check(`${width}px: a company shows Website, Facebook and LinkedIn as links that open in a new tab`, JSON.stringify(hrefs.map((h) => [h[0], h[1], h[2]])) === JSON.stringify([["Website", "https://acme.com", "_blank"], ["Facebook", "https://facebook.com/acme", "_blank"], ["LinkedIn", "https://www.linkedin.com/company/acme", "_blank"]]) && hrefs.every((h) => /noopener/.test(h[3])), JSON.stringify(hrefs));
   check(`${width}px: it counts the jobs of that company (matching names)`, (await acme.getByText("1 job in Job Apply").count()) === 1);
   check(`${width}px: a company without links says so`, (await page.locator("li", { hasText: "Markopolo AI INC" }).getByText("No links yet").count()) === 0, "it has three");
+  check(`${width}px: a company without links has "Add links" that names the company`, (await page.getByRole("button", { name: `Add links for ${LONG}` }).count()) === 1);
   check(`${width}px: the note is shown`, (await acme.getByText("Ask for Rahim in HR").count()) === 1);
 
   calls.length = 0;
@@ -96,6 +116,8 @@ for (const width of [390, 320, 1280]) {
 
   calls.length = 0;
   await page.getByRole("button", { name: "Add Company" }).first().click();
+  await page.waitForTimeout(100);
+  check(`${width}px: a new company starts with the cursor in the name`, await page.locator("#company-name").evaluate((el) => el === document.activeElement));
   await page.getByRole("dialog").locator("#company-name").fill("Brand New Ltd");
   await page.getByRole("dialog").getByRole("button", { name: "Add company" }).click();
   await page.waitForTimeout(600);

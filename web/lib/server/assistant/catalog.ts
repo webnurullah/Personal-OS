@@ -102,7 +102,7 @@ const ENDPOINTS: [string, string, string, z.ZodType?][] = [
   ["DELETE", "/jobs/:id", "Delete a saved job (it goes to the Archive)"],
   ["GET", "/companies", "The company list (Job Apply → Company list), A to Z: name, website, Facebook, LinkedIn, note"],
   ["POST", "/companies", "Add a company (name required; links like markopolo.ai are tidied to https://…; a name already in the list is refused)", CompanyFields],
-  ["PATCH", "/companies/:id", "Change a company's name, links or note", CompanyFields],
+  ["PATCH", "/companies/:id", "Change a company's name, links or note (send only what changes)", CompanyFields.partial()],
   ["DELETE", "/companies/:id", "Delete a company (it goes to the Archive)"],
 
   ["GET", "/resources", "The Learning library: certificate courses, YouTube playlists, videos and books to complete (status todo/learning/completed/dropped, progress items_done of items_total, certificate details)"],

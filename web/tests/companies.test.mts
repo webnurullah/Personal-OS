@@ -27,6 +27,20 @@ test("links: only web links, with a real host, and no spaces", () => {
     assert.ok("problem" in readLink("website", bad), `${bad} should be refused`);
   }
   assert.ok("problem" in readLink("website", "https://example.com/" + "a".repeat(500)), "over 500 letters");
+  // A lone number is read as an IP address by the URL reader ("2026" → 0.0.7.234), so it is not a host; neither is a number with a dot.
+  for (const bad of ["2026", "3.5", "0x7f.1", "https://a..b", "a.b.", "//", "///"]) {
+    assert.ok("problem" in readLink("website", bad), `${bad} should be refused`);
+  }
+  // No control characters anywhere (a tab, a line break, NUL), even where the URL reader would drop them.
+  for (const bad of ["exa\u0000mple.com", "example.com\u0007", "exa\tmple.com", "example.com/a\nb", "example.com\u0085"]) {
+    assert.ok("problem" in readLink("website", bad), `${JSON.stringify(bad)} should be refused`);
+  }
+  assert.match((readLink("website", "https://example.com/" + "a".repeat(500)) as { problem: string }).problem, /500 letters at most, with https:\/\/ in front/);
+});
+
+test("links: a link copied without its scheme (//example.com) is read as example.com", () => {
+  assert.deepEqual(readLink("website", "//evil.com"), { link: "https://evil.com" });
+  assert.deepEqual(readLink("facebook", "//facebook.com/markopolo"), { link: "https://facebook.com/markopolo" });
 });
 
 test("links: a Facebook box only takes Facebook, a LinkedIn box only LinkedIn (also their short and country forms)", () => {
@@ -60,6 +74,21 @@ test("the company form: name tidied, links read, strict, partial for a change", 
   const wrong = CompanyFields.safeParse({ name: "A", facebook: "linkedin.com/company/a" });
   assert.equal(wrong.success, false);
   assert.match(JSON.stringify(wrong.error?.issues), /does not look like a Facebook link/);
+  // NUL cannot be stored by Postgres: it is refused at the door with a plain message, not as a database error.
+  assert.equal(CompanyFields.safeParse({ name: "A\u0000B" }).success, false);
+  assert.equal(CompanyFields.safeParse({ name: "A", note: "x\u0000y" }).success, false);
+  assert.equal(CompanyFields.safeParse({ name: "A", website: "exa\u0000mple.com" }).success, false);
   assert.equal(CompanyFields.partial().strict().safeParse({ linkedin: "lnkd.in/x" }).success, true);
   assert.equal(CompanyFields.partial().strict().safeParse({}).success, true);
+});
+
+test("the assistant changes a company without sending its name again", async () => {
+  const { API_GUIDE } = await import("../lib/server/assistant/catalog.ts");
+  const lines = API_GUIDE.split("\n");
+  const at = lines.findIndex((l: string) => l.startsWith("PATCH /companies/:id"));
+  assert.ok(at >= 0, "the endpoint is listed");
+  const body = JSON.parse(lines[at + 1].replace(/^\s*body:\s*/, ""));
+  assert.ok(!(body.required ?? []).includes("name"), "name is not required for a change");
+  const post = JSON.parse(lines[lines.findIndex((l: string) => l.startsWith("POST /companies")) + 1].replace(/^\s*body:\s*/, ""));
+  assert.deepEqual(post.required, ["name"]);
 });

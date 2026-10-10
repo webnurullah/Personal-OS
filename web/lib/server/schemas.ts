@@ -155,11 +155,11 @@ const companyLink = (kind: LinkKind) =>
     return read.link;
   });
 export const CompanyFields = z.object({
-  name: z.string().transform(tidyName).pipe(z.string().min(1, "Required").max(200)),
+  name: z.string().transform(tidyName).pipe(z.string().min(1, "Required").max(200).refine((v) => !v.includes("\u0000"), "That name has a character that cannot be saved.")),
   website: companyLink("website").optional(),
   facebook: companyLink("facebook").optional(),
   linkedin: companyLink("linkedin").optional(),
-  note: s.optionalText(1000).optional(),
+  note: s.optionalText(1000).refine((v) => !v.includes("\u0000"), "That note has a character that cannot be saved.").optional(),
 }).strict();
 
 // ---------- Courses ----------

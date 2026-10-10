@@ -86,7 +86,12 @@ export function refreshAll() {
 
 /** A friendly message for any error. */
 export function errorMessage(error: unknown) {
-  if (error instanceof ApiError) return error.message;
+  if (error instanceof ApiError) {
+    // "Please check the values you sent." with the first field's own reason: "(facebook: That does not look like a Facebook link.)"
+    const fields = (error.details as { fieldErrors?: Record<string, unknown> } | undefined)?.fieldErrors;
+    const first = fields && typeof fields === "object" ? Object.entries(fields).find(([, v]) => Array.isArray(v) && typeof v[0] === "string") : undefined;
+    return first ? `${error.message} (${first[0]}: ${(first[1] as string[])[0]})` : error.message;
+  }
   if (error instanceof Error) return error.message;
   return "Something went wrong.";
 }

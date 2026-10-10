@@ -682,7 +682,7 @@ function page_add(page, label) {
 
 unit("jobs", "/jobs", heading, () => ({ "/jobs": jobs, "/companies": companies, "/resources": resources, "/jobs/analyze": jobAnalysis }), [
   scene("Add company from a job", async (page, snap) => {
-    await openDialog(page, page.getByRole("button", { name: /to the company list/ }).first());
+    await openDialog(page, page.getByRole("button", { name: /^Add company/ }).first());
     await snap("quick add dialog (company name filled in)");
     await fillAll(page, dlg(page));
     await snap("long text typed");
