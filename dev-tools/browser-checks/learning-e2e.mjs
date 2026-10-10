@@ -112,6 +112,21 @@ const browser = await launch();
   check("wide: two courses share the first row", links.length === 3 && links[0].top === links[1].top && links[1].left > links[0].left && links[2].top > links[0].top, JSON.stringify(links));
   check("wide: both are about the same width (half the card)", Math.abs(links[0].width - links[1].width) <= 2, JSON.stringify(links));
   if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/learning-wide.png`, fullPage: true });
+  // Like a project box: no white card around the boxes, an archive button on each, asking first.
+  const outer = await section.evaluate((el) => getComputedStyle(el).backgroundColor);
+  check("the boxes sit on the page background (no white card around them)", outer === "rgba(0, 0, 0, 0)", outer);
+  const deletes = [];
+  await ctx.route(/\/api\/courses\/c1$/, (route) => {
+    if (route.request().method() === "DELETE") {
+      deletes.push(route.request().url());
+      return route.fulfill({ json: { ok: true } });
+    }
+    return route.fallback();
+  });
+  await page.getByRole("button", { name: "Archive Digital Marketing" }).click();
+  await page.getByRole("button", { name: "Delete course" }).click();
+  await page.waitForTimeout(600);
+  check("the archive button asks first, then moves the course to the Archive", deletes.length === 1, JSON.stringify(deletes));
   // The week's planned sessions can still be ticked and removed (a closed list under the week in review).
   const details = page.locator("details", { hasText: "Study sessions this week" });
   check("a planned session is listed (closed) so it can still be ticked or removed", (await details.count()) === 1 && (await details.getAttribute("open")) === null);

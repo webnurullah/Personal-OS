@@ -1,15 +1,16 @@
 "use client";
 
 import { toArchive } from "@/lib/archive";
+import { cacheMutate } from "@/lib/cache";
+import { colorOf } from "@/lib/colors";
 import { useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
-import { ArrowUpRight, GraduationCap, Hourglass, Plus, Sparkles, Timer, Trash2 } from "lucide-react";
+import { Archive, GraduationCap, Hourglass, Plus, Sparkles, Timer, Trash2 } from "lucide-react";
 import { api, errorMessage, refresh } from "@/lib/api";
 import { addDays, formatDate, mondayOf, weekdayIndex } from "@/lib/dates";
 import { COURSE_TEMPLATES, templateWeeks } from "@/lib/course-templates";
-import { timeLeft } from "@/lib/course";
 import { hm, num, plural } from "@/lib/format";
 import { useNewAction } from "@/lib/new-action";
 import { OUTLINE_LIMITS, parseOutline } from "@/lib/outline";
@@ -18,7 +19,7 @@ import { clock } from "@/lib/focus";
 import { REVISION_DAYS } from "@/lib/revision";
 import { forecastText } from "@/lib/study";
 import { useFocus } from "@/lib/use-focus";
-import type { LearningWeek, RevisionDue, StudyBlock, StudyNextItem } from "@/lib/types";
+import type { CourseSummary, LearningWeek, RevisionDue, StudyBlock, StudyNextItem } from "@/lib/types";
 import { Progress } from "@/components/ui/charts";
 import { Field } from "@/components/ui/controls";
 import { useFeedback } from "@/components/ui/feedback";
@@ -26,6 +27,13 @@ import { Modal, ModalActions } from "@/components/ui/modal";
 import { LoadError, PageHeader, PageSkeleton } from "@/components/ui/states";
 import { LearningTabs } from "./learning-tabs";
 import { StudyNext } from "./study-next";
+
+/** The badge on a course card: "Due in 20 days", "Due today", "Date passed". */
+function courseTimeBadge(daysLeft: number) {
+  if (daysLeft < 0) return "Date passed";
+  if (daysLeft === 0) return "Due today";
+  return `Due in ${daysLeft} ${daysLeft === 1 ? "day" : "days"}`;
+}
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
@@ -89,6 +97,20 @@ export function LearningView() {
       () => api(item.kind === "topic" ? `/topics/${item.id}` : `/resources/${item.id}`, { method: "PATCH", body: { revision_step: item.step + 1 } }),
       item.step + 1 >= REVISION_DAYS.length ? "All three looks done. Well done!" : `Revised. The next look is in ${REVISION_DAYS[item.step + 1] - REVISION_DAYS[item.step]} days.`,
     );
+  /** Moves a course (with its units, topics and hours) to the Archive, after asking; it can be restored from there. */
+  const archiveCourse = async (course: CourseSummary) => {
+    const ok = await confirm({ title: "Delete this course?", message: toArchive(`“${course.title}” and all its units, topics and logged hours`), action: "Delete course" });
+    if (!ok) return;
+    try {
+      await api(`/courses/${course.id}`, { method: "DELETE" });
+      // Forget the saved copy of its page, so Back or another tab cannot bring the deleted course back.
+      cacheMutate(`/courses/${course.id}`, undefined, { revalidate: false }).catch(() => undefined);
+      toast("Course moved to the Archive");
+    } catch (e) {
+      toast(errorMessage(e), "error");
+    }
+    await refresh("/learning", "/courses");
+  };
   const finishTopic = (item: StudyNextItem) =>
     run(() => api(`/topics/${item.topic_id}`, { method: "PATCH", body: { status: "done" } }), `${item.code} marked finished`);
 
@@ -122,7 +144,7 @@ export function LearningView() {
 
       <StudyNext data={data} onLog={(topicId) => openLog(`t:${topicId}`, true)} onFinish={finishTopic} onFocus={(topicId) => focus.start(`t:${topicId}`)} onRevised={markRevised} />
 
-      <section className="card mt-5 p-5" aria-labelledby="courses-title">
+      <section className="mt-5" aria-labelledby="courses-title">
         <div className="flex items-center justify-between">
           <h2 id="courses-title" className="card-title">My courses</h2>
           <button type="button" className="btn btn-secondary btn-sm" onClick={() => setNewCourse(true)}>
@@ -130,41 +152,58 @@ export function LearningView() {
           </button>
         </div>
         {data.courses.length ? (
-          <ul className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {data.courses.map((course) => (
-              <li key={course.id}>
-                <Link href={`/learning/${course.id}`} className="group block h-full rounded-2xl border border-slate-200 p-4 transition hover:border-blue-200 hover:bg-blue-50/40">
-                  <div className="flex items-start gap-3">
-                    <span className="icon-tile size-10 bg-[#12305a] text-white">
-                      <GraduationCap className="size-5" />
+          <ul className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {data.courses.map((course) => {
+              const color = colorOf(course.color);
+              const tone = course.days_left < 0 ? "bg-rose-50 text-rose-700" : course.days_left <= 7 ? "bg-amber-50 text-amber-700" : "bg-slate-100 text-slate-600";
+              return (
+                <li key={course.id} className="card relative transition hover:shadow-md">
+                  <Link href={`/learning/${course.id}`} className="block h-full rounded-2xl p-5 pr-14 focus-visible:outline-2 focus-visible:outline-blue-400">
+                    <span className="flex items-start gap-3">
+                      <span className={`icon-tile size-10 shrink-0 ${color.tile}`}>
+                        <GraduationCap className="size-5" aria-hidden />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-base font-semibold text-slate-900" title={course.title}>{course.title}</span>
+                        <span className="block truncate text-sm text-slate-500">{plural(course.unit_count, "unit")} · {plural(course.topic_count, "topic")}</span>
+                      </span>
                     </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="line-clamp-2 font-semibold leading-snug text-slate-900">{course.title}</p>
-                      <p className="text-xs text-slate-500">
-                        {plural(course.unit_count, "unit")} · {plural(course.topic_count, "topic")} · due {formatDate(course.target_date, "date")}
-                      </p>
-                    </div>
-                    <ArrowUpRight className="size-4 shrink-0 text-slate-400 transition group-hover:text-blue-600" />
-                  </div>
-                  <div className="mt-3 flex items-center gap-3">
-                    <Progress value={course.percent} fill="bg-emerald-500" className="h-2 flex-1" />
-                    <span className="text-xs font-semibold text-slate-600">{course.percent}%</span>
-                  </div>
-                  <p className="mt-2 text-xs text-slate-500">
-                    {num(course.done_hours)}h of {num(course.est_hours)}h done · {timeLeft(course.days_left)}
-                  </p>
-                  {course.state === "behind" && (
-                    <p className="mt-1 text-xs font-medium text-amber-700">
-                      Behind: {hm(course.behind_hours)} to catch up{course.weeks_behind > 0 ? ` (${plural(course.weeks_behind, "week")} late)` : ""}
-                    </p>
-                  )}
-                  {course.forecast && course.state !== "done" && <p className="mt-1 text-xs text-slate-500">{forecastText(course.forecast)}</p>}
-                </Link>
-              </li>
-            ))}
+                    <span className="mt-3 flex flex-wrap items-center gap-1.5">
+                      <span className={`badge ${tone}`}>{courseTimeBadge(course.days_left)}</span>
+                      {course.state === "behind" && (
+                        <span className="badge max-w-full bg-amber-50 text-amber-700">
+                          <span className="truncate">Behind: {hm(course.behind_hours)} to catch up{course.weeks_behind > 0 ? ` (${plural(course.weeks_behind, "week")} late)` : ""}</span>
+                        </span>
+                      )}
+                    </span>
+                    <span className="mt-3 block truncate text-sm text-slate-600">
+                      {course.forecast && course.state !== "done" ? forecastText(course.forecast) : `Due ${formatDate(course.target_date, "date")}`}
+                    </span>
+                    <span className="mt-4 block">
+                      <span className="flex items-center gap-3">
+                        <Progress value={course.percent} fill={color.bar} track="bg-slate-100" className="h-1.5 flex-1" />
+                        <span className="text-xs font-semibold text-slate-600">{course.percent}%</span>
+                      </span>
+                      <span className="mt-1.5 block text-xs text-slate-500">
+                        {course.topic_count === 0 ? "No topics yet" : `${num(course.done_hours)}h of ${num(course.est_hours)}h done`}
+                      </span>
+                    </span>
+                  </Link>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm btn-icon absolute right-3 top-3 text-slate-400 hover:text-slate-700"
+                    onClick={() => archiveCourse(course)}
+                    aria-label={`Archive ${course.title}`}
+                    title="Move to the Archive"
+                  >
+                    <Archive className="size-4" />
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         ) : (
-          <p className="mt-4 text-sm text-slate-500">Track a course unit by unit. Add one with “New”.</p>
+          <p className="mt-4 rounded-xl border border-dashed border-slate-200 px-4 py-10 text-center text-sm text-slate-500">Track a course unit by unit. Add one with “New”.</p>
         )}
       </section>
 
