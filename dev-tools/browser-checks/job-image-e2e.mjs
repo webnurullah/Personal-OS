@@ -69,9 +69,10 @@ for (const width of [390, 320, 1280]) {
   if (wide) await ctx.addCookies([{ name: "sb-127-auth-token", value: "base64-" + Buffer.from(JSON.stringify(session)).toString("base64url"), url: BASE }]);
   let list = [job("j1", "Sales lead", { image_url: DOT }), job("j2", LONG, { image_url: DOT }), job("j3", "No picture yet")];
   let failUpload = false;
+  let slowUpload = false;
   const calls = [];
   await apiMock(ctx, { "/jobs": () => ({ today: TODAY, items: list }), "/companies": { today: TODAY, items: [] } });
-  await ctx.route(/\/api\/jobs(\/[^/]+)?(\/image)?$/, (route) => {
+  await ctx.route(/\/api\/jobs(\/[^/]+)?(\/image)?$/, async (route) => {
     const req = route.request();
     if (req.method() === "GET") return route.fallback();
     const path = new URL(req.url()).pathname.replace("/api", "");
@@ -81,6 +82,7 @@ for (const width of [390, 320, 1280]) {
     calls.push({ method: req.method(), url: path, type, bytes: raw, body });
     const id = path.split("/")[2];
     if (path.endsWith("/image")) {
+      if (req.method() === "POST" && slowUpload) await new Promise((resolve) => setTimeout(resolve, 1200));
       if (req.method() === "POST" && failUpload) return route.fulfill({ status: 502, json: { error: "The picture could not be saved. Please try again." } });
       list = list.map((j) => (j.id === id ? { ...j, image_url: req.method() === "POST" ? DOT : null } : j));
       return route.fulfill({ json: list.find((j) => j.id === id) });
@@ -128,7 +130,7 @@ for (const width of [390, 320, 1280]) {
   check(`${width}px: a file that is not a picture is refused with a message, nothing is shown`, /cannot be opened/.test(await form.getByRole("alert").innerText()) && (await form.getByRole("img", { name: "The picture of this job" }).count()) === 0);
 
   // a big picture is chosen: it shows at once
-  await form.locator("#job-picture").setInputFiles({ name: "circular.png", mimeType: "image/png", buffer: png(3000, 1800) });
+  await form.locator("#job-picture").setInputFiles({ name: "circular.png", mimeType: "image/png", buffer: png(3600, 2400) });
   const preview = form.getByRole("img", { name: "The picture of this job" });
   await preview.waitFor();
   check(`${width}px: the chosen picture is shown at once in the form (and the old message is gone)`, (await preview.getAttribute("src")).startsWith("blob:") && (await form.getByRole("alert").count()) === 0);
@@ -147,7 +149,7 @@ for (const width of [390, 320, 1280]) {
   check(`${width}px: the job body has the URL and no picture data`, created?.body?.url === "https://example.com/careers/1" && !("image_url" in created.body) && !("image_path" in created.body), JSON.stringify(created?.body));
   const sent = up?.bytes;
   const size = sent && jpegSize(sent);
-  check(`${width}px: the picture is sent as a JPEG, shrunk to 2000 px on its long side, under 2.5 MB`, up?.type === "image/jpeg" && sent[0] === 0xff && sent[1] === 0xd8 && size?.width === 2000 && size?.height === 1200 && sent.length < 2.5 * 1024 * 1024, JSON.stringify({ type: up?.type, size, bytes: sent?.length }));
+  check(`${width}px: the picture is sent as a JPEG, shrunk to about 8 megapixels (same shape), under 2.5 MB`, up?.type === "image/jpeg" && sent[0] === 0xff && sent[1] === 0xd8 && size && Math.abs(size.width / size.height - 1.5) < 0.01 && size.width * size.height <= 8_020_000 && size.width * size.height >= 7_800_000 && sent.length < 2.5 * 1024 * 1024, JSON.stringify({ type: up?.type, size, bytes: sent?.length }));
   check(`${width}px: after saving, the new job shows its picture`, (await page.getByRole("button", { name: "View the picture of New job with picture" }).count()) === 1);
 
   // ---- Edit: the saved picture is shown in the form, can be removed
@@ -181,6 +183,25 @@ for (const width of [390, 320, 1280]) {
   await retry.getByRole("button", { name: "Save changes" }).click();
   await page.waitForTimeout(800);
   check(`${width}px: if only the picture fails, the job is saved and the message says so`, calls.some((c) => c.method === "PATCH") && (await page.getByText(/The job is saved, but its picture was not/).count()) >= 1, JSON.stringify(calls.map((c) => [c.method, c.url])));
+
+  // ---- while the job and its picture are being saved the dialog cannot be closed (a late save must not close a newer form)
+  slowUpload = true;
+  failUpload = false;
+  calls.length = 0;
+  await page.getByRole("button", { name: /Add Job|Add job/ }).first().click();
+  const slow = page.getByRole("dialog").last();
+  await slow.getByLabel("Job title").fill("Saved slowly");
+  await slow.locator("#job-picture").setInputFiles({ name: "b.png", mimeType: "image/png", buffer: png(600, 400) });
+  await slow.getByRole("img", { name: "The picture of this job" }).waitFor();
+  await slow.getByRole("button", { name: "Add Job" }).click();
+  await page.waitForTimeout(300);
+  check(`${width}px: while saving, Cancel is disabled and Esc does not close the form`, await slow.getByRole("button", { name: "Cancel" }).isDisabled());
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(150);
+  check(`${width}px: the form is still open after Esc while saving`, (await page.getByRole("dialog").count()) >= 1 && (await slow.getByLabel("Job title").inputValue()) === "Saved slowly");
+  await page.waitForTimeout(1600);
+  check(`${width}px: when the save is done it closes by itself, with the picture on the new job`, (await page.getByRole("button", { name: "View the picture of Saved slowly" }).count()) === 1 && calls.some((c) => c.url === "/jobs/jnew/image"), JSON.stringify(calls.map((c) => [c.method, c.url])));
+  slowUpload = false;
 
   // ---- the Board view keeps working with pictures
   await page.getByRole("tab", { name: "Board" }).click();

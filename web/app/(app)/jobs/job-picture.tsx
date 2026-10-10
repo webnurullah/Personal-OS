@@ -20,6 +20,7 @@ export function JobPictureField({ shown, preparing, error, onFile, onRemove }: {
         accept="image/*"
         className="sr-only"
         tabIndex={-1}
+        disabled={preparing}
         onChange={(e) => {
           const file = e.target.files?.[0];
           e.target.value = ""; // choosing the same file again must work too

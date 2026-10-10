@@ -334,7 +334,7 @@ async function fillAll(page, scope, seed = 0) {
   const selects = scope.locator("select");
   for (let i = 0, n = await selects.count(); i < n; i++) {
     const s = selects.nth(i);
-    if (!(await s.isVisible()) || !(await s.isEnabled())) continue;
+    if (!(await s.isVisible().catch(() => false)) || !(await s.isEnabled({ timeout: 500 }).catch(() => false))) continue; // (a form can change its fields while it is filled)
     const value = await s.evaluate((el) => { let best = null; for (const o of el.options) if (!o.disabled && (!best || o.text.length > best.text.length)) best = o; return best ? best.value : null; });
     if (value !== null) await s.selectOption(value, { timeout: 1500 }).catch(() => undefined);
   }
@@ -342,14 +342,14 @@ async function fillAll(page, scope, seed = 0) {
   const texts = scope.locator("input:not([type]), input[type=text], input[type=search], input[type=url], input[type=email], textarea");
   for (let i = 0, n = await texts.count(); i < n; i++) {
     const el = texts.nth(i);
-    if (!(await el.isVisible()) || !(await el.isEditable())) continue;
+    if (!(await el.isVisible().catch(() => false)) || !(await el.isEditable({ timeout: 500 }).catch(() => false))) continue;
     const max = Number(await el.getAttribute("maxlength")) || 0;
     await el.fill(H(seed + i, max || undefined), { timeout: 1500 }).catch(() => undefined);
   }
   const numbers = scope.locator("input[type=number]");
   for (let i = 0, n = await numbers.count(); i < n; i++) {
     const el = numbers.nth(i);
-    if (!(await el.isVisible()) || !(await el.isEditable())) continue;
+    if (!(await el.isVisible().catch(() => false)) || !(await el.isEditable({ timeout: 500 }).catch(() => false))) continue;
     await el.fill("12345678.5", { timeout: 1500 }).catch(() => undefined);
   }
   await settle(page, 200);

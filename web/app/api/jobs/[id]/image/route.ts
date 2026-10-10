@@ -1,10 +1,11 @@
 import { handle } from "@/lib/server/api";
 import { sniffImage } from "@/lib/server/avatar";
 import { HttpError, must } from "@/lib/server/http";
-import { imagePath, JOB_IMAGE_BUCKET, JOB_IMAGE_MAX_BYTES, presentJob, removeJobImages } from "@/lib/server/job-image";
+import { imagePath, JOB_IMAGE_BUCKET, JOB_IMAGE_MAX_BYTES, presentJob, removeJobImages, sameImage } from "@/lib/server/job-image";
 import { parse, s } from "@/lib/server/validate";
 
 const TOO_LARGE = "That picture is too large. Choose a smaller one.";
+const CHANGED = "This job's picture was changed somewhere else. Reload the page and try again.";
 
 /**
  * Saves a picture with a job (replacing the old one). The body is the picture itself (the app sends a JPEG
@@ -31,22 +32,30 @@ export const POST = handle<{ id: string }>(async ({ db, user, params, req }) => 
     throw new HttpError(502, "The picture could not be saved. Please try again.", stored.error.message);
   }
 
+  // Only if the job still has the picture read above: a second tab that changed it meanwhile wins, and this upload is undone
+  // (otherwise the file that is replaced first would be left behind in the bucket with nothing pointing at it).
   let job;
   try {
-    job = must(await db.from("job_applications").update({ image_path: path }).eq("id", id).select().single());
+    job = must(await sameImage(db.from("job_applications").update({ image_path: path }).eq("id", id), before).select().maybeSingle());
   } catch (error) {
     await removeJobImages(db, user.id, [path]);
     throw error;
   }
-  if (before !== path) await removeJobImages(db, user.id, [before]);
+  if (!job) {
+    await removeJobImages(db, user.id, [path]);
+    throw new HttpError(409, CHANGED);
+  }
+  await removeJobImages(db, user.id, [before]);
   return presentJob(db, user.id, job);
 });
 
 /** Takes the picture off a job (and deletes the file). */
 export const DELETE = handle<{ id: string }>(async ({ db, user, params }) => {
   const id = parse(s.id, params.id);
-  const before = must(await db.from("job_applications").select("image_path").eq("id", id).single()).image_path;
-  const job = must(await db.from("job_applications").update({ image_path: null }).eq("id", id).select().single());
-  await removeJobImages(db, user.id, [before]);
+  const current = must(await db.from("job_applications").select("*").eq("id", id).single());
+  if (!current.image_path) return presentJob(db, user.id, current);
+  const job = must(await sameImage(db.from("job_applications").update({ image_path: null }).eq("id", id), current.image_path).select().maybeSingle());
+  if (!job) throw new HttpError(409, CHANGED);
+  await removeJobImages(db, user.id, [current.image_path]);
   return presentJob(db, user.id, job);
 });

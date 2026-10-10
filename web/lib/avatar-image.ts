@@ -66,14 +66,17 @@ async function decode(file: File): Promise<{ source: CanvasImageSource; width: n
   }
 }
 
-/** The size a picture gets when its longest side may be `max` pixels at most (never enlarged). */
-export function fitSize(width: number, height: number, max: number) {
-  const scale = Math.min(1, max / Math.max(width, height));
+/**
+ * The size a picture gets when its longest side may be `max` pixels at most and (when given) it may have `maxPixels` pixels in all.
+ * It is never enlarged. The pixel limit keeps a very tall screenshot readable: its width is not squeezed to fit its height.
+ */
+export function fitSize(width: number, height: number, max: number, maxPixels = Infinity) {
+  const scale = Math.min(1, max / Math.max(width, height), Math.sqrt(maxPixels / (width * height)));
   return { width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale)) };
 }
 
-/** Opens the chosen file as a picture (white behind any see-through parts, big pictures shrunk to `maxSize` pixels for speed). */
-export async function loadPicture(file: File, maxSize = WORKING_SIZE): Promise<Picture> {
+/** Opens the chosen file as a picture (white behind any see-through parts, big pictures shrunk to `maxSize` pixels, and `maxPixels` in all, for speed). */
+export async function loadPicture(file: File, maxSize = WORKING_SIZE, maxPixels = Infinity): Promise<Picture> {
   if (file.type && (!file.type.startsWith("image/") || file.type === "image/svg+xml")) throw new PictureError("Please choose a picture (JPG, PNG or WebP).");
   if (file.size > MAX_SOURCE_BYTES) throw new PictureError("That picture is too large (over 30 MB). Choose a smaller one.");
   let decoded;
@@ -85,7 +88,7 @@ export async function loadPicture(file: File, maxSize = WORKING_SIZE): Promise<P
   try {
     const { source, width, height } = decoded;
     if (!width || !height) throw new PictureError("This picture cannot be opened here. Try a JPG or PNG photo.");
-    const size = fitSize(width, height, maxSize);
+    const size = fitSize(width, height, maxSize, maxPixels);
     const canvas = document.createElement("canvas");
     canvas.width = size.width;
     canvas.height = size.height;

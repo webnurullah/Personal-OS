@@ -1,7 +1,7 @@
 "use client";
 
 import { toArchive } from "@/lib/archive";
-import { useEffect, useState, type DragEvent, type FormEvent } from "react";
+import { useEffect, useRef, useState, type DragEvent, type FormEvent } from "react";
 import Link from "next/link";
 import useSWR from "swr";
 import { Building2, BriefcaseBusiness, CalendarClock, Check, ChevronDown, Download, ExternalLink, GraduationCap, LayoutGrid, Link2, List as ListIcon, Loader2, MapPin, Pencil, Plus, Sparkles, Trash2, X } from "lucide-react";
@@ -50,6 +50,7 @@ export function JobsView() {
   const { data: profile, mutate: mutateProfile } = useSWR<Profile>("/profile");
   const { data: library } = useSWR<{ items: LearningResource[] }>("/resources");
   const { data: companyList } = useSWR<List<Company>>("/companies");
+  const [savingJob, setSavingJob] = useState(false); // while a job (and its picture) is being saved the dialog cannot be closed
   const [addingCompany, setAddingCompany] = useState<string | null>(null); // the company of the job whose "Add company" was pressed
   const { toast, confirm } = useFeedback();
   const [editing, setEditing] = useState<JobApplication | "new" | null>(null);
@@ -291,8 +292,8 @@ export function JobsView() {
       <Modal open={addingCompany !== null} onClose={() => setAddingCompany(null)} title="Add to your company list" description="Links can be typed without https://." size="md">
         {addingCompany !== null && <CompanyForm key={addingCompany} company={null} name={addingCompany} onClose={() => setAddingCompany(null)} />}
       </Modal>
-      <Modal open={editing !== null} onClose={() => setEditing(null)} title={editing === "new" ? "Add a job" : "Edit job"} description={editing === "new" ? "Read a link to fill the form, or type it in yourself." : undefined} size="lg">
-        {editing && <JobForm key={editing === "new" ? "new" : editing.id} job={editing === "new" ? null : editing} today={today} onClose={() => setEditing(null)} />}
+      <Modal open={editing !== null} onClose={() => setEditing(null)} title={editing === "new" ? "Add a job" : "Edit job"} description={editing === "new" ? "Read a link to fill the form, or type it in yourself." : undefined} size="lg" dismissible={!savingJob}>
+        {editing && <JobForm key={editing === "new" ? "new" : editing.id} job={editing === "new" ? null : editing} today={today} onClose={() => setEditing(null)} onSaving={setSavingJob} />}
       </Modal>
     </>
   );
@@ -561,7 +562,7 @@ function SkillsCard({ skills, onSave }: { skills: string[]; onSave: (skills: str
 }
 
 /** Add or edit a job. "Read link" fills the fields; every field can be typed or corrected by hand. */
-function JobForm({ job, today, onClose }: { job: JobApplication | null; today: string; onClose: () => void }) {
+function JobForm({ job, today, onClose, onSaving }: { job: JobApplication | null; today: string; onClose: () => void; onSaving: (saving: boolean) => void }) {
   const { toast } = useFeedback();
   const [busy, setBusy] = useState(false);
   const [reading, setReading] = useState(false);
@@ -595,17 +596,27 @@ function JobForm({ job, today, onClose }: { job: JobApplication | null; today: s
     };
   }, [picture]);
   const shownPicture = picture?.url ?? (removePicture ? null : job?.image_url ?? null);
+  const choice = useRef(0); // which choice is the latest: a slower, older one must not replace it
+  const open = useRef(true);
+  useEffect(() => {
+    open.current = true;
+    return () => {
+      open.current = false;
+    };
+  }, []);
   const choosePicture = async (file: File) => {
+    const mine = ++choice.current;
     setPreparing(true);
     setPictureError("");
     try {
       const blob = await prepareJobImage(file);
+      if (mine !== choice.current || !open.current) return;
       setPicture({ blob, url: URL.createObjectURL(blob) });
       setRemovePicture(false);
     } catch (err) {
-      setPictureError(err instanceof PictureError ? err.message : "This picture cannot be opened here. Try a JPG or PNG photo.");
+      if (mine === choice.current && open.current) setPictureError(err instanceof PictureError ? err.message : "This picture cannot be opened here. Try a JPG or PNG photo.");
     } finally {
-      setPreparing(false);
+      if (mine === choice.current && open.current) setPreparing(false);
     }
   };
   const dropPicture = () => {
@@ -646,6 +657,7 @@ function JobForm({ job, today, onClose }: { job: JobApplication | null; today: s
     if (url && !/^https?:\/\/\S+$/i.test(url)) return setError("The link should start with https://");
     if (!f.title.trim()) return setError("Add the job title.");
     setBusy(true);
+    onSaving(true);
     setError("");
     const body = {
       url,
@@ -679,6 +691,7 @@ function JobForm({ job, today, onClose }: { job: JobApplication | null; today: s
       setError(errorMessage(err));
     } finally {
       setBusy(false);
+      onSaving(false);
     }
   };
 
@@ -765,7 +778,7 @@ function JobForm({ job, today, onClose }: { job: JobApplication | null; today: s
         <textarea id="job-notes" className="input min-h-16" value={f.notes} onChange={set("notes")} maxLength={5000} placeholder="Contact person, documents to send, interview date…" />
       </Field>
 
-      <ModalActions onCancel={onClose} submitLabel={job ? "Save changes" : "Add Job"} busy={busy} disabled={preparing} />
+      <ModalActions onCancel={onClose} submitLabel={job ? "Save changes" : "Add Job"} busy={busy} disabled={preparing} cancelDisabled={busy} />
     </form>
   );
 }

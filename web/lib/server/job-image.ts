@@ -45,3 +45,8 @@ export async function removeAllJobImages(db: Db, userId: string) {
     }
   }
 }
+
+/** Limits an update to the job whose picture is still `before` (null means: no picture yet). */
+export function sameImage<Q extends { is(column: "image_path", value: null): Q; eq(column: "image_path", value: string): Q }>(query: Q, before: string | null) {
+  return before === null ? query.is("image_path", null) : query.eq("image_path", before);
+}

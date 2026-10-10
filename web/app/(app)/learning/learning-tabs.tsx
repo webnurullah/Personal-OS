@@ -20,14 +20,15 @@ export function LearningTabs({ current }: { current: "courses" | "library" }) {
 
 /**
  * The row under the Learning title, the same on both parts: the two sections on the left, what to show (a filter) in the
- * middle and the buttons that add things on the right. On a narrow screen the three groups wrap onto their own lines.
+ * middle and the buttons that add things on the right (spread evenly on a very wide screen, the buttons pushed to the right edge
+ * on a laptop). On a narrow screen the three groups wrap onto their own lines.
  */
 export function LearningToolbar({ current, filter, actions }: { current: "courses" | "library"; filter?: ReactNode; actions: ReactNode }) {
   return (
-    <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-3 lg:justify-between">
+    <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-3 2xl:justify-between">
       <LearningTabs current={current} />
       {filter}
-      <div className="flex min-w-0 flex-wrap items-center gap-2 sm:ml-auto lg:ml-0">{actions}</div>
+      <div className="flex min-w-0 flex-wrap items-center gap-2 sm:ml-auto 2xl:ml-0">{actions}</div>
     </div>
   );
 }
