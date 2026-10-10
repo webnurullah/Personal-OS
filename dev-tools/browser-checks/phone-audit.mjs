@@ -869,7 +869,7 @@ unit("learning", "/learning", heading, () => ({ "/learning/week": (_m, url) => (
     await snap("form on a topic");
   }),
   scene("New course dialog", async (page, snap) => {
-    await openDialog(page, page.locator("section[aria-labelledby='courses-title']").getByRole("button", { name: "New" }));
+    await openDialog(page, page.getByRole("button", { name: "Add a course" }));
     await snap("empty form");
     await fillAll(page, dlg(page));
     await snap("long text typed");

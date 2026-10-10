@@ -163,6 +163,24 @@ await ctx.close();
   await c2.close();
 }
 
+// The header row on a wide screen (the new Learning header design): the two sections, what to show, and the buttons that add, on one line.
+{
+  const wide = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  await wide.addCookies([{ name: "sb-127-auth-token", value: "base64-" + Buffer.from(JSON.stringify(session)).toString("base64url"), url: BASE }]);
+  await stateful(wide);
+  const pw = await wide.newPage();
+  await pw.goto(`${BASE}/learning/library`);
+  await pw.getByText("SEO full course").first().waitFor();
+  const at = async (loc) => { const b = await loc.boundingBox(); return { x: Math.round(b.x), y: Math.round(b.y) }; };
+  const parts = [await at(pw.getByRole("navigation", { name: "Learning sections" })), await at(pw.getByRole("tablist", { name: "Show" })), await at(pw.getByRole("button", { name: "Ideas" })), await at(pw.getByRole("button", { name: "Paste a list" })), await at(pw.getByRole("button", { name: "Add", exact: true }))];
+  check("wide: the sections, To do / Completed / Certificates, Ideas, Paste a list and Add are on one line, in that order", Math.max(...parts.map((p) => p.y)) - Math.min(...parts.map((p) => p.y)) <= 6 && parts.every((p, i) => i === 0 || p.x > parts[i - 1].x), JSON.stringify(parts));
+  check("wide: the 'Show' buttons are not repeated under the totals", (await pw.getByRole("tablist", { name: "Show" }).count()) === 1);
+  check("wide: the search and filters are still there", (await pw.getByLabel("Search the library").count()) === 1 && (await pw.getByLabel("Subject").count()) === 1);
+  const mw = await measure(pw, 1440);
+  check("wide: the library page fits", !mw.zoomedOut && mw.mainClipped === 0, JSON.stringify(mw));
+  await wide.close();
+}
+
 check("no page errors", errors.length === 0, errors.join(" | "));
 await browser.close();
 console.log(failures ? `\n${failures} check(s) FAILED` : "\nAll checks passed");

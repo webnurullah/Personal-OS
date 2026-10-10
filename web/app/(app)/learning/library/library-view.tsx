@@ -13,7 +13,7 @@ import type { CourseSummary, LearningResource, ResourceKind } from "@/lib/types"
 import { Segmented } from "@/components/ui/controls";
 import { Modal } from "@/components/ui/modal";
 import { EmptyState, LoadError, PageHeader, PageSkeleton } from "@/components/ui/states";
-import { LearningTabs } from "../learning-tabs";
+import { LearningToolbar } from "../learning-tabs";
 import { PasteList, StarterIdeas } from "./add-many";
 import { CompleteDialog } from "./complete-dialog";
 import { ResourceForm } from "./resource-form";
@@ -83,21 +83,40 @@ export function LibraryView() {
 
   return (
     <>
-      <PageHeader title="Learning" description="Collect the courses and playlists you want to finish, and keep your certificates in one place.">
-        <button type="button" className="btn btn-secondary" onClick={() => setAdding("ideas")}>
-          <Sparkles className="size-4" />
-          Ideas
-        </button>
-        <button type="button" className="btn btn-secondary" onClick={() => setAdding("list")}>
-          <ListChecks className="size-4" />
-          Paste a list
-        </button>
-        <button type="button" className="btn btn-primary" onClick={() => setEditing("new")}>
-          <Plus className="size-4" />
-          Add
-        </button>
-      </PageHeader>
-      <LearningTabs current="library" />
+      <PageHeader title="Learning" description="Collect the courses and playlists you want to finish, and keep your certificates in one place." />
+      <LearningToolbar
+        current="library"
+        filter={
+          items.length > 0 && (
+            <Segmented
+              label="Show"
+              value={view}
+              onChange={setView}
+              options={[
+                { value: "todo", label: `To do (${open.length})` },
+                { value: "completed", label: `Completed (${completed.length})` },
+                { value: "certificates", label: `Certificates (${certificates.length})` },
+              ]}
+            />
+          )
+        }
+        actions={
+          <>
+            <button type="button" className="btn btn-secondary" onClick={() => setAdding("ideas")}>
+              <Sparkles className="size-4" />
+              Ideas
+            </button>
+            <button type="button" className="btn btn-secondary" onClick={() => setAdding("list")}>
+              <ListChecks className="size-4" />
+              Paste a list
+            </button>
+            <button type="button" className="btn btn-primary" onClick={() => setEditing("new")}>
+              <Plus className="size-4" />
+              Add
+            </button>
+          </>
+        }
+      />
 
       {items.length === 0 ? (
         <div className="card mt-5">
@@ -121,17 +140,7 @@ export function LibraryView() {
             <Stat label="Spent" value={stats.spent ? money(stats.spent) : "Free"} tone="text-slate-700" />
           </div>
 
-          <div className="mt-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <Segmented
-              label="Show"
-              value={view}
-              onChange={setView}
-              options={[
-                { value: "todo", label: `To do (${open.length})` },
-                { value: "completed", label: `Completed (${completed.length})` },
-                { value: "certificates", label: `Certificates (${certificates.length})` },
-              ]}
-            />
+          <div className="mt-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-end">
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto] lg:w-auto lg:min-w-[34rem]">
               <div className="relative min-w-0">
                 <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />

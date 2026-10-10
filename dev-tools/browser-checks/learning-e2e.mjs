@@ -137,6 +137,21 @@ const browser = await launch();
   const tabs = async (label) => (await page.getByRole("tablist", { name: label }).getByRole("tab").allInnerTexts()).map((t) => t.trim());
   check("the category tabs are All, then each category in use (spelled the same way once), then Other", JSON.stringify(await tabs("Category")) === JSON.stringify(["All", "Data", "Digital Marketing", "Other"]), JSON.stringify(await tabs("Category")));
   check("the status tabs count every course", JSON.stringify(await tabs("Status")) === JSON.stringify(["Active (4)", "Paused (1)", "Done (1)"]), JSON.stringify(await tabs("Status")));
+  // The row under the title: the two sections, the status buttons and the buttons that add, on one line (the new header design).
+  const toolbar = async () => {
+    const y = async (loc) => Math.round((await loc.boundingBox()).y);
+    const x = async (loc) => Math.round((await loc.boundingBox()).x);
+    const nav = page.getByRole("navigation", { name: "Learning sections" });
+    const status = page.getByRole("tablist", { name: "Status" });
+    const ideas = page.getByRole("button", { name: "Ideas" });
+    const add = page.getByRole("button", { name: "Add a course" });
+    return { y: [await y(nav), await y(status), await y(ideas), await y(add)], x: [await x(nav), await x(status), await x(ideas), await x(add)] };
+  };
+  const row = await toolbar();
+  check("the header row has the sections, the status buttons, Ideas, Paste a list and Add on one line, in that order", Math.max(...row.y) - Math.min(...row.y) <= 6 && row.x[0] < row.x[1] && row.x[1] < row.x[2] && row.x[2] < row.x[3], JSON.stringify(row));
+  check("the buttons Focus and Log Study Session stay at the top right, next to the title", (await page.getByRole("button", { name: "Focus" }).count()) === 1 && (await page.getByRole("button", { name: "Log Study Session" }).count()) === 1 && (await page.getByRole("button", { name: "Focus" }).boundingBox()).y < row.y[0]);
+  check("the status buttons are not repeated next to the categories", (await page.getByRole("tablist", { name: "Status" }).count()) === 1);
+  check("the course boxes have no 'New' button of their own any more", (await section.getByRole("button", { name: "New" }).count()) === 0);
   const titles = async () => (await section.locator("a").evaluateAll((els) => els.map((e) => e.querySelector("span.truncate")?.textContent ?? ""))).sort();
   await page.getByRole("tablist", { name: "Category" }).getByRole("tab", { name: "Digital Marketing" }).click();
   check("a category shows its courses (Google Ads and Meta Ads), with the category on the box", JSON.stringify(await titles()) === JSON.stringify(["Google Ads", "Meta Ads"]) && (await section.getByText(/^Digital Marketing · 2 units/).count()) >= 1, JSON.stringify(await titles()));
@@ -153,11 +168,22 @@ const browser = await launch();
   await page.getByRole("tablist", { name: "Category" }).getByRole("tab", { name: "All" }).click();
 
   // The course form: a category (suggestions from the ones in use; a template fills it) and, when editing, a status.
-  await section.getByRole("button", { name: "New" }).click();
+  await page.getByRole("button", { name: "Add a course" }).click();
   const dialog = page.getByRole("dialog");
   const options = await dialog.locator("#course-categories option").evaluateAll((els) => els.map((e) => e.value).sort());
   check("the form suggests the categories already in use", JSON.stringify(options) === JSON.stringify(["Data", "Digital Marketing"]), JSON.stringify(options));
   check("a new course has no status field (it starts active)", (await dialog.locator("#course-status").count()) === 0);
+  check("Add opens a blank course with the cursor in the name", await dialog.locator("#course-title").evaluate((el) => el === document.activeElement));
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Ideas" }).click();
+  await page.waitForTimeout(100);
+  check("Ideas opens the New course dialog on the ready-made courses (the cursor is in 'Start from')", await dialog.locator("#course-template").evaluate((el) => el === document.activeElement));
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Paste a list" }).click();
+  await page.waitForTimeout(100);
+  check("Paste a list opens it on the outline box, already open", (await dialog.locator("details").getAttribute("open")) !== null && (await dialog.locator("#course-outline").evaluate((el) => el === document.activeElement)));
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Add a course" }).click();
   await dialog.locator("#course-template").selectOption("digital-marketing");
   check("a template fills the category", (await dialog.locator("#course-category").inputValue()) === "Digital Marketing");
   await dialog.locator("#course-category").fill("Design");
@@ -174,7 +200,7 @@ const browser = await launch();
   await ctx.close();
 }
 
-// ---------- Courses with no category yet: the All button is still there, on one line with Active / Paused / Done ----------
+// ---------- Courses with no category yet: no lone "All" button; the status buttons sit in the header row ----------
 {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const { session } = await import("/home/user/Personal-OS/dev-tools/browser-checks/audit-lib.mjs");
@@ -184,12 +210,12 @@ const browser = await launch();
   const page = await ctx.newPage();
   await page.goto(`${BASE}/learning`);
   await page.getByRole("heading", { name: "My courses" }).waitFor();
-  const cat = page.getByRole("tablist", { name: "Category" });
+  check("with no categories yet there is no category row (a lone All would do nothing)", (await page.getByRole("tablist", { name: "Category" }).count()) === 0);
+  const nav = page.getByRole("navigation", { name: "Learning sections" });
   const stat = page.getByRole("tablist", { name: "Status" });
-  check("with no categories yet there is still an All button", JSON.stringify(await cat.getByRole("tab").allInnerTexts()) === JSON.stringify(["All"]) && (await cat.getByRole("tab", { name: "All" }).getAttribute("aria-selected")) === "true");
-  const yc = (await cat.boundingBox()).y;
+  const yn = (await nav.boundingBox()).y;
   const ys = (await stat.boundingBox()).y;
-  check("and it is on one line with the status buttons, like Projects", Math.abs(yc - ys) < 4, JSON.stringify({ yc, ys }));
+  check("the status buttons are on the same line as the sections", Math.abs(yn - ys) < 4, JSON.stringify({ yn, ys }));
   await ctx.close();
 }
 

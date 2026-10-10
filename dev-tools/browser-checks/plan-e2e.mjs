@@ -103,7 +103,7 @@ for (const width of [390, 320]) {
   const created = await recordPosts(ctx, /\/api\/courses(\/new1\/outline)?$/, (req) => (req.url().endsWith("/outline") ? { units: 6, topics: 15, hours: 38, warnings: [], plan: null } : { id: "new1" }));
   const page = await ctx.newPage();
   await page.goto(`${BASE}/learning`);
-  await page.getByRole("button", { name: "New", exact: true }).first().click();
+  await page.getByRole("button", { name: "Add a course" }).click();
   const dialog = page.getByRole("dialog");
   const target = dialog.locator("#course-target");
   const before = await target.inputValue();

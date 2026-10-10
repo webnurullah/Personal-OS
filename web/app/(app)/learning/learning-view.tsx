@@ -2,11 +2,11 @@
 
 import { toArchive } from "@/lib/archive";
 import { colorOf } from "@/lib/colors";
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
-import { GraduationCap, Hourglass, Plus, Sparkles, Timer, Trash2 } from "lucide-react";
+import { GraduationCap, Hourglass, ListChecks, Plus, Sparkles, Timer, Trash2 } from "lucide-react";
 import { api, errorMessage, refresh } from "@/lib/api";
 import { addDays, formatDate, mondayOf, weekdayIndex } from "@/lib/dates";
 import { COURSE_TEMPLATES, templateWeeks } from "@/lib/course-templates";
@@ -25,7 +25,7 @@ import { Field, Segmented } from "@/components/ui/controls";
 import { useFeedback } from "@/components/ui/feedback";
 import { Modal, ModalActions } from "@/components/ui/modal";
 import { LoadError, PageHeader, PageSkeleton } from "@/components/ui/states";
-import { LearningTabs } from "./learning-tabs";
+import { LearningToolbar } from "./learning-tabs";
 import { LearningProgressCard } from "./learning-progress";
 import { StudyNext } from "./study-next";
 
@@ -47,6 +47,9 @@ function courseTimeBadge(daysLeft: number) {
   return `Due in ${daysLeft} ${daysLeft === 1 ? "day" : "days"}`;
 }
 
+/** Where the New course dialog starts: a blank course, on the ready-made courses ("Ideas"), or on the box for a pasted outline. */
+type NewCourseStart = "blank" | "ideas" | "list";
+
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
 export function LearningView() {
@@ -59,7 +62,7 @@ export function LearningView() {
   const [logNow, setLogNow] = useState(false); // from "Study next" (always about today): this week, even when another week is on screen
   const [logHours, setLogHours] = useState<number | undefined>(undefined); // from the focus timer: the time on the clock
   const focus = useFocus();
-  const [newCourse, setNewCourse] = useState(false);
+  const [newCourse, setNewCourse] = useState<NewCourseStart | null>(null); // the New course dialog, and where its cursor starts
   const openLog = (choice = "", now = false, hours?: number) => {
     setLogChoice(choice);
     setLogNow(now);
@@ -134,7 +137,35 @@ export function LearningView() {
           Log Study Session
         </button>
       </PageHeader>
-      <LearningTabs current="courses" />
+      <LearningToolbar
+        current="courses"
+        filter={
+          data.courses.length > 0 && (
+            <Segmented
+              label="Status"
+              value={statusPick}
+              onChange={(next) => setStatusPick(next as CourseStatus)}
+              options={COURSE_STATUSES.map((x) => ({ value: x.value, label: `${x.label} (${data.courses.filter((c) => statusOf(c) === x.value).length})` }))}
+            />
+          )
+        }
+        actions={
+          <>
+            <button type="button" className="btn btn-secondary" onClick={() => setNewCourse("ideas")} title="Start from a ready-made course (Digital Marketing, SQL …)">
+              <Sparkles className="size-4" />
+              Ideas
+            </button>
+            <button type="button" className="btn btn-secondary" onClick={() => setNewCourse("list")} title="Paste the units and topics of a course">
+              <ListChecks className="size-4" />
+              Paste a list
+            </button>
+            <button type="button" className="btn btn-primary" onClick={() => setNewCourse("blank")} aria-label="Add a course">
+              <Plus className="size-4" />
+              Add
+            </button>
+          </>
+        }
+      />
 
       {focus.running && (
         <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl bg-indigo-600 px-4 py-3 text-white shadow-lg shadow-indigo-600/20" role="timer" aria-label="Focus timer">
@@ -149,27 +180,14 @@ export function LearningView() {
       )}
 
       <section className="mt-5" aria-labelledby="courses-title">
-        <div className="flex items-center justify-between">
-          <h2 id="courses-title" className="card-title">My courses</h2>
-          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setNewCourse(true)}>
-            <Plus className="size-4" /> New
-          </button>
-        </div>
-        {data.courses.length > 0 && (
-          <div className="mt-4 flex flex-wrap items-center gap-3">
-            <Segmented
-              label="Category"
-              value={category}
-              onChange={setCategoryPick}
-              options={[{ value: "all", label: "All" }, ...categories.map((c) => ({ value: c.key, label: c.label })), ...(categories.length > 0 && uncategorised ? [{ value: "none", label: "Other" }] : [])]}
-            />
-            <Segmented
-              label="Status"
-              value={statusPick}
-              onChange={(next) => setStatusPick(next as CourseStatus)}
-              options={COURSE_STATUSES.map((x) => ({ value: x.value, label: `${x.label} (${data.courses.filter((c) => statusOf(c) === x.value).length})` }))}
-            />
-          </div>
+        <h2 id="courses-title" className="sr-only">My courses</h2>
+        {categories.length > 0 && (
+          <Segmented
+            label="Category"
+            value={category}
+            onChange={setCategoryPick}
+            options={[{ value: "all", label: "All" }, ...categories.map((c) => ({ value: c.key, label: c.label })), ...(uncategorised ? [{ value: "none", label: "Other" }] : [])]}
+          />
         )}
         {visibleCourses.length ? (
           <ul className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -215,7 +233,7 @@ export function LearningView() {
           </ul>
         ) : (
           <p className="mt-4 rounded-xl border border-dashed border-slate-200 px-4 py-10 text-center text-sm text-slate-500">
-            {data.courses.length ? `No ${statusPick} courses${category === "all" ? "" : " in this category"}.` : "Track a course unit by unit. Add one with “New”."}
+            {data.courses.length ? `No ${statusPick} courses${category === "all" ? "" : " in this category"}.` : "Track a course unit by unit. Add one with “Add”."}
           </p>
         )}
       </section>
@@ -266,8 +284,8 @@ export function LearningView() {
       >
         <SessionForm data={data} weekStart={logNow ? thisWeek : data.week_start} choice={logChoice} defaultHours={logHours} onClose={() => setLogging(false)} />
       </Modal>
-      <Modal open={newCourse} onClose={() => setNewCourse(false)} title="New course" description="Then add its units and topics on the course page.">
-        <CourseForm today={data.today} onClose={() => setNewCourse(false)} />
+      <Modal open={newCourse !== null} onClose={() => setNewCourse(null)} title="New course" description="Then add its units and topics on the course page.">
+        <CourseForm today={data.today} start={newCourse ?? "blank"} onClose={() => setNewCourse(null)} />
       </Modal>
     </>
   );
@@ -399,7 +417,7 @@ function SessionForm({ data, weekStart, choice: firstChoice, defaultHours, onClo
   );
 }
 
-export function CourseForm({ today, onClose, course }: { today: string; onClose: () => void; course?: { id: string; title: string; subtitle: string; quote: string; start_date: string; target_date: string; category?: string; status?: CourseStatus } }) {
+export function CourseForm({ today, onClose, course, start: startAt = "blank" }: { today: string; onClose: () => void; start?: NewCourseStart; course?: { id: string; title: string; subtitle: string; quote: string; start_date: string; target_date: string; category?: string; status?: CourseStatus } }) {
   const { toast } = useFeedback();
   const router = useRouter();
   const { profile } = useProfile();
@@ -423,6 +441,13 @@ export function CourseForm({ today, onClose, course }: { today: string; onClose:
   const [targetTouched, setTargetTouched] = useState(false);
   const [templateKey, setTemplateKey] = useState("");
   const [outline, setOutline] = useState("");
+  // The cursor starts where the button that opened the dialog points (it waits a tick: the dialog is shown after this form is drawn).
+  useEffect(() => {
+    if (course) return;
+    const id = startAt === "ideas" ? "course-template" : startAt === "list" ? "course-outline" : "course-title";
+    const tick = setTimeout(() => document.getElementById(id)?.focus(), 0);
+    return () => clearTimeout(tick);
+  }, [course, startAt]);
   const template = COURSE_TEMPLATES.find((t) => t.key === templateKey);
   const parsed = useMemo(() => parseOutline(outline), [outline]);
   const weeks = useMemo(() => (outline.trim() && parsed.topicCount ? templateWeeks({ outline, weeklyHours: weeklyGoal }, weeklyGoal, parsed) : 0), [outline, parsed, weeklyGoal]);
@@ -542,7 +567,7 @@ export function CourseForm({ today, onClose, course }: { today: string; onClose:
         <input id="course-quote" name="quote" className="input" maxLength={200} defaultValue={course?.quote} placeholder="Plan your learning. Track your progress. Achieve your goal." />
       </Field>
       {!course && (
-        <details className="rounded-2xl border border-slate-200 p-3" open={Boolean(outline)}>
+        <details className="rounded-2xl border border-slate-200 p-3" open={Boolean(outline) || startAt === "list"}>
           <summary className="cursor-pointer text-sm font-medium text-slate-700">{outline ? "Outline: units and topics to add" : "Or paste an outline (optional)"}</summary>
           <textarea
             id="course-outline"
