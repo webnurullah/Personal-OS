@@ -50,9 +50,10 @@ export function Donut({ segments, max, thickness = 16, track = "#edf1f6", round 
 }
 
 /** A thin progress bar. `fill` is a background class such as "bg-blue-500". */
-export function Progress({ value, fill = "bg-blue-500", track = "", className = "h-2" }: { value: number; fill?: string; track?: string; className?: string }) {
+export function Progress({ value, fill = "bg-blue-500", track = "", className = "h-2", label }: { value: number; fill?: string; track?: string; className?: string; label?: string }) {
+  // The value read out stays between 0 and 100 (a goal can be passed; the bar is then simply full).
   return (
-    <div className={`progress ${track} ${className}`} role="progressbar" aria-valuenow={Math.round(value)} aria-valuemin={0} aria-valuemax={100}>
+    <div className={`progress ${track} ${className}`} role="progressbar" aria-label={label} aria-valuenow={Math.round(Math.max(0, Math.min(100, value)))} aria-valuemin={0} aria-valuemax={100}>
       <span className={fill} style={{ width: `${Math.max(0, Math.min(100, value))}%` }} />
     </div>
   );

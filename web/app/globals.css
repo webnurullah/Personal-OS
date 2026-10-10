@@ -428,6 +428,10 @@
     padding: 0.375rem 0.75rem;
     border-radius: 0.5rem;
     white-space: nowrap;
+    /* a very long name is cut at the edge of the row (with ...) instead of widening the page */
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
     font-size: 0.8125rem;
     font-weight: 500;
     color: #64748b;

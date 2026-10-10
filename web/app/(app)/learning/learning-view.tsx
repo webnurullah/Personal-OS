@@ -1,33 +1,44 @@
 "use client";
 
 import { toArchive } from "@/lib/archive";
-import { cacheMutate } from "@/lib/cache";
 import { colorOf } from "@/lib/colors";
 import { useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
-import { Archive, GraduationCap, Hourglass, Plus, Sparkles, Timer, Trash2 } from "lucide-react";
+import { GraduationCap, Hourglass, Plus, Sparkles, Timer, Trash2 } from "lucide-react";
 import { api, errorMessage, refresh } from "@/lib/api";
 import { addDays, formatDate, mondayOf, weekdayIndex } from "@/lib/dates";
 import { COURSE_TEMPLATES, templateWeeks } from "@/lib/course-templates";
 import { hm, num, plural } from "@/lib/format";
 import { useNewAction } from "@/lib/new-action";
 import { OUTLINE_LIMITS, parseOutline } from "@/lib/outline";
+import { COURSE_STATUSES } from "@/lib/course";
 import { useProfile } from "@/lib/profile";
 import { clock } from "@/lib/focus";
 import { REVISION_DAYS } from "@/lib/revision";
 import { forecastText } from "@/lib/study";
 import { useFocus } from "@/lib/use-focus";
-import type { CourseSummary, LearningWeek, RevisionDue, StudyBlock, StudyNextItem } from "@/lib/types";
+import type { CourseStatus, CourseSummary, LearningWeek, RevisionDue, StudyBlock, StudyNextItem } from "@/lib/types";
 import { Progress } from "@/components/ui/charts";
-import { Field } from "@/components/ui/controls";
+import { Field, Segmented } from "@/components/ui/controls";
 import { useFeedback } from "@/components/ui/feedback";
 import { Modal, ModalActions } from "@/components/ui/modal";
 import { LoadError, PageHeader, PageSkeleton } from "@/components/ui/states";
 import { LearningTabs } from "./learning-tabs";
 import { LearningProgressCard } from "./learning-progress";
 import { StudyNext } from "./study-next";
+
+const categoryKey = (category: string | undefined) => (category ?? "").trim().toLowerCase();
+/** The categories in use, once each (spelled as first written), in order of name. */
+function courseCategories(courses: CourseSummary[]) {
+  const seen = new Map<string, string>();
+  for (const c of courses) {
+    const key = categoryKey(c.category);
+    if (key && !seen.has(key)) seen.set(key, (c.category ?? "").trim());
+  }
+  return [...seen].map(([key, label]) => ({ key, label })).sort((a, b) => a.label.localeCompare(b.label));
+}
 
 /** The badge on a course card: "Due in 20 days", "Due today", "Date passed". */
 function courseTimeBadge(daysLeft: number) {
@@ -40,6 +51,8 @@ const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"
 
 export function LearningView() {
   const { data, error, mutate } = useSWR<LearningWeek>("/learning/week");
+  const [categoryPick, setCategoryPick] = useState("all"); // "all", a category's key (lower case), or "none" for courses without one
+  const [statusPick, setStatusPick] = useState<CourseStatus>("active");
   const { toast, confirm } = useFeedback();
   const [logging, setLogging] = useState(false);
   const [logChoice, setLogChoice] = useState(""); // what the session form starts on: "t:<topic id>", "r:<library item id>" or nothing
@@ -98,20 +111,12 @@ export function LearningView() {
       () => api(item.kind === "topic" ? `/topics/${item.id}` : `/resources/${item.id}`, { method: "PATCH", body: { revision_step: item.step + 1 } }),
       item.step + 1 >= REVISION_DAYS.length ? "All three looks done. Well done!" : `Revised. The next look is in ${REVISION_DAYS[item.step + 1] - REVISION_DAYS[item.step]} days.`,
     );
-  /** Moves a course (with its units, topics and hours) to the Archive, after asking; it can be restored from there. */
-  const archiveCourse = async (course: CourseSummary) => {
-    const ok = await confirm({ title: "Delete this course?", message: toArchive(`“${course.title}” and all its units, topics and logged hours`), action: "Delete course" });
-    if (!ok) return;
-    try {
-      await api(`/courses/${course.id}`, { method: "DELETE" });
-      // Forget the saved copy of its page, so Back or another tab cannot bring the deleted course back.
-      cacheMutate(`/courses/${course.id}`, undefined, { revalidate: false }).catch(() => undefined);
-      toast("Course moved to the Archive");
-    } catch (e) {
-      toast(errorMessage(e), "error");
-    }
-    await refresh("/learning", "/courses");
-  };
+  // Courses by category (written by you in the course form) and by status, like the project list.
+  const statusOf = (c: CourseSummary): CourseStatus => c.status ?? "active"; // (a copy saved before categories existed has neither)
+  const categories = courseCategories(data.courses);
+  const uncategorised = data.courses.some((c) => !(c.category ?? "").trim());
+  const category = categoryPick === "all" || (categoryPick === "none" && categories.length && uncategorised) || categories.some((c) => c.key === categoryPick) ? categoryPick : "all";
+  const visibleCourses = data.courses.filter((c) => statusOf(c) === statusPick && (category === "all" || (category === "none" ? !(c.category ?? "").trim() : categoryKey(c.category) === category)));
   const finishTopic = (item: StudyNextItem) =>
     run(() => api(`/topics/${item.topic_id}`, { method: "PATCH", body: { status: "done" } }), `${item.code} marked finished`);
 
@@ -150,21 +155,39 @@ export function LearningView() {
             <Plus className="size-4" /> New
           </button>
         </div>
-        {data.courses.length ? (
+        {data.courses.length > 0 && (
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            {categories.length > 0 && (
+              <Segmented
+                label="Category"
+                value={category}
+                onChange={setCategoryPick}
+                options={[{ value: "all", label: "All" }, ...categories.map((c) => ({ value: c.key, label: c.label })), ...(uncategorised ? [{ value: "none", label: "Other" }] : [])]}
+              />
+            )}
+            <Segmented
+              label="Status"
+              value={statusPick}
+              onChange={(next) => setStatusPick(next as CourseStatus)}
+              options={COURSE_STATUSES.map((x) => ({ value: x.value, label: `${x.label} (${data.courses.filter((c) => statusOf(c) === x.value).length})` }))}
+            />
+          </div>
+        )}
+        {visibleCourses.length ? (
           <ul className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {data.courses.map((course) => {
+            {visibleCourses.map((course) => {
               const color = colorOf(course.color);
               const tone = course.days_left < 0 ? "bg-rose-50 text-rose-700" : course.days_left <= 7 ? "bg-amber-50 text-amber-700" : "bg-slate-100 text-slate-600";
               return (
-                <li key={course.id} className="card relative transition hover:shadow-md">
-                  <Link href={`/learning/${course.id}`} className="block h-full rounded-2xl p-5 pr-14 focus-visible:outline-2 focus-visible:outline-blue-400">
+                <li key={course.id} className="card transition hover:shadow-md">
+                  <Link href={`/learning/${course.id}`} className="block h-full rounded-2xl p-5 focus-visible:outline-2 focus-visible:outline-blue-400">
                     <span className="flex items-start gap-3">
                       <span className={`icon-tile size-10 shrink-0 ${color.tile}`}>
                         <GraduationCap className="size-5" aria-hidden />
                       </span>
                       <span className="min-w-0">
                         <span className="block truncate text-base font-semibold text-slate-900" title={course.title}>{course.title}</span>
-                        <span className="block truncate text-sm text-slate-500">{plural(course.unit_count, "unit")} · {plural(course.topic_count, "topic")}</span>
+                        <span className="block truncate text-sm text-slate-500">{(course.category ?? "").trim() ? `${course.category} · ` : ""}{plural(course.unit_count, "unit")} · {plural(course.topic_count, "topic")}</span>
                       </span>
                     </span>
                     <span className="mt-3 flex flex-wrap items-center gap-1.5">
@@ -188,21 +211,14 @@ export function LearningView() {
                       </span>
                     </span>
                   </Link>
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm btn-icon absolute right-3 top-3 text-slate-400 hover:text-slate-700"
-                    onClick={() => archiveCourse(course)}
-                    aria-label={`Archive ${course.title}`}
-                    title="Move to the Archive"
-                  >
-                    <Archive className="size-4" />
-                  </button>
                 </li>
               );
             })}
           </ul>
         ) : (
-          <p className="mt-4 rounded-xl border border-dashed border-slate-200 px-4 py-10 text-center text-sm text-slate-500">Track a course unit by unit. Add one with “New”.</p>
+          <p className="mt-4 rounded-xl border border-dashed border-slate-200 px-4 py-10 text-center text-sm text-slate-500">
+            {data.courses.length ? `No ${statusPick} courses${category === "all" ? "" : " in this category"}.` : "Track a course unit by unit. Add one with “New”."}
+          </p>
         )}
       </section>
 
@@ -385,7 +401,7 @@ function SessionForm({ data, weekStart, choice: firstChoice, defaultHours, onClo
   );
 }
 
-export function CourseForm({ today, onClose, course }: { today: string; onClose: () => void; course?: { id: string; title: string; subtitle: string; quote: string; start_date: string; target_date: string } }) {
+export function CourseForm({ today, onClose, course }: { today: string; onClose: () => void; course?: { id: string; title: string; subtitle: string; quote: string; start_date: string; target_date: string; category?: string; status?: CourseStatus } }) {
   const { toast } = useFeedback();
   const router = useRouter();
   const { profile } = useProfile();
@@ -398,6 +414,12 @@ export function CourseForm({ today, onClose, course }: { today: string; onClose:
   // Words you typed yourself are kept when another template is picked; the ones a template filled in are replaced.
   const [titleTyped, setTitleTyped] = useState(false);
   const [subtitleTyped, setSubtitleTyped] = useState(false);
+  // The category groups courses ("Digital Marketing" over "Google Ads" and "Meta Ads"): any words, and the ones already in use are suggested.
+  const [category, setCategory] = useState(course?.category ?? "");
+  const [categoryTyped, setCategoryTyped] = useState(false);
+  const [status, setStatus] = useState<CourseStatus>(course?.status ?? "active");
+  const { data: allCourses } = useSWR<{ items: CourseSummary[] }>("/courses");
+  const knownCategories = courseCategories(allCourses?.items ?? []);
   const [start, setStart] = useState(course?.start_date ?? today);
   const [target, setTarget] = useState(course?.target_date ?? addDays(today, 112));
   const [targetTouched, setTargetTouched] = useState(false);
@@ -417,6 +439,7 @@ export function CourseForm({ today, onClose, course }: { today: string; onClose:
     setOutline(t ? t.outline : "");
     if (!titleTyped) setTitle(t ? t.title : "");
     if (!subtitleTyped) setSubtitle(t ? t.subtitle : DEFAULT_SUBTITLE);
+    if (!categoryTyped) setCategory(t ? t.subject : "");
   };
 
   const submit = async (e: FormEvent<HTMLFormElement>) => {
@@ -428,6 +451,8 @@ export function CourseForm({ today, onClose, course }: { today: string; onClose:
       quote: String(form.get("quote")),
       start_date: start,
       target_date: shownTarget,
+      category: category.trim().replace(/\s+/g, " "),
+      ...(course ? { status } : {}),
     };
     setBusy(true);
     try {
@@ -489,6 +514,32 @@ export function CourseForm({ today, onClose, course }: { today: string; onClose:
           />
         </Field>
       </div>
+      <Field label="Category (optional)" htmlFor="course-category" hint="Groups your courses: “Digital Marketing” over “Google Ads” and “Meta Ads”. Pick one you already use or type a new one.">
+        <input
+          id="course-category"
+          className="input"
+          maxLength={60}
+          list="course-categories"
+          value={category}
+          onChange={(e) => { setCategory(e.target.value); setCategoryTyped(e.target.value.trim() !== ""); }}
+          placeholder="e.g. Digital Marketing"
+          autoComplete="off"
+        />
+        <datalist id="course-categories">
+          {knownCategories.map((c) => (
+            <option key={c.key} value={c.label} />
+          ))}
+        </datalist>
+      </Field>
+      {course && (
+        <Field label="Status" htmlFor="course-status" hint="Paused and finished courses are left out of “Study next” and the reminders.">
+          <select id="course-status" className="select select-lg" value={status} onChange={(e) => setStatus(e.target.value as CourseStatus)}>
+            {COURSE_STATUSES.map((x) => (
+              <option key={x.value} value={x.value}>{x.label}</option>
+            ))}
+          </select>
+        </Field>
+      )}
       <Field label="Motto (optional)" htmlFor="course-quote">
         <input id="course-quote" name="quote" className="input" maxLength={200} defaultValue={course?.quote} placeholder="Plan your learning. Track your progress. Achieve your goal." />
       </Field>

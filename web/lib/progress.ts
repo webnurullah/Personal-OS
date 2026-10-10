@@ -55,6 +55,8 @@ export type ProgressInput = {
   today: string;
   /** The weekly study goal in hours (a month or a quarter has that many weeks' worth). */
   weeklyGoal: number;
+  /** Weeks that were given a goal of their own (the Monday of the week -> hours); every other week has the weekly goal. */
+  weekGoals?: Record<string, number>;
   sessions: ProgressSession[];
   /** The days topics were finished on. */
   topicDays: string[];
@@ -84,34 +86,58 @@ export type PeriodStats = Period & {
   avg_session: number;
   topics_done: number;
   items_done: number;
-  /** Where the hours went, biggest first (at most 5; the rest are "Other courses"). */
+  /** How many different courses had study time in it. */
+  courses_studied: number;
+  /** Where the hours went, biggest first: up to 4 courses (the rest of the courses folded into "Other courses"), library items, other study. */
   shares: TimeShare[];
 };
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
-const MAX_SHARES = 5;
+/** How many courses are listed one by one in "where the time went" (the others are folded into one row). */
+const MAX_COURSE_SHARES = 4;
+
+/** The goal for a period: each day carries a seventh of its week's goal, so a month or a quarter adds up the weeks it covers. */
+function periodGoal(period: Period, input: ProgressInput) {
+  const days = daysBetween(period.start, period.end) + 1;
+  let total = 0;
+  for (let i = 0; i < days; i += 1) {
+    const monday = mondayOf(addDays(period.start, i));
+    total += Math.max(0, input.weekGoals?.[monday] ?? input.weeklyGoal) / 7;
+  }
+  return Math.round(total * 2) / 2;
+}
 
 export function summarisePeriod(period: Period, input: ProgressInput): PeriodStats {
   const days = daysBetween(period.start, period.end) + 1;
   const current = input.today >= period.start && input.today <= period.end;
   const elapsed = input.today < period.start ? 0 : Math.min(days, daysBetween(period.start, input.today) + 1);
-  const inside = input.sessions.filter((s) => s.date >= period.start && s.date <= period.end);
+  // Only study that has happened: a session ticked for a day still to come counts when that day comes.
+  const inside = input.sessions.filter((s) => s.date >= period.start && s.date <= period.end && s.date <= input.today);
   const hours = round2(inside.reduce((sum, s) => sum + s.hours, 0));
-  const goal = Math.round(((Math.max(0, input.weeklyGoal) * days) / 7) * 2) / 2;
-  const within = (list: string[]) => list.filter((d) => d >= period.start && d <= period.end).length;
+  const goal = periodGoal(period, input);
+  const within = (list: string[]) => list.filter((d) => d >= period.start && d <= period.end && d <= input.today).length;
 
-  const byKey = new Map<string, TimeShare>();
+  const courseHours = new Map<string, TimeShare>();
+  let library = 0;
+  let other = 0;
   for (const s of inside) {
     const title = s.course_id ? input.courseTitles[s.course_id] : undefined;
-    const key = s.course_id && title ? `course:${s.course_id}` : s.library ? "library" : "other";
-    const row = byKey.get(key) ?? { key, title: key === "library" ? "Library items" : key === "other" ? "Other study" : (title as string), course_id: key.startsWith("course:") ? (s.course_id as string) : null, hours: 0 };
-    row.hours += s.hours;
-    byKey.set(key, row);
+    if (s.course_id && title) {
+      const row = courseHours.get(s.course_id) ?? { key: `course:${s.course_id}`, title, course_id: s.course_id, hours: 0 };
+      row.hours += s.hours;
+      courseHours.set(s.course_id, row);
+    } else if (s.library) library += s.hours;
+    else other += s.hours;
   }
-  const ranked = [...byKey.values()].map((r) => ({ ...r, hours: round2(r.hours) })).sort((a, b) => b.hours - a.hours || a.title.localeCompare(b.title));
-  const shares = ranked.length > MAX_SHARES
-    ? [...ranked.slice(0, MAX_SHARES - 1), { key: "more", title: "Other courses", course_id: null, hours: round2(ranked.slice(MAX_SHARES - 1).reduce((sum, r) => sum + r.hours, 0)) }]
-    : ranked;
+  const courses = [...courseHours.values()].map((r) => ({ ...r, hours: round2(r.hours) })).sort((a, b) => b.hours - a.hours || a.title.localeCompare(b.title));
+  const listed = courses.length > MAX_COURSE_SHARES + 1 ? courses.slice(0, MAX_COURSE_SHARES) : courses;
+  const folded = courses.slice(listed.length);
+  const shares: TimeShare[] = [
+    ...listed,
+    ...(folded.length ? [{ key: "more", title: `${folded.length} other courses`, course_id: null, hours: round2(folded.reduce((sum, r) => sum + r.hours, 0)) }] : []),
+    ...(library > 0 ? [{ key: "library", title: "Library items", course_id: null, hours: round2(library) }] : []),
+    ...(other > 0 ? [{ key: "other", title: "Other study", course_id: null, hours: round2(other) }] : []),
+  ].sort((a, b) => b.hours - a.hours || a.title.localeCompare(b.title));
 
   return {
     ...period,
@@ -127,6 +153,7 @@ export function summarisePeriod(period: Period, input: ProgressInput): PeriodSta
     avg_session: inside.length ? round2(hours / inside.length) : 0,
     topics_done: within(input.topicDays),
     items_done: within(input.itemDays),
+    courses_studied: courseHours.size,
     shares,
   };
 }

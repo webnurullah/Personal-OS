@@ -86,6 +86,21 @@ const browser = await launch();
   await page.goto(`${BASE}/learning/c1`);
   await page.getByText("Topic 1.1").first().waitFor();
   check("wide: table is shown, one set of hour boxes", (await page.locator("table").count()) >= 1 && (await page.getByLabel("Actual hours for topic 1.1").count()) === 1);
+  // The course page: its category, and a status that can be changed with one tap.
+  const patches = [];
+  await ctx.route(/\/api\/courses\/c1$/, (route) => {
+    if (route.request().method() === "PATCH") {
+      patches.push(route.request().postDataJSON());
+      return route.fulfill({ json: { ok: true } });
+    }
+    return route.fallback();
+  });
+  const statusTabs = page.getByRole("tablist", { name: "Course status" });
+  check("the course page shows Active / Paused / Done, Active chosen", JSON.stringify(await statusTabs.getByRole("tab").allInnerTexts()) === JSON.stringify(["Active", "Paused", "Done"]) && (await statusTabs.getByRole("tab", { name: "Active" }).getAttribute("aria-selected")) === "true");
+  await statusTabs.getByRole("tab", { name: "Paused" }).click();
+  await page.waitForTimeout(500);
+  check("pausing a course saves the status at once", patches.length === 1 && patches[0].status === "paused", JSON.stringify(patches));
+  check("and says it is left out of Study next", (await page.getByText(/left out of Study next/).count()) >= 1);
   await ctx.close();
 }
 
@@ -94,8 +109,9 @@ const browser = await launch();
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const { session } = await import("/home/user/Personal-OS/dev-tools/browser-checks/audit-lib.mjs");
   await ctx.addCookies([{ name: "sb-127-auth-token", value: "base64-" + Buffer.from(JSON.stringify(session)).toString("base64url"), url: BASE }]);
-  const c = (id, title) => ({ id, title, subtitle: "", start_date: "2026-09-14", target_date: "2026-12-31", color: "blue", est_hours: 4, done_hours: 1, spent_hours: 1, percent: 25, topic_count: 2, unit_count: 2, days_left: 80, state: "on-track", behind_hours: 0, weeks_behind: 0, forecast: null });
-  await apiMock(ctx, { "/learning/week": { today: TODAY, week_start: "2026-10-05", topic: "", goal_hours: 6, blocks: [{ id: "b1", week_start: "2026-10-05", weekday: 4, hours: 1, activity: "Google Digital Marketing & E-commerce Certificate", done: false, topic_id: null, resource_id: null }], courses: [c("c1", "Digital Marketing"), c("c2", "SQL"), c("c3", "Excel")] } });
+  const c = (id, title, over = {}) => ({ id, title, subtitle: "", category: "", status: "active", start_date: "2026-09-14", target_date: "2026-12-31", color: "blue", est_hours: 4, done_hours: 1, spent_hours: 1, percent: 25, topic_count: 2, unit_count: 2, days_left: 80, state: "on-track", behind_hours: 0, weeks_behind: 0, forecast: null, ...over });
+  const courseList = [c("c1", "Google Ads", { category: "Digital Marketing" }), c("c2", "Meta Ads", { category: "Digital marketing" }), c("c3", "SQL", { category: "Data" }), c("c4", "English"), c("c5", "Old course", { status: "done", category: "Data" }), c("c6", "Paused course", { status: "paused", category: "Digital Marketing" })];
+  await apiMock(ctx, { "/learning/week": { today: TODAY, week_start: "2026-10-05", topic: "", goal_hours: 6, blocks: [{ id: "b1", week_start: "2026-10-05", weekday: 4, hours: 1, activity: "Google Digital Marketing & E-commerce Certificate", done: false, topic_id: null, resource_id: null }], courses: courseList }, "/courses": { today: TODAY, items: courseList } });
   const calls = [];
   await ctx.route(/\/api\/learning\/blocks\/[^/]+$/, (route) => {
     calls.push({ method: route.request().method(), body: route.request().postDataJSON() });
@@ -109,24 +125,45 @@ const browser = await launch();
   const box = await section.boundingBox();
   check("wide: My courses spans the page width", box && main && box.width >= main.width - 70, JSON.stringify({ card: box?.width, main: main?.width }));
   const links = await section.locator("a").evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return { top: Math.round(r.top), left: Math.round(r.left), width: Math.round(r.width) }; }));
-  check("wide: two courses share the first row", links.length === 3 && links[0].top === links[1].top && links[1].left > links[0].left && links[2].top > links[0].top, JSON.stringify(links));
-  check("wide: both are about the same width (half the card)", Math.abs(links[0].width - links[1].width) <= 2, JSON.stringify(links));
+  check("wide: only the active courses are listed, two in the first row", links.length === 4 && links[0].top === links[1].top && links[1].left > links[0].left && links[2].top > links[0].top && links[2].top === links[3].top, JSON.stringify(links));
+  check("wide: both are about the same width (half the width)", Math.abs(links[0].width - links[1].width) <= 2, JSON.stringify(links));
   if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/learning-wide.png`, fullPage: true });
-  // Like a project box: no white card around the boxes, an archive button on each, asking first.
+  // Like a project box: no white card around the boxes, and no archive button on them.
   const outer = await section.evaluate((el) => getComputedStyle(el).backgroundColor);
   check("the boxes sit on the page background (no white card around them)", outer === "rgba(0, 0, 0, 0)", outer);
-  const deletes = [];
-  await ctx.route(/\/api\/courses\/c1$/, (route) => {
-    if (route.request().method() === "DELETE") {
-      deletes.push(route.request().url());
-      return route.fulfill({ json: { ok: true } });
-    }
-    return route.fallback();
-  });
-  await page.getByRole("button", { name: "Archive Digital Marketing" }).click();
-  await page.getByRole("button", { name: "Delete course" }).click();
-  await page.waitForTimeout(600);
-  check("the archive button asks first, then moves the course to the Archive", deletes.length === 1, JSON.stringify(deletes));
+  check("a course box has no archive button", (await page.getByRole("button", { name: /^Archive / }).count()) === 0);
+
+  // Category and status, like the project list.
+  const tabs = async (label) => (await page.getByRole("tablist", { name: label }).getByRole("tab").allInnerTexts()).map((t) => t.trim());
+  check("the category tabs are All, then each category in use (spelled the same way once), then Other", JSON.stringify(await tabs("Category")) === JSON.stringify(["All", "Data", "Digital Marketing", "Other"]), JSON.stringify(await tabs("Category")));
+  check("the status tabs count every course", JSON.stringify(await tabs("Status")) === JSON.stringify(["Active (4)", "Paused (1)", "Done (1)"]), JSON.stringify(await tabs("Status")));
+  const titles = async () => (await section.locator("a").evaluateAll((els) => els.map((e) => e.querySelector("span.truncate")?.textContent ?? ""))).sort();
+  await page.getByRole("tablist", { name: "Category" }).getByRole("tab", { name: "Digital Marketing" }).click();
+  check("a category shows its courses (Google Ads and Meta Ads), with the category on the box", JSON.stringify(await titles()) === JSON.stringify(["Google Ads", "Meta Ads"]) && (await section.getByText(/^Digital Marketing · 2 units/).count()) >= 1, JSON.stringify(await titles()));
+  await page.getByRole("tablist", { name: "Status" }).getByRole("tab", { name: /Paused/ }).click();
+  check("paused courses of that category", JSON.stringify(await titles()) === JSON.stringify(["Paused course"]));
+  await page.getByRole("tablist", { name: "Category" }).getByRole("tab", { name: "Data" }).click();
+  check("an empty list says so", (await section.getByText("No paused courses in this category.").count()) === 1);
+  await page.getByRole("tablist", { name: "Category" }).getByRole("tab", { name: "All" }).click();
+  await page.getByRole("tablist", { name: "Status" }).getByRole("tab", { name: /Done/ }).click();
+  check("finished courses are under Done", JSON.stringify(await titles()) === JSON.stringify(["Old course"]));
+  await page.getByRole("tablist", { name: "Status" }).getByRole("tab", { name: /Active/ }).click();
+  await page.getByRole("tablist", { name: "Category" }).getByRole("tab", { name: "Other" }).click();
+  check("courses without a category are under Other", JSON.stringify(await titles()) === JSON.stringify(["English"]));
+  await page.getByRole("tablist", { name: "Category" }).getByRole("tab", { name: "All" }).click();
+
+  // The course form: a category (suggestions from the ones in use; a template fills it) and, when editing, a status.
+  await section.getByRole("button", { name: "New" }).click();
+  const dialog = page.getByRole("dialog");
+  const options = await dialog.locator("#course-categories option").evaluateAll((els) => els.map((e) => e.value).sort());
+  check("the form suggests the categories already in use", JSON.stringify(options) === JSON.stringify(["Data", "Digital Marketing"]), JSON.stringify(options));
+  check("a new course has no status field (it starts active)", (await dialog.locator("#course-status").count()) === 0);
+  await dialog.locator("#course-template").selectOption("digital-marketing");
+  check("a template fills the category", (await dialog.locator("#course-category").inputValue()) === "Digital Marketing");
+  await dialog.locator("#course-category").fill("Design");
+  await dialog.locator("#course-template").selectOption("sql");
+  check("a category you typed is kept when another template is picked", (await dialog.locator("#course-category").inputValue()) === "Design");
+  await page.keyboard.press("Escape");
   // The week's planned sessions can still be ticked and removed (a closed list under the week in review).
   const details = page.locator("details", { hasText: "Study sessions this week" });
   check("a planned session is listed (closed) so it can still be ticked or removed", (await details.count()) === 1 && (await details.getAttribute("open")) === null);
@@ -159,7 +196,7 @@ const browser = await launch();
   await page.getByText("2 units · 2 topics").first().waitFor();
   check("course card counts units from the units (2 units · 2 topics)", (await page.getByText("2 units · 2 topics").count()) === 1);
   check("course card words: date passed", (await page.getByText("date passed").count()) >= 1);
-  check("the old Learning Progress card (weekly goal, topic, planned blocks) is gone", (await page.getByText("Learning Progress").count()) === 0 && (await page.getByText("Planned Learning Blocks").count()) === 0 && (await page.getByLabel("Half an hour more").count()) === 0);
+  check("the old Learning Progress card (weekly goal, topic, planned blocks) is gone", (await page.getByText("Learning Progress", { exact: true }).count()) === 0 && (await page.getByText("Planned Learning Blocks").count()) === 0 && (await page.getByLabel("Half an hour more").count()) === 0);
 
   check("the week arrows are gone (the page is always this week)", (await page.getByLabel("Next week").count()) === 0 && (await page.getByText("Week in review").count()) === 0);
 
