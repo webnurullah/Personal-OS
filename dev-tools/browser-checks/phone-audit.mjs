@@ -21,6 +21,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { deflateSync } from "node:zlib";
 import { launch, newPhone, apiMock, measure, BASE, TODAY, profile as baseProfile } from "./audit-lib.mjs";
+import { buildProgress } from "../../web/lib/progress.ts";
 
 const WIDTHS = (process.env.WIDTHS ?? "320,360,390,450").split(",").map(Number);
 const ONLY = process.env.ONLY ? process.env.ONLY.split(",") : null;
@@ -216,6 +217,19 @@ const courseSummary = (i, over = {}) => ({
 });
 const courses = range(3).map((i) => courseSummary(i));
 const coursesResponse = { today: TODAY, items: courses };
+// Learning progress and time: a lot of sessions over a year, six courses with very long names, big hours.
+const progressResponse = {
+  today: TODAY,
+  weekly_goal: 6,
+  ...buildProgress({
+    today: TODAY,
+    weeklyGoal: 6,
+    sessions: range(160).map((i) => ({ date: addDays(TODAY, -i * 2), hours: [0.25, 1.5, 12, 3.25][i % 4], course_id: i % 7 === 6 ? null : `c${i % 6}`, library: i % 7 === 6 })),
+    topicDays: range(40).map((i) => addDays(TODAY, -i * 3)),
+    itemDays: range(15).map((i) => addDays(TODAY, -i * 9)),
+    courseTitles: Object.fromEntries(range(6).map((i) => [`c${i}`, H(i, 300)])),
+  }),
+};
 const openTopics = range(8).map((i) => ({ id: uuid(i + 1), course_id: `c${i % 3}`, label: `1.${i + 1} ${H(i, 300)}`, status: i % 2 ? "in-progress" : "not-started", hours_left: 3.5 }));
 const studyNext = range(4).map((i) => ({
   topic_id: uuid(i + 1), course_id: `c${i % 3}`, course_title: H(i, 300), course_color: COLORS[i], code: `1.${i + 1}`, title: H(i + 1, 300), status: "not-started", est_hours: 3, hours_left: 3,
@@ -801,7 +815,19 @@ unit("project", "/projects/p1", (p) => p.locator("main h1").first().waitFor({ ti
 
 unit("project-archived", "/projects/p2", (p) => p.locator("main h1").first().waitFor({ timeout: 12000 }), () => ({ "/projects/p2": projectDetail(2, { archived_at: iso(D(-3)), archived_on: D(-3) }) }), []);
 
-unit("learning", "/learning", heading, () => ({ "/learning/week": (_m, url) => ({ ...learningWeek, week_start: url.searchParams.get("start") ?? learningWeek.week_start }), "/courses": coursesResponse, "/resources": resources }), [
+unit("learning", "/learning", heading, () => ({ "/learning/week": (_m, url) => ({ ...learningWeek, week_start: url.searchParams.get("start") ?? learningWeek.week_start }), "/courses": coursesResponse, "/learning/progress": progressResponse, "/resources": resources }), [
+  scene("Progress and time", async (page, snap) => {
+    const card = page.locator("section[aria-labelledby='progress-title']");
+    await snap("weekly");
+    await press(card.locator("button[aria-pressed]").nth(2));
+    await snap("an older week picked");
+    await press(card.getByRole("tab", { name: "Monthly" }));
+    await snap("monthly");
+    await press(card.getByRole("tab", { name: "Quarterly" }));
+    await snap("quarterly");
+    await press(card.locator("button[aria-pressed]").nth(1));
+    await snap("an older quarter picked");
+  }),
   scene("This week's study sessions", async (page, snap) => {
     await press(page.locator("details", { hasText: "Study sessions this week" }).locator("summary"));
     await snap("sessions list open");

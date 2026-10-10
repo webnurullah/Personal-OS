@@ -26,6 +26,7 @@ import { useFeedback } from "@/components/ui/feedback";
 import { Modal, ModalActions } from "@/components/ui/modal";
 import { LoadError, PageHeader, PageSkeleton } from "@/components/ui/states";
 import { LearningTabs } from "./learning-tabs";
+import { LearningProgressCard } from "./learning-progress";
 import { StudyNext } from "./study-next";
 
 /** The badge on a course card: "Due in 20 days", "Due today", "Date passed". */
@@ -142,8 +143,6 @@ export function LearningView() {
         </div>
       )}
 
-      <StudyNext data={data} onLog={(topicId) => openLog(`t:${topicId}`, true)} onFinish={finishTopic} onFocus={(topicId) => focus.start(`t:${topicId}`)} onRevised={markRevised} />
-
       <section className="mt-5" aria-labelledby="courses-title">
         <div className="flex items-center justify-between">
           <h2 id="courses-title" className="card-title">My courses</h2>
@@ -206,6 +205,10 @@ export function LearningView() {
           <p className="mt-4 rounded-xl border border-dashed border-slate-200 px-4 py-10 text-center text-sm text-slate-500">Track a course unit by unit. Add one with “New”.</p>
         )}
       </section>
+
+      <StudyNext data={data} onLog={(topicId) => openLog(`t:${topicId}`, true)} onFinish={finishTopic} onFocus={(topicId) => focus.start(`t:${topicId}`)} onRevised={markRevised} />
+
+      <LearningProgressCard />
 
       {data.blocks.length > 0 && (
         <details className="card mt-5 p-5">

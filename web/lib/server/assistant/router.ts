@@ -34,6 +34,7 @@ import * as job from "@/app/api/jobs/[id]/route";
 import * as jobAnalyze from "@/app/api/jobs/analyze/route";
 import * as blocks from "@/app/api/learning/blocks/route";
 import * as block from "@/app/api/learning/blocks/[id]/route";
+import * as progress from "@/app/api/learning/progress/route";
 import * as week from "@/app/api/learning/week/route";
 import * as weekStart from "@/app/api/learning/week/[start]/route";
 import * as milestone from "@/app/api/milestones/[id]/route";
@@ -64,7 +65,7 @@ const ROUTES: [string, Module][] = [
   ["/events", events], ["/events/:id", event],
   ["/goals", goals], ["/goals/:id", goal], ["/goals/:id/milestones", goalMilestones], ["/milestones/:id", milestone],
   ["/habits", habits], ["/habits/:id", habit], ["/habits/:id/logs/:date", habitLog],
-  ["/learning/week", week], ["/learning/week/:start", weekStart], ["/learning/blocks", blocks], ["/learning/blocks/:id", block],
+  ["/learning/progress", progress], ["/learning/week", week], ["/learning/week/:start", weekStart], ["/learning/blocks", blocks], ["/learning/blocks/:id", block],
   ["/courses", courses], ["/courses/:id", course], ["/courses/:id/units", courseUnits], ["/courses/:id/topics", courseTopics], ["/courses/:id/outline", courseOutline], ["/courses/:id/plan", coursePlan], ["/courses/:id/tasks", courseTasks],
   ["/units/:id", unit], ["/topics/:id", topic],
   ["/finance", finance], ["/finance/transactions", transactions], ["/finance/transactions/:id", transaction],

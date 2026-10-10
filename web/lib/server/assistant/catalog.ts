@@ -51,6 +51,7 @@ const ENDPOINTS: [string, string, string, z.ZodType?][] = [
   ["DELETE", "/habits/:id/logs/:date", "Untick a habit for a day"],
 
   ["GET", "/learning/week?start=YYYY-MM-DD", "A study week (default this week): topic, goal hours, study blocks, and every course's progress"],
+  ["GET", "/learning/progress", "Hours studied, study days, finished topics and where the time went, by week, month and quarter (current period last)"],
   ["PUT", "/learning/week/:monday", "Set a week's topic or goal hours (path date must be a Monday)", WeekUpdate],
   ["POST", "/learning/blocks", "Plan a study block (weekday 0 = Monday … 6 = Sunday). Give topic_id (a course topic) to add its hours to that topic once done, resource_id for a library item", BlockCreate],
   ["PATCH", "/learning/blocks/:id", "Change or tick a study block", BlockCreate.omit({ week_start: true }).partial()],
