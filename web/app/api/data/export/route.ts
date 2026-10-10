@@ -4,7 +4,7 @@ import { fetchAll } from "@/lib/server/paging";
 const TABLES = [
   "categories", "tasks", "events", "goals", "goal_milestones", "habits", "habit_logs", "study_weeks", "study_blocks",
   "courses", "course_units", "course_topics", "budget_categories", "transactions", "bills", "health_logs", "notes", "reminders",
-  "job_applications", "projects", "learning_resources", "archive_items",
+  "job_applications", "companies", "projects", "learning_resources", "archive_items",
 ] as const;
 
 // Download everything as one JSON file.

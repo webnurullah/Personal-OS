@@ -304,6 +304,9 @@ export type JobApplication = {
   created_at: string;
 };
 
+/** A company in Job Apply → Company list. */
+export type Company = { id: string; name: string; website: string; facebook: string; linkedin: string; note: string; created_at: string };
+
 /** What reading a job post found (nothing is saved until the form is submitted). */
 export type JobAnalysis = {
   title: string;

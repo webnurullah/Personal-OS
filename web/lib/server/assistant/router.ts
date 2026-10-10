@@ -29,6 +29,8 @@ import * as habit from "@/app/api/habits/[id]/route";
 import * as habitLog from "@/app/api/habits/[id]/logs/[date]/route";
 import * as health from "@/app/api/health/route";
 import * as healthDay from "@/app/api/health/[date]/route";
+import * as companies from "@/app/api/companies/route";
+import * as company from "@/app/api/companies/[id]/route";
 import * as jobs from "@/app/api/jobs/route";
 import * as job from "@/app/api/jobs/[id]/route";
 import * as jobAnalyze from "@/app/api/jobs/analyze/route";
@@ -73,7 +75,7 @@ const ROUTES: [string, Module][] = [
   ["/finance/bills", bills], ["/finance/bills/:id", bill], ["/finance/bills/:id/pay", billPay],
   ["/health", health], ["/health/:date", healthDay],
   ["/notes", notes], ["/notes/:id", note], ["/reminders", reminders], ["/reminders/:id", reminder],
-  ["/jobs", jobs], ["/jobs/analyze", jobAnalyze], ["/jobs/:id", job],
+  ["/companies", companies], ["/companies/:id", company], ["/jobs", jobs], ["/jobs/analyze", jobAnalyze], ["/jobs/:id", job],
   ["/resources", resources], ["/resources/:id", resource], ["/resources/:id/practice", resourcePractice],
 ];
 

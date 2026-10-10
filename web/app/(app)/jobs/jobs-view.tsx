@@ -4,19 +4,22 @@ import { toArchive } from "@/lib/archive";
 import { useState, type DragEvent, type FormEvent } from "react";
 import Link from "next/link";
 import useSWR from "swr";
-import { BriefcaseBusiness, CalendarClock, Check, ChevronDown, Download, ExternalLink, GraduationCap, LayoutGrid, Link2, List as ListIcon, Loader2, MapPin, Pencil, Plus, Sparkles, Trash2, X } from "lucide-react";
+import { Building2, BriefcaseBusiness, CalendarClock, Check, ChevronDown, Download, ExternalLink, GraduationCap, LayoutGrid, Link2, List as ListIcon, Loader2, MapPin, Pencil, Plus, Sparkles, Trash2, X } from "lucide-react";
 import { api, errorMessage, refresh } from "@/lib/api";
 import { daysBetween, formatDate } from "@/lib/dates";
 import { hm } from "@/lib/format";
+import { companyKey } from "@/lib/companies";
 import { fixLink } from "@/lib/job-actions";
 import { deadlineLabel, isOpen, matchPercent, mergeSkills, skillKey, skillMatch, skillsToLearn } from "@/lib/jobs";
 import { useNewAction } from "@/lib/new-action";
-import type { JobAnalysis, JobApplication, JobStatus, LearningResource, List, Profile } from "@/lib/types";
+import type { Company, JobAnalysis, JobApplication, JobStatus, LearningResource, List, Profile } from "@/lib/types";
 import { Progress } from "@/components/ui/charts";
 import { Field, Segmented } from "@/components/ui/controls";
 import { useFeedback } from "@/components/ui/feedback";
 import { Modal, ModalActions } from "@/components/ui/modal";
 import { EmptyState, LoadError, PageHeader, PageSkeleton } from "@/components/ui/states";
+import { CompanyForm } from "./company-form";
+import { JobsTabs } from "./jobs-tabs";
 
 const STATUSES: { value: JobStatus; label: string; badge: string; column: string }[] = [
   { value: "saved", label: "Saved", badge: "bg-slate-100 text-slate-700", column: "bg-slate-50" },
@@ -44,6 +47,8 @@ export function JobsView() {
   const { data, error, mutate } = useSWR<List<JobApplication>>("/jobs");
   const { data: profile, mutate: mutateProfile } = useSWR<Profile>("/profile");
   const { data: library } = useSWR<{ items: LearningResource[] }>("/resources");
+  const { data: companyList } = useSWR<List<Company>>("/companies");
+  const [addingCompany, setAddingCompany] = useState<string | null>(null); // the company of the job whose "Add company" was pressed
   const { toast, confirm } = useFeedback();
   const [editing, setEditing] = useState<JobApplication | "new" | null>(null);
   const [view, setView] = useState<"list" | "board">("list");
@@ -158,8 +163,10 @@ export function JobsView() {
     }
   };
 
+  // A job's company is "in the list" when a company of the same name is there (capital letters and extra spaces do not count).
+  const listed = new Map((companyList?.items ?? []).map((c) => [companyKey(c.name), c]));
   const card = (job: JobApplication) => (
-    <JobCard key={job.id} job={job} today={today} mySkills={mySkills} onChange={(c) => update(job, c)} onEdit={() => setEditing(job)} onDelete={() => remove(job)} onLearned={(skill) => saveSkills([...mySkills, skill])} />
+    <JobCard key={job.id} job={job} today={today} mySkills={mySkills} listed={listed.get(companyKey(job.company))} onAddCompany={() => setAddingCompany(job.company)} onChange={(c) => update(job, c)} onEdit={() => setEditing(job)} onDelete={() => remove(job)} onLearned={(skill) => saveSkills([...mySkills, skill])} />
   );
 
   return (
@@ -176,6 +183,7 @@ export function JobsView() {
           Add Job
         </button>
       </PageHeader>
+      <JobsTabs current="applications" />
 
       {jobs.length > 0 && (
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
@@ -278,6 +286,9 @@ export function JobsView() {
         </aside>
       </div>
 
+      <Modal open={addingCompany !== null} onClose={() => setAddingCompany(null)} title="Add to your company list" description="Links can be typed without https://." size="md">
+        {addingCompany !== null && <CompanyForm key={addingCompany} company={null} name={addingCompany} onClose={() => setAddingCompany(null)} />}
+      </Modal>
       <Modal open={editing !== null} onClose={() => setEditing(null)} title={editing === "new" ? "Add a job" : "Edit job"} description={editing === "new" ? "Read a link to fill the form, or type it in yourself." : undefined} size="lg">
         {editing && <JobForm key={editing === "new" ? "new" : editing.id} job={editing === "new" ? null : editing} today={today} onClose={() => setEditing(null)} />}
       </Modal>
@@ -309,8 +320,8 @@ function StatusSelect({ status, onChange }: { status: JobStatus; onChange: (stat
   );
 }
 
-function JobCard({ job, today, mySkills, onChange, onEdit, onDelete, onLearned }: {
-  job: JobApplication; today: string; mySkills: string[];
+function JobCard({ job, today, mySkills, listed, onAddCompany, onChange, onEdit, onDelete, onLearned }: {
+  job: JobApplication; today: string; mySkills: string[]; listed?: Company; onAddCompany: () => void;
   onChange: (changes: Partial<JobApplication>) => void; onEdit: () => void; onDelete: () => void; onLearned: (skill: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -329,6 +340,18 @@ function JobCard({ job, today, mySkills, onChange, onEdit, onDelete, onLearned }
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {job.company.trim() &&
+            (listed ? (
+              <Link href="/jobs/companies" className="badge whitespace-nowrap bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100" title={`${listed.name} is in your company list`}>
+                <Check className="mr-1 size-3.5" aria-hidden />
+                In company list
+              </Link>
+            ) : (
+              <button type="button" className="btn btn-secondary btn-sm" onClick={onAddCompany} title={`Add ${job.company} to your company list`} aria-label={`Add ${job.company} to the company list`}>
+                <Building2 className="size-3.5" aria-hidden />
+                Add company
+              </button>
+            ))}
           {job.deadline ? (
             <span className={`badge ${job.status === "saved" ? daysTone(job.deadline, today) : "bg-slate-100 text-slate-500"}`} title={`Last date to apply: ${formatDate(job.deadline, "date")}`}>
               <CalendarClock className="mr-1 size-3.5" />

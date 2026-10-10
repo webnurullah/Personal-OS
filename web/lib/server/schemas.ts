@@ -1,5 +1,6 @@
 // What each endpoint accepts. Anything else is refused with a 400 and the field errors.
 import { courseWeeks, MAX_COURSE_WEEKS } from "../course.ts";
+import { readLink, tidyName, type LinkKind } from "../companies.ts";
 import { GOAL_LINK_KINDS } from "../goal-link.ts";
 import { isHttpUrl } from "../projects.ts";
 import { daysBetween, mondayOf, weekdayIndex } from "./dates.ts";
@@ -141,6 +142,24 @@ export const BlockCreate = z.object({
   // What it was about: a topic of one of your courses (its hours then add up there) and/or a library item.
   topic_id: s.id.nullable().optional(),
   resource_id: s.id.nullable().optional(),
+}).strict();
+
+// ---------- Companies ----------
+const companyLink = (kind: LinkKind) =>
+  z.string().max(600).transform((value, ctx) => {
+    const read = readLink(kind, value);
+    if ("problem" in read) {
+      ctx.addIssue({ code: "custom", message: read.problem });
+      return z.NEVER;
+    }
+    return read.link;
+  });
+export const CompanyFields = z.object({
+  name: z.string().transform(tidyName).pipe(z.string().min(1, "Required").max(200)),
+  website: companyLink("website").optional(),
+  facebook: companyLink("facebook").optional(),
+  linkedin: companyLink("linkedin").optional(),
+  note: s.optionalText(1000).optional(),
 }).strict();
 
 // ---------- Courses ----------

@@ -205,6 +205,9 @@ const job = (i, over = {}) => ({
   notes: H(i, 500), created_at: iso("2026-10-01"), ...over,
 });
 const jobs = { today: TODAY, items: range(8).map((i) => job(i)) };
+// The company list: very long names and links, some without links, matching some of the jobs' companies.
+const companyRow = (i, over = {}) => ({ id: `co${i}`, name: i < 3 ? H(i, 200) : `${H(i, 180)} (${i})`, website: i % 3 === 2 ? "" : `https://www.${"verylongcompanydomain".repeat(4)}.com/${WORD}`, facebook: i % 2 ? `https://facebook.com/${WORD}` : "", linkedin: i % 2 ? "" : `https://www.linkedin.com/company/${WORD}`, note: i % 2 ? H(i + 1, 1000) : "", created_at: iso("2026-10-01"), ...over });
+const companies = { today: TODAY, items: range(7).map((i) => companyRow(i)) };
 const jobAnalysis = {
   title: H(0, 200), company: H(1, 200), location: H(2, 200), deadline: D(9), summary: SENT.repeat(4), requirements: [H(0), H(1), H(2), H(3)],
   skills: ["React", "Docker", cut(WORD, 60), cut(BN, 60), cut(LINK, 60)], by: "rules",
@@ -677,7 +680,13 @@ function page_add(page, label) {
   return page.getByRole("button", { name: label, exact: true }).first();
 }
 
-unit("jobs", "/jobs", heading, () => ({ "/jobs": jobs, "/resources": resources, "/jobs/analyze": jobAnalysis }), [
+unit("jobs", "/jobs", heading, () => ({ "/jobs": jobs, "/companies": companies, "/resources": resources, "/jobs/analyze": jobAnalysis }), [
+  scene("Add company from a job", async (page, snap) => {
+    await openDialog(page, page.getByRole("button", { name: /to the company list/ }).first());
+    await snap("quick add dialog (company name filled in)");
+    await fillAll(page, dlg(page));
+    await snap("long text typed");
+  }),
   scene("job card opened", async (page, snap) => {
     await press(page.getByRole("button", { name: /Requirements/ }).first());
     await snap("Requirements & notes expanded");
@@ -946,6 +955,24 @@ unit("library", "/learning/library", heading, () => ({ "/resources": resources, 
     await openDialog(page, page.locator("button[aria-label^='Edit ']").first());
     await snap("edit prefilled");
   }),
+]);
+
+unit("companies", "/jobs/companies", heading, () => ({ "/jobs": jobs, "/companies": companies }), [
+  scene("Search", async (page, snap) => {
+    await page.locator("input[aria-label='Search companies']").fill(WORD);
+    await snap("search with a long word");
+  }),
+  scene("Add company dialog", async (page, snap) => {
+    await openDialog(page, page.getByRole("button", { name: "Add Company" }).first());
+    await snap("empty form");
+    await fillAll(page, dlg(page));
+    await snap("long text typed");
+  }),
+  scene("Edit company dialog", async (page, snap) => {
+    await openDialog(page, page.getByRole("button", { name: /^Edit / }).first());
+    await snap("form with long links");
+  }),
+  confirmScene("Delete company question", (page) => page.getByRole("button", { name: /^Delete / }).first()),
 ]);
 
 unit("archive", "/archive", heading, () => ({ "/archive": archive }), [

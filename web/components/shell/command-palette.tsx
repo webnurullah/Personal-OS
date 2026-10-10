@@ -6,12 +6,12 @@ import useSWR from "swr";
 import { Banknote, CalendarDays, CalendarPlus, CircleDot, FileText, FolderKanban, GraduationCap, HeartPulse, NotebookPen, PiggyBank, Plus, Repeat, Search, SquareCheck, Target, Timer, type LucideIcon } from "lucide-react";
 import { formatDate } from "@/lib/dates";
 import type { SearchItem } from "@/lib/types";
-import { ARCHIVE_NAV, NAV, SETTINGS_NAV } from "./nav";
+import { ALL_NAV } from "./nav";
 
 type Command = { group: string; label: string; href: string; icon: LucideIcon; hint?: string; action?: boolean };
 
 const COMMANDS: Command[] = [
-  ...[...NAV, SETTINGS_NAV, ARCHIVE_NAV].map((n) => ({ group: "Pages", label: n.label, href: n.href, icon: n.icon })),
+  ...ALL_NAV.map((n) => ({ group: "Pages", label: n.label, href: n.href, icon: n.icon })),
   { group: "Quick actions", label: "New task", href: "/tasks", icon: Plus, action: true },
   { group: "Quick actions", label: "New project", href: "/projects", icon: FolderKanban, action: true },
   { group: "Quick actions", label: "New event", href: "/calendar", icon: CalendarPlus, action: true },

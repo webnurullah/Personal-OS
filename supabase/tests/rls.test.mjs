@@ -756,6 +756,33 @@ check('deleting the practice project keeps the item', (await one('select practic
     await restore(aGoal3);
     check('an old Archive copy of a goal is brought back unlinked', JSON.stringify(await goalLink(g)) === JSON.stringify({ k: null, c: null }), JSON.stringify(await goalLink(g)));
   }
+
+// Job Apply -> Company list (20261015000000_companies.sql)
+{
+  const co = (await one(`insert into companies (name, website, linkedin) values ('Markopolo AI INC', 'https://markopolo.ai', 'https://www.linkedin.com/company/markopolo') returning id, facebook, note`)).id;
+  check('a company is saved with its links', JSON.stringify(await one('select name, website, facebook from companies where id = $1', [co])) === JSON.stringify({ name: 'Markopolo AI INC', website: 'https://markopolo.ai', facebook: '' }));
+  await expectError('the same name twice is refused', () => qa(`insert into companies (name) values ('Markopolo AI INC')`), 'duplicate key');
+  await expectError('also when only the capital letters differ', () => qa(`insert into companies (name) values ('  markopolo ai inc ')`), 'duplicate key');
+  check('another person can have a company with the same name', (await qb(`insert into companies (name) values ('Markopolo AI INC') returning id`)).length === 1);
+  await expectError('an empty name is refused', () => qa(`insert into companies (name) values ('')`), 'check constraint');
+  await expectError('a name over 200 characters is refused', () => qa('insert into companies (name) values ($1)', ['x'.repeat(201)]), 'check constraint');
+  await expectError('a link over 500 characters is refused', () => qa('update companies set website = $1 where id = $2', ['https://x.com/' + 'a'.repeat(500), co]), 'check constraint');
+  check("nobody else sees my companies", (await qb('select count(*)::int n from companies where id = $1', [co]))[0].n === 0);
+  check("and cannot change them", (await qb(`update companies set note = 'mine now' where id = $1 returning id`, [co])).length === 0);
+  await expectError('a signed-out visitor cannot read them', () => qanon('select * from companies'), 'permission denied');
+  await qa(`update companies set note = 'Dhaka office' where id = $1`, [co]);
+  check('"last edited" moves on an edit', (await one('select updated_at > created_at as moved from companies where id = $1', [co])).moved === true);
+
+  // Deleting goes to the Archive; restoring brings it back. A name that was added again meanwhile blocks the restore.
+  const archived = await arch('company', co);
+  check('a deleted company is gone from the list and waits in the Archive', (await one('select count(*)::int n from companies where id = $1', [co])).n === 0 && (await one(`select kind, title from archive_items where id = $1`, [archived])).title === 'Markopolo AI INC');
+  await restore(archived);
+  check('and comes back with its links and note', JSON.stringify(await one('select name, website, note from companies where id = $1', [co])) === JSON.stringify({ name: 'Markopolo AI INC', website: 'https://markopolo.ai', note: 'Dhaka office' }));
+  const archived2 = await arch('company', co);
+  await qa(`insert into companies (name) values ('markopolo ai inc')`);
+  await expectError('restoring it while the name is taken again is refused (nothing is lost)', () => restore(archived2), 'already in your lists');
+  check('and it stays in the Archive', (await one('select count(*)::int n from archive_items where id = $1', [archived2])).n === 1);
+}
 }
 
 // Security advisor fixes (20261006000100_security_hardening.sql)

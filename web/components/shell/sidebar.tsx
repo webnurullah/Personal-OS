@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import type { ReactNode } from "react";
 import { Sprout, X } from "lucide-react";
 import { prefetchPage } from "@/lib/prefetch";
 import { ARCHIVE_NAV, NAV, SETTINGS_NAV, activeItem, type NavItem } from "./nav";
@@ -28,20 +29,23 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
   const pathname = usePathname();
   const current = activeItem(pathname);
 
-  const link = (item: NavItem) => (
+  const link = (item: NavItem, sub = false): ReactNode => (
     <li key={item.href}>
       <Link
         href={item.href}
-        className="nav-link"
+        className={sub ? "nav-link !py-2 !text-[0.875rem]" : "nav-link"}
         aria-current={current === item ? "page" : undefined}
         onClick={onClose}
         onMouseEnter={() => prefetchPage(item.href)}
         onFocus={() => prefetchPage(item.href)}
         onTouchStart={() => prefetchPage(item.href)}
       >
-        <item.icon className="size-5 shrink-0" />
+        <item.icon className={sub ? "size-4 shrink-0" : "size-5 shrink-0"} />
         <span>{item.label}</span>
       </Link>
+      {item.children && (
+        <ul className="ml-6 mt-1 space-y-1 border-l border-slate-200 pl-2">{item.children.map((child) => link(child, true))}</ul>
+      )}
     </li>
   );
 
@@ -64,7 +68,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
           </button>
         </div>
         <nav className="min-h-0 flex-1 overflow-y-auto px-3 pb-4 pt-2">
-          <ul className="space-y-1">{NAV.map(link)}</ul>
+          <ul className="space-y-1">{NAV.map((item) => link(item))}</ul>
           <div className="mx-3 my-3 border-t border-slate-200/80" />
           <ul className="space-y-1">
             {link(SETTINGS_NAV)}

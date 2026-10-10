@@ -174,6 +174,25 @@ const browser = await launch();
   await ctx.close();
 }
 
+// ---------- Courses with no category yet: the All button is still there, on one line with Active / Paused / Done ----------
+{
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const { session } = await import("/home/user/Personal-OS/dev-tools/browser-checks/audit-lib.mjs");
+  await ctx.addCookies([{ name: "sb-127-auth-token", value: "base64-" + Buffer.from(JSON.stringify(session)).toString("base64url"), url: BASE }]);
+  const plain = { id: "c1", title: "SQL", subtitle: "", category: "", status: "active", start_date: "2026-09-14", target_date: "2026-12-31", color: "blue", est_hours: 4, done_hours: 1, spent_hours: 1, percent: 25, topic_count: 2, unit_count: 2, days_left: 80, state: "on-track", behind_hours: 0, weeks_behind: 0, forecast: null };
+  await apiMock(ctx, { "/learning/week": { today: TODAY, week_start: "2026-10-05", topic: "", goal_hours: 6, blocks: [], courses: [plain] } });
+  const page = await ctx.newPage();
+  await page.goto(`${BASE}/learning`);
+  await page.getByRole("heading", { name: "My courses" }).waitFor();
+  const cat = page.getByRole("tablist", { name: "Category" });
+  const stat = page.getByRole("tablist", { name: "Status" });
+  check("with no categories yet there is still an All button", JSON.stringify(await cat.getByRole("tab").allInnerTexts()) === JSON.stringify(["All"]) && (await cat.getByRole("tab", { name: "All" }).getAttribute("aria-selected")) === "true");
+  const yc = (await cat.boundingBox()).y;
+  const ys = (await stat.boundingBox()).y;
+  check("and it is on one line with the status buttons, like Projects", Math.abs(yc - ys) < 4, JSON.stringify({ yc, ys }));
+  await ctx.close();
+}
+
 // ---------- Course page: finishing the last topic marks the course done (the database does it; the page says so) ----------
 {
   const ctx = await newPhone(browser, 390);

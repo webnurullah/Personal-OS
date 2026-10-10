@@ -610,6 +610,44 @@ export type Database = {
 
         ];
       };
+      companies: {
+        Row: {
+          id: string;
+          user_id: string;
+          name: string;
+          website: string;
+          facebook: string;
+          linkedin: string;
+          note: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string;
+          name: string;
+          website?: string;
+          facebook?: string;
+          linkedin?: string;
+          note?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          name?: string;
+          website?: string;
+          facebook?: string;
+          linkedin?: string;
+          note?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+
+        ];
+      };
       job_applications: {
         Row: {
           id: string;

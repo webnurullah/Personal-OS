@@ -44,6 +44,7 @@ Frontend and backend are **one Vercel project**. Every push to GitHub `main` put
    15. `20261012000000_study_review_revision.sql` (Learning: a reflection column on a study week (no longer used by the app); how many look-backs of a finished topic or library item are done; a goal that follows a course or the certificates you earn)
    16. `20261013000000_course_category_status.sql` (Learning: a course has a category you write yourself ("Digital Marketing" over "Google Ads" and "Meta Ads") and a status: active, paused or done)
    17. `20261014000000_course_auto_done.sql` (Learning: a course becomes done by itself when all of its topics are done, and active again when a topic is added or reopened; a paused course is never changed)
+   18. `20261015000000_companies.sql` (Job Apply: the company list (name, website, Facebook, LinkedIn, note), one entry per name; it goes to the Archive when deleted)
 
    Already set up? Only run the files you have not run yet. Each new file is listed here when it is added.
 3. **Authentication → URL Configuration**

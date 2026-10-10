@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
-import { Archive, Award, BookOpen, BriefcaseBusiness, CalendarDays, ChartColumn, Clock, FileText, Flag, FolderKanban, GraduationCap, Layers, PiggyBank, Receipt, RotateCcw, SquareCheck, Tag, Target, Trash2, Bell, Wallet, type LucideIcon } from "lucide-react";
+import { Archive, Award, BookOpen, Building2, BriefcaseBusiness, CalendarDays, ChartColumn, Clock, FileText, Flag, FolderKanban, GraduationCap, Layers, PiggyBank, Receipt, RotateCcw, SquareCheck, Tag, Target, Trash2, Bell, Wallet, type LucideIcon } from "lucide-react";
 import { api, errorMessage, refreshAll } from "@/lib/api";
 import { foreverMessage, kindName, relatedText } from "@/lib/archive";
 import { colorOf } from "@/lib/colors";
@@ -16,7 +16,7 @@ import { forgetProject, useProjectActions } from "../projects/shared";
 const ICONS: Record<string, LucideIcon> = {
   task: SquareCheck, note: FileText, event: CalendarDays, goal: Target, milestone: Flag, habit: ChartColumn,
   course: GraduationCap, unit: Layers, topic: BookOpen, study_block: Clock, transaction: Wallet, bill: Receipt,
-  budget_category: PiggyBank, category: Tag, reminder: Bell, job: BriefcaseBusiness, project: FolderKanban, resource: Award,
+  budget_category: PiggyBank, category: Tag, reminder: Bell, job: BriefcaseBusiness, project: FolderKanban, resource: Award, company: Building2,
 };
 
 /** "2026-10-20" → "20 Oct 2026"; anything else as it is. */

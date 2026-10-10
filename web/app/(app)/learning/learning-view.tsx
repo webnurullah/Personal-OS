@@ -157,14 +157,12 @@ export function LearningView() {
         </div>
         {data.courses.length > 0 && (
           <div className="mt-4 flex flex-wrap items-center gap-3">
-            {categories.length > 0 && (
-              <Segmented
-                label="Category"
-                value={category}
-                onChange={setCategoryPick}
-                options={[{ value: "all", label: "All" }, ...categories.map((c) => ({ value: c.key, label: c.label })), ...(uncategorised ? [{ value: "none", label: "Other" }] : [])]}
-              />
-            )}
+            <Segmented
+              label="Category"
+              value={category}
+              onChange={setCategoryPick}
+              options={[{ value: "all", label: "All" }, ...categories.map((c) => ({ value: c.key, label: c.label })), ...(categories.length > 0 && uncategorised ? [{ value: "none", label: "Other" }] : [])]}
+            />
             <Segmented
               label="Status"
               value={statusPick}

@@ -21,6 +21,7 @@ export const ARCHIVE_KINDS: Record<string, Kind> = {
   reminder: { label: "Reminder", href: "/notes" },
   job: { label: "Job", href: "/jobs" },
   resource: { label: "Course or playlist", href: "/learning/library" },
+  company: { label: "Company", href: "/jobs/companies" },
   project: { label: "Project", href: "/projects", related: ["task", "tasks"] },
 };
 

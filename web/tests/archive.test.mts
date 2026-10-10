@@ -5,7 +5,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { ARCHIVE_KINDS, foreverMessage, kindName, relatedText, toArchive } from "../lib/archive.ts";
 
 // Every kind the database function knows (supabase/migrations: archive_items.sql, and later migrations that add kinds) has a name and a home page.
-const DATABASE_KINDS = ["task", "note", "event", "goal", "milestone", "habit", "course", "unit", "topic", "study_block", "transaction", "bill", "budget_category", "category", "reminder", "job", "resource"];
+const DATABASE_KINDS = ["task", "note", "event", "goal", "milestone", "habit", "course", "unit", "topic", "study_block", "transaction", "bill", "budget_category", "category", "reminder", "job", "resource", "company"];
 
 // The newest migration that (re)defines something is the one in force.
 const migrations = new URL("../../supabase/migrations/", import.meta.url);
