@@ -410,13 +410,6 @@ export function CourseView({ id }: { id: string }) {
         </section>
       </div>
 
-      {/* Notes about the course (they can be made public) */}
-      <CourseNotes
-        key={course.id}
-        course={course}
-        onSaved={(saved) => mutate((current) => current && { ...current, course: { ...current.course, ...saved } }, { revalidate: false })}
-      />
-
       {/* Topics table */}
       <section className="card mt-5 overflow-hidden" aria-labelledby="topics-title">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-5 py-3">
@@ -633,6 +626,13 @@ export function CourseView({ id }: { id: string }) {
 
       {/* Certificate courses and playlists collected for this subject */}
       <CourseLibrary course={course} />
+
+      {/* Notes about the course: after the topics and the playlists */}
+      <CourseNotes
+        key={course.id}
+        course={course}
+        onSaved={(saved) => mutate((current) => current && { ...current, course: { ...current.course, ...saved } }, { revalidate: false })}
+      />
 
       {/* Weekly plan + overall progress */}
       <div className="mt-5 grid grid-cols-1 gap-5 2xl:grid-cols-[minmax(0,1fr)_24rem]">

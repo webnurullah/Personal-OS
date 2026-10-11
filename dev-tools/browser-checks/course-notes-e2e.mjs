@@ -44,7 +44,11 @@ for (const width of [390, 320, 1280]) {
   // ---- the card
   check(`${width}px: the notes are shown formatted in the editor (heading, bold, link, list)`, (await editor.locator("h2").innerText()) === "Old heading" && (await editor.locator("strong").innerText()) === "bold" && (await editor.locator("a").getAttribute("href")) === "https://moz.com/" && (await editor.locator("li").count()) === 2);
   check(`${width}px: it is a simple note: a toolbar, nothing about public or private`, (await page.getByRole("toolbar", { name: "Text formatting" }).count()) === 1 && (await page.getByRole("switch").count()) === 0 && (await page.locator("#notes-title").locator("xpath=ancestor::section").getByText(/public|private/i).count()) === 0);
-  check(`${width}px: the card sits above the topics`, (await page.locator("#notes-title").boundingBox()).y < (await page.locator("#topics-title").boundingBox()).y);
+  {
+    const y = async (selector) => (await page.locator(selector).first().boundingBox()).y;
+    const [topics, playlists, notes, plan] = [await y("#topics-title"), await y("section[aria-labelledby='library-title']"), await y("#notes-title"), await y("#plan-title")];
+    check(`${width}px: the Notes card comes after the Topics and the Courses & playlists sections (and before the weekly plan)`, topics < playlists && playlists < notes && notes < plan, JSON.stringify({ topics, playlists, notes, plan }));
+  }
   let m = await measure(page, width);
   check(`${width}px: the course page does not overflow with the editor`, !m.zoomedOut && m.mainClipped === 0 && m.offenders.length === 0, JSON.stringify(m));
   if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/course-notes-${width}.png`, fullPage: true });
