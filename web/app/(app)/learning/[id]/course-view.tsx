@@ -17,6 +17,7 @@ import type { CourseDetail, CourseStatus, Topic, TopicStatus, Unit } from "@/lib
 import { useProfile } from "@/lib/profile";
 import { useMedia } from "@/lib/use-media";
 import { useSaveLater } from "@/lib/use-save-later";
+import { CourseNotes } from "./course-notes";
 import { Donut, Progress } from "@/components/ui/charts";
 import { ColorPicker, Field, Segmented } from "@/components/ui/controls";
 import { useFeedback } from "@/components/ui/feedback";
@@ -408,6 +409,13 @@ export function CourseView({ id }: { id: string }) {
           </svg>
         </section>
       </div>
+
+      {/* Notes about the course (they can be made public) */}
+      <CourseNotes
+        key={course.id}
+        course={course}
+        onSaved={(saved) => mutate((current) => current && { ...current, course: { ...current.course, ...saved } }, { revalidate: false })}
+      />
 
       {/* Topics table */}
       <section className="card mt-5 overflow-hidden" aria-labelledby="topics-title">

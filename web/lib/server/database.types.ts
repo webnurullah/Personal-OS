@@ -300,6 +300,9 @@ export type Database = {
           target_date: string;
           weekly_plan: number[];
           color: string;
+          notes: string;
+          notes_share: string | null;
+          notes_updated_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -315,6 +318,9 @@ export type Database = {
           target_date: string;
           weekly_plan?: number[];
           color?: string;
+          notes?: string;
+          notes_share?: string | null;
+          notes_updated_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -330,6 +336,9 @@ export type Database = {
           target_date?: string;
           weekly_plan?: number[];
           color?: string;
+          notes?: string;
+          notes_share?: string | null;
+          notes_updated_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -1188,6 +1197,10 @@ export type Database = {
       add_course_outline: {
         Args: { p_course: string; p_units: Json };
         Returns: Json;
+      };
+      public_course_notes: {
+        Args: { p_token: string };
+        Returns: { title: string; notes: string; updated_at: string | null }[];
       };
       archive_delete: {
         Args: { p_kind: string; p_id: string };
