@@ -257,7 +257,7 @@ const topic = (u, k) => ({
 });
 const courseDetail = {
   today: TODAY,
-  course: { id: "c0", title: H(0, 300), subtitle: H(1, 120), quote: H(2, 200), start_date: D(-30), target_date: D(60), weekly_plan: range(14).map((i) => (i % 3) * 2.5), color: "blue", notes: `${H(0, 3000)}\n\n${LINK}\n\n${WORD}\n\n${BN}`.slice(0, 20000), notes_share: "0f1e2d3c-4b5a-4968-8776-655443322110", notes_updated_at: iso("2026-10-01") },
+  course: { id: "c0", title: H(0, 300), subtitle: H(1, 120), quote: H(2, 200), start_date: D(-30), target_date: D(60), weekly_plan: range(14).map((i) => (i % 3) * 2.5), color: "blue", notes: `<h2>${H(0, 200)}</h2><p>${H(1, 3000)} <a href="https://example.com/${"x".repeat(80)}">${LINK}</a></p><ul><li><p>${WORD}</p></li><li><p>${BN}</p></li></ul><blockquote><p>${H(2, 400)}</p></blockquote>`, notes_updated_at: iso("2026-10-01") },
   units: range(3).map((u) => ({ id: `u${u}`, course_id: "c0", code: String(u + 1), title: H(u + 3, 200), color: COLORS[u], position: u, topics: range(4).map((k) => topic(u, k)) })),
 };
 const resource = (i, over = {}) => ({
@@ -888,13 +888,16 @@ unit("learning", "/learning", heading, () => ({ "/learning/week": (_m, url) => (
 ]);
 
 unit("course", "/learning/c0", heading, () => ({ "/courses/c0": courseDetail, "/resources": resources, "/courses": coursesResponse }), [
-  scene("Notes (public, long text)", async (page, snap) => {
-    await snap("notes card with the public link");
-    await page.getByLabel("Notes about this course").fill(("Long notes " + WORD + " " + LINK + "\n").repeat(40));
-    await snap("long notes typed");
-    await press(page.getByRole("switch", { name: "Make these notes public" }));
-    await settle(page, 400);
-    await snap("make private / ask");
+  scene("Notes editor", async (page, snap) => {
+    await snap("notes card with long formatted text");
+    const editor = page.getByRole("textbox", { name: "Notes about this course" });
+    await editor.click();
+    await page.keyboard.press("Control+End");
+    await page.keyboard.type(" " + WORD + " " + BN + " " + LINK);
+    await snap("long text typed");
+    await press(page.getByRole("button", { name: "Link", exact: true }));
+    await page.getByRole("textbox", { name: "Link address" }).fill(LINK);
+    await snap("link box open");
   }, { reload: true }),
   scene("Paste outline dialog", async (page, snap) => {
     await openDialog(page, button(page, "Paste outline"));

@@ -1,5 +1,6 @@
 // Lets the assistant use this app's own API, in the same server process and as the signed-in user,
 // so it gets exactly the same checks (sign-in, validation, Row Level Security) as the web app.
+import { withoutCourseNotes } from "./scrub.ts";
 import { NextRequest } from "next/server";
 import * as categories from "@/app/api/categories/route";
 import * as category from "@/app/api/categories/[id]/route";
@@ -108,5 +109,5 @@ export async function callApi({ method, path, body }: ApiCall, token: string, or
   });
   const res = await handler(req, { params: Promise.resolve(found.params) as Promise<never> });
   const json = await res.json().catch(() => null);
-  return { status: res.status, body: json };
+  return { status: res.status, body: withoutCourseNotes(json) };
 }

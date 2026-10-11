@@ -36,6 +36,20 @@ create or replace trigger courses_notes_stamp
   before update of notes on public.courses
   for each row execute function public.course_notes_stamp();
 
+-- The link code is made by the database, never chosen by the client (a person with their own login can write any column of their own
+-- course): any code sent is replaced by the code the course already has, or by a new random one when it had none. So a code that was
+-- turned off or deleted cannot be claimed again by someone who remembers it, and turning it on twice keeps the same code.
+create or replace function public.course_share_guard() returns trigger
+language plpgsql set search_path = '' as $$
+begin
+  new.notes_share := case when new.notes_share is null then null else coalesce(old.notes_share, gen_random_uuid()) end;
+  return new;
+end $$;
+
+create or replace trigger courses_share_guard
+  before update of notes_share on public.courses
+  for each row execute function public.course_share_guard();
+
 -- What the public page may read: the title and the notes of the course whose link code is given, and the time of the last change.
 -- This runs with the rights of its owner (the page has no sign-in), so it answers only for an exact code and returns nothing else.
 create or replace function public.public_course_notes(p_token uuid)

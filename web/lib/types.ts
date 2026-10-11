@@ -213,10 +213,8 @@ export type Course = {
   target_date: string;
   weekly_plan: number[];
   color: ColorName;
-  /** Your notes about the course. */
+  /** Your notes about the course: what the text editor stores (HTML), or empty. */
   notes: string;
-  /** The code of the public link while the notes are public (the page is /shared/course/<code>); null while they are private. */
-  notes_share: string | null;
   notes_updated_at: string | null;
 };
 export type CourseDetail = { today: string; course: Course; units: Unit[] };

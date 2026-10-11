@@ -188,43 +188,35 @@ await db.exec(`delete from job_applications where id = '${jimg.id}'`);
   await db.exec(`delete from job_applications where id = '${jf.id}'`);
 }
 
-// Course notes and the public link (20261018000000_course_notes.sql)
+// Course notes (20261018000000_course_notes.sql, 20261019000000_course_notes_simple.sql): private, simple notes
 {
-  const cn = (await qa(`insert into courses (title, start_date, target_date) values ('Notes course', '2026-10-05', '2026-12-28') returning id, notes, notes_share, notes_updated_at`))[0];
-  check('a course starts with empty notes and no public link', cn.notes === '' && cn.notes_share === null && cn.notes_updated_at === null);
-  const token = '0f1e2d3c-4b5a-4968-8776-655443322110';
-  const readPublic = async (t, q = qanon) => q('select title, notes, updated_at from public_course_notes($1)', [t]);
-  check('a private course is not readable with any code', (await readPublic(token)).length === 0);
-  const saved = (await qa('update courses set notes = $1 where id = $2 returning notes, notes_updated_at', ['Line one\n\nLine two with https://example.com/a', cn.id]))[0];
-  check('notes keep their line breaks and the time of the change is stamped', saved.notes === 'Line one\n\nLine two with https://example.com/a' && saved.notes_updated_at !== null);
-  await qa('update courses set notes_share = $1 where id = $2', [token, cn.id]);
-  const pub = await readPublic(token);
-  check('with the link turned on, the code shows the title and the notes to a signed-out visitor', pub.length === 1 && pub[0].title === 'Notes course' && pub[0].notes.startsWith('Line one'), JSON.stringify(pub));
-  check('the visitor gets only those three things', JSON.stringify(Object.keys(pub[0])) === JSON.stringify(['title', 'notes', 'updated_at']));
-  check('a signed-in person can read through the code too', (await readPublic(token, qb)).length === 1);
-  check('another code shows nothing', (await readPublic('11111111-2222-4333-8444-555555555555')).length === 0);
-  check('no code shows nothing', (await qanon('select * from public_course_notes(null)')).length === 0);
-  await expectError('the visitor cannot read the courses table itself', () => qanon('select title from courses'), 'permission denied');
-  check("another person cannot see this course's notes in the table", (await qb('select notes from courses where id = $1', [cn.id])).length === 0);
-  await expectError('two courses cannot share one code', async () => {
-    const other = (await qa(`insert into courses (title, start_date, target_date) values ('Other', '2026-10-05', '2026-12-28') returning id`))[0].id;
-    await qa('update courses set notes_share = $1 where id = $2', [token, other]);
-  }, 'courses_notes_share_idx');
-  await expectError('notes over 20000 letters are refused', () => qa('update courses set notes = $1 where id = $2', ['x'.repeat(20001), cn.id]), 'check constraint');
-  await qa('update courses set notes_share = null where id = $1', [cn.id]);
-  check('turning the link off stops it at once', (await readPublic(token)).length === 0);
-  await qa('update courses set notes_share = $1 where id = $2', [token, cn.id]);
+  const cn = (await qa(`insert into courses (title, start_date, target_date) values ('Notes course', '2026-10-05', '2026-12-28') returning id, notes, notes_updated_at`))[0];
+  check('a course starts with empty notes', cn.notes === '' && cn.notes_updated_at === null);
+  const html = '<h2>Key points</h2><p>Line one</p><ul><li><p>SEO needs <strong>patience</strong></p></li></ul>';
+  const saved = (await qa('update courses set notes = $1 where id = $2 returning notes, notes_updated_at', [html, cn.id]))[0];
+  check('notes are kept as written and the time of the change is stamped', saved.notes === html && saved.notes_updated_at !== null);
+  const stamp = saved.notes_updated_at.toISOString();
+  await qa("update courses set title = 'Notes course 2' where id = $1", [cn.id]);
+  check('changing something else leaves the notes time alone', (await qa('select notes_updated_at from courses where id = $1', [cn.id]))[0].notes_updated_at.toISOString() === stamp);
+  check("another person cannot see this course's notes", (await qb('select notes from courses where id = $1', [cn.id])).length === 0);
+  check('a signed-out visitor cannot read them either', await (async () => { try { await qanon('select notes from courses'); return false; } catch (e) { return /permission denied/.test(String(e.message)); } })());
+  // The public link idea was switched off: nobody can call the old reader, and a course can never be given a link code.
+  await expectError('nobody can call the old public reader (signed out)', () => qanon('select * from public_course_notes($1)', ['0f1e2d3c-4b5a-4968-8776-655443322110']), 'permission denied');
+  await expectError('nobody can call the old public reader (signed in)', () => qa('select * from public_course_notes($1)', ['0f1e2d3c-4b5a-4968-8776-655443322110']), 'permission denied');
+  const shared = (await qa('update courses set notes_share = $1 where id = $2 returning notes_share', ['0f1e2d3c-4b5a-4968-8776-655443322110', cn.id]))[0].notes_share;
+  check('a course cannot be given a link code (it stays empty)', shared === null);
+  await qa('update courses set notes = $1 where id = $2', ['x'.repeat(100000), cn.id]);
+  await expectError('notes over 100000 letters are refused', () => qa('update courses set notes = $1 where id = $2', ['x'.repeat(100001), cn.id]), 'check constraint');
+  await qa('update courses set notes = $1 where id = $2', [html, cn.id]);
   const archivedNotes = (await qa('select archive_delete($1, $2) as id', ['course', cn.id]))[0].id;
-  check('a deleted (archived) course is no longer public', (await readPublic(token)).length === 0);
   await qa('select archive_restore($1)', [archivedNotes]);
-  const back = (await qa('select notes, notes_share from courses where id = $1', [cn.id]))[0];
-  check('and when it is brought back its notes are kept but it is private again', back.notes.startsWith('Line one') && back.notes_share === null && (await readPublic(token)).length === 0);
+  check('a course keeps its notes through the Archive', (await qa('select notes from courses where id = $1', [cn.id]))[0].notes === html);
   const archivedOld = (await qa('select archive_delete($1, $2) as id', ['course', cn.id]))[0].id;
-  await db.exec(`update archive_items set data = jsonb_set(data, '{row}', (data -> 'row') - 'notes' - 'notes_share' - 'notes_updated_at') where id = '${archivedOld}'`);
+  await db.exec(`update archive_items set data = jsonb_set(data, '{row}', (data -> 'row') - 'notes' - 'notes_updated_at') where id = '${archivedOld}'`);
   await qa('select archive_restore($1)', [archivedOld]);
-  const old = (await qa('select notes, notes_share, notes_updated_at from courses where id = $1', [cn.id]))[0];
-  check('an old Archive copy of a course (made before notes) is brought back with empty notes, private', old.notes === '' && old.notes_share === null && old.notes_updated_at === null);
-  await db.exec(`delete from courses where title in ('Notes course', 'Other')`);
+  const old = (await qa('select notes, notes_updated_at from courses where id = $1', [cn.id]))[0];
+  check('an old Archive copy of a course (made before notes) is brought back with empty notes', old.notes === '' && old.notes_updated_at === null);
+  await db.exec(`delete from courses where title like 'Notes course%'`);
 }
 
 // The file pasted into the Supabase SQL Editor (supabase/archive-step-2.sql) runs on a migrated database, twice, and changes nothing that the tests below rely on.

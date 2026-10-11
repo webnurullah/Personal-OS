@@ -176,12 +176,14 @@ export const CourseFields = z.object({
   status: z.enum(["active", "paused", "done"]).optional(),
 }).strict();
 
-/** The notes of a course and whether they are public (read-only for anyone with the link). Sent on their own, never with the course. */
+/**
+ * The notes of a course, sent on their own (never with the course). They are what the text editor stores: HTML made of a few
+ * tags (paragraphs, headings, lists, links, bold and italic), which is only ever shown back through the editor. About 100,000
+ * letters with the tags; no trimming, and Postgres cannot store a NUL character.
+ */
 export const CourseNotes = z.object({
-  // Kept as typed (no trimming): this is writing, with its own blank lines. Postgres cannot store a NUL character.
-  notes: z.string().max(20000, "Notes can be 20,000 letters at most.").refine((v) => !v.includes("\u0000"), "Some text has a character that cannot be saved."),
-  public: z.boolean(),
-}).partial().strict();
+  notes: z.string().max(100000, "The notes are too long to save. Shorten them a little.").refine((v) => !v.includes("\u0000"), "Some text has a character that cannot be saved."),
+}).strict();
 
 export const UnitFields = z.object({
   code: s.text(10),
