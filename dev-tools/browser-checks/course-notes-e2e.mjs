@@ -10,6 +10,7 @@ const check = (name, ok, extra = "") => {
 };
 
 const course = { id: "c1", title: "Digital Marketing", subtitle: "", category: "", status: "active", start_date: "2026-09-14", target_date: "2026-12-31", color: "blue", est_hours: 10, done_hours: 2, spent_hours: 2, percent: 20, topic_count: 3, unit_count: 1, days_left: 86, quote: "", weekly_plan: [], notes: "<h2>Old heading</h2><p>Old note with <strong>bold</strong> and a <a href=\"https://moz.com/\">link</a>.</p><ul><li><p>first</p></li><li><p>second</p></li></ul>", notes_updated_at: "2026-10-01T00:00:00Z" };
+const STYLED = `<p>A <a class="btn btn-primary" title="x" rel="" target="_self" href="https://example.com/styled">styled link</a> pasted from another site</p>`;
 const UNSAFE = `<script>window.__ran = 1</script><p onclick="window.__ran = 1">Click me</p><img src="x" onerror="window.__ran = 1"><iframe src="https://example.com"></iframe><p>Safe text <a href="javascript:window.__ran = 1">bad link</a> <a href="https://example.com/ok" onmouseover="window.__ran = 1">good link</a></p>`;
 const browser = await launch();
 
@@ -127,6 +128,47 @@ for (const width of [390, 320, 1280]) {
   })());
   await page.waitForTimeout(1200);
 
+  // ---- links: written without a selection, opened with Ctrl+click, not made from file names, no toggle roles
+  calls.length = 0;
+  await editor.click();
+  await page.keyboard.press("Control+A");
+  await page.keyboard.press("Backspace");
+  await page.getByRole("button", { name: "Link" }).click();
+  await page.getByRole("textbox", { name: "Link address" }).fill("example.com/docs");
+  await page.getByRole("button", { name: "Add link" }).click();
+  check(`${width}px: "Add link" with nothing selected writes the address as the link`, (await editor.locator("a").innerText()) === "example.com/docs" && (await editor.locator("a").getAttribute("href")) === "https://example.com/docs", await html());
+  await page.keyboard.press("End");
+  await page.keyboard.type(" and main.py and README.md then https://example.org/x ");
+  check(`${width}px: only real addresses become links by themselves (not main.py or README.md)`, JSON.stringify(await editor.locator("a").evaluateAll((els) => els.map((e) => e.getAttribute("href")))) === JSON.stringify(["https://example.com/docs", "https://example.org/x"]), await html());
+  if (wide) {
+    const popup = ctx.waitForEvent("page", { timeout: 3000 }).catch(() => null);
+    await editor.locator("a").first().click({ modifiers: ["Control"] });
+    const opened = await popup;
+    check(`${width}px: Ctrl+click on a link opens it in a new tab`, opened !== null, opened ? "opened" : "no tab");
+    await opened?.close();
+  }
+  await editor.locator("a").first().click();
+  await page.getByRole("button", { name: "Link" }).click();
+  check(`${width}px: with the cursor in a link, the link box shows its address and an Open link`, (await page.getByRole("textbox", { name: "Link address" }).inputValue()) === "https://example.com/docs" && (await page.getByRole("link", { name: "Open link" }).getAttribute("href")) === "https://example.com/docs");
+  await page.getByRole("button", { name: "Cancel" }).click();
+  check(`${width}px: only the real toggles say pressed (not Link, Undo or Redo)`, (await page.getByRole("button", { name: "Link" }).getAttribute("aria-pressed")) === null && (await page.getByRole("button", { name: "Undo" }).getAttribute("aria-pressed")) === null && (await page.getByRole("button", { name: "Redo" }).getAttribute("aria-pressed")) === null && (await page.getByRole("button", { name: "Bold" }).getAttribute("aria-pressed")) !== null);
+  await page.waitForTimeout(1300);
+
+  // ---- notes changed in another tab or phone are loaded, and Undo does not bring the older notes back
+  calls.length = 0;
+  row = { ...row, notes: "<p>Written on the phone</p>", notes_updated_at: "2026-10-12T00:00:00Z" };
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await page.waitForFunction(() => document.querySelector(".rich-text")?.textContent === "Written on the phone", null, { timeout: 4000 }).catch(() => undefined);
+  check(`${width}px: notes saved elsewhere appear when the page gets the focus again`, (await editor.innerText()) === "Written on the phone");
+  check(`${width}px: and Undo has nothing to undo (it cannot bring the older notes back and save them)`, (await page.getByRole("button", { name: "Undo" }).isDisabled()) && calls.length === 0, JSON.stringify(calls));
+
+  // ---- the same text typed later keeps its runs of spaces
+  await editor.click();
+  await page.keyboard.press("Control+A");
+  await page.keyboard.type("a    b");
+  await page.waitForTimeout(1300);
+  check(`${width}px: runs of spaces are saved as typed`, calls.length === 1 && calls[0].notes === "<p>a    b</p>", JSON.stringify(calls));
+
   // ---- an empty note is saved as empty text, not as an empty paragraph
   calls.length = 0;
   await editor.click();
@@ -145,6 +187,37 @@ for (const width of [390, 320, 1280]) {
   await page.getByRole("button", { name: "Try again" }).click();
   await page.waitForTimeout(400);
   check(`${width}px: "Try again" saves it`, calls.length === 2 && calls[1].notes === "<p>This one fails first</p>" && (await page.getByText("Saved", { exact: true }).count()) === 1, JSON.stringify(calls));
+
+  // ---- a save that failed is tried once more when you switch away
+  calls.length = 0;
+  failNext = true;
+  await editor.click();
+  await page.keyboard.press("Control+A");
+  await page.keyboard.type("Typed before the connection dropped");
+  await page.waitForTimeout(1400);
+  await page.evaluate(() => {
+    Object.defineProperty(document, "visibilityState", { value: "hidden", configurable: true });
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+  await page.waitForTimeout(500);
+  check(`${width}px: after a failed save, switching away tries once more and stores the text`, calls.length === 2 && calls[1].notes === "<p>Typed before the connection dropped</p>", JSON.stringify(calls));
+  await page.evaluate(() => {
+    Object.defineProperty(document, "visibilityState", { value: "visible", configurable: true });
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+
+  // ---- too long: said once, in the status line, and the older shorter text is not saved in its place
+  calls.length = 0;
+  await editor.click();
+  await page.keyboard.press("Control+A");
+  await page.keyboard.type("short");
+  await page.evaluate(() => document.execCommand("insertText", false, "x".repeat(100100)));
+  await page.waitForTimeout(1500);
+  check(`${width}px: notes that are too long say "Too long to save" and nothing is sent (not even the older short text)`, (await page.getByText("Too long to save", { exact: true }).count()) === 1 && calls.length === 0 && (await page.getByText("Saved", { exact: true }).count()) === 0, JSON.stringify(calls.map((c) => c.notes.length)));
+  await page.keyboard.press("Control+A");
+  await page.keyboard.type("Back to normal");
+  await page.waitForTimeout(1400);
+  check(`${width}px: and typing a shorter text saves again`, calls.length === 1 && calls[0].notes === "<p>Back to normal</p>" && (await page.getByText("Saved", { exact: true }).count()) === 1, JSON.stringify(calls.map((c) => c.notes.slice(0, 30))));
 
   // ---- typing while a save is on its way: nothing typed is lost or put back, and the last text is the last one stored
   calls.length = 0;
@@ -182,6 +255,19 @@ for (const width of [390, 320, 1280]) {
   const inside = await editor.evaluate((el) => ({ scripts: el.querySelectorAll("script, img, iframe").length, handlers: [...el.querySelectorAll("*")].filter((n) => [...n.attributes].some((a) => a.name.startsWith("on"))).length, hrefs: [...el.querySelectorAll("a")].map((a) => a.getAttribute("href")), ran: window.__ran ?? null }));
   check("stored HTML with a script, onclick, onerror, a frame and a javascript: link: none of it runs or is kept", inside.scripts === 0 && inside.handlers === 0 && inside.ran === null && JSON.stringify(inside.hrefs) === JSON.stringify(["https://example.com/ok"]), JSON.stringify(inside));
   check("and the safe text is still shown", (await editor.innerText()).includes("Safe text") && errors.length === 0, errors.join(" | "));
+  await ctx.close();
+}
+
+// ---- a link pasted from a styled site keeps only its address (no class, title, target or rel from the other site)
+{
+  const ctx = await newPhone(browser, 390);
+  await apiMock(ctx, { "/courses/c1": { today: TODAY, course: { ...course, notes: STYLED }, units: [] } });
+  const page = await ctx.newPage();
+  await page.goto(`${BASE}/learning/c1`);
+  const editor = page.getByRole("textbox", { name: "Notes about this course" });
+  await editor.waitFor();
+  const attrs = await editor.locator("a").evaluate((a) => ({ class: a.getAttribute("class"), title: a.getAttribute("title"), rel: a.getAttribute("rel"), target: a.getAttribute("target"), href: a.getAttribute("href") }));
+  check("a link with a class, title, rel and target of another site keeps only its address; rel and target are ours", attrs.class === null && attrs.title === null && attrs.rel === "noopener noreferrer nofollow" && attrs.target === "_blank" && attrs.href === "https://example.com/styled", JSON.stringify(attrs));
   await ctx.close();
 }
 

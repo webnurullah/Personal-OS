@@ -41,6 +41,14 @@ export function useSaveLater(delay = 700) {
     }, delay);
     waiting.set(key, { timer, save });
   };
+  /** Forgets what is waiting under `key` without saving it. */
+  later.cancel = (key: string) => {
+    const waiting = pending.current;
+    const entry = waiting.get(key);
+    if (!entry) return;
+    clearTimeout(entry.timer);
+    waiting.delete(key);
+  };
   /** Saves what is waiting under `key` now (nothing happens when nothing is waiting). Gives back what the save returns. */
   later.flush = (key: string) => {
     const waiting = pending.current;

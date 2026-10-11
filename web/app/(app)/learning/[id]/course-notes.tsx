@@ -32,28 +32,41 @@ export function CourseNotes({ course, onSaved }: { course: Course; onSaved: (sav
   const newest = useRef(0); // bumps with every change you type and every save: an answer to an older one must not mark the notes saved
   const queue = useRef<Promise<unknown>>(Promise.resolve()); // saves go one after the other, so the last text typed is the last one stored
 
+  const failed = useRef<string | null>(null); // the text of a save that did not go through: it is tried once more when you leave
+
   const mark = (next: SaveState) => {
     stateRef.current = next;
     setState(next);
   };
   // Notes changed somewhere else (another tab or phone) show up here too, as long as nothing typed here is waiting to be saved.
+  // They are loaded into a fresh editor (its undo history starts empty, so Undo can never bring older notes back).
+  const [generation, setGeneration] = useState(0);
+  const textRef = useRef(text);
   useEffect(() => {
-    if (stateRef.current === "saved") setText(savedNotes);
+    textRef.current = text;
+  }, [text]);
+  useEffect(() => {
+    if (stateRef.current === "saved" && savedNotes !== textRef.current) {
+      textRef.current = savedNotes;
+      setText(savedNotes);
+      setGeneration((g) => g + 1);
+    }
   }, [savedNotes]);
 
-  /** Saves `value`; true when it is stored. */
-  const save = (value: string): Promise<boolean> => {
+  /** Saves `value` (the text of change number `version`); true when it is stored. */
+  const save = (value: string, version = ++newest.current): Promise<boolean> => {
     const run = async () => {
-      const mine = ++newest.current;
-      mark("saving");
+      if (version === newest.current) mark("saving");
       try {
         const saved = await api<SavedNotes>(`/courses/${course.id}/notes`, { method: "PATCH", body: { notes: value } });
-        if (mine !== newest.current) return true; // you typed more meanwhile: that text is on its way, nothing here is "saved" yet
+        if (version !== newest.current) return true; // you typed more meanwhile: that text is on its way, nothing here is "saved" yet
+        failed.current = null;
         onSaved(saved);
         mark("saved");
         return true;
       } catch (error) {
-        if (mine === newest.current) {
+        if (version === newest.current) {
+          failed.current = value;
           mark("error");
           toast(`Your notes could not be saved: ${errorMessage(error)}`, "error");
         }
@@ -65,19 +78,45 @@ export function CourseNotes({ course, onSaved }: { course: Course; onSaved: (sav
     return result;
   };
 
+  // A save that failed is tried once more when you leave the page or switch away (nothing else would send that text again).
+  const saveRef = useRef(save);
+  useEffect(() => {
+    saveRef.current = save;
+  });
+  useEffect(() => {
+    const retry = () => {
+      const value = failed.current;
+      if (value === null) return;
+      failed.current = null;
+      void saveRef.current(value);
+    };
+    const onHide = () => {
+      if (document.visibilityState === "hidden") retry();
+    };
+    window.addEventListener("pagehide", retry);
+    document.addEventListener("visibilitychange", onHide);
+    return () => {
+      window.removeEventListener("pagehide", retry);
+      document.removeEventListener("visibilitychange", onHide);
+      retry();
+    };
+  }, []);
+
   const type = (html: string) => {
-    newest.current++;
+    const version = ++newest.current;
     setText(html);
     if (html.length > LIMIT) {
+      saveLater.cancel("notes"); // the shorter text waiting to be saved is not what is on screen any more
+      failed.current = null;
+      if (stateRef.current !== "error") toast("These notes are too long to save. Shorten them a little.", "error");
       mark("error");
-      toast("These notes are too long to save. Shorten them a little.", "error");
       return;
     }
     mark("unsaved");
-    saveLater("notes", () => save(html));
+    saveLater("notes", () => save(html, version));
   };
 
-  const status = { saved: "Saved", saving: "Saving…", unsaved: "Not saved yet", error: "Could not save" }[state];
+  const status = text.length > LIMIT ? "Too long to save" : { saved: "Saved", saving: "Saving…", unsaved: "Not saved yet", error: "Could not save" }[state];
 
   return (
     <section className="card mt-5 p-5" aria-labelledby="notes-title" onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) void saveLater.flush("notes"); }}>
@@ -93,7 +132,7 @@ export function CourseNotes({ course, onSaved }: { course: Course; onSaved: (sav
           )}
         </p>
       </div>
-      <RichEditor value={text} onChange={type} label="Notes about this course" placeholder="Write what you want to remember about this course: key points, links, questions…" />
+      <RichEditor key={generation} value={text} onChange={type} label="Notes about this course" placeholder="Write what you want to remember about this course: key points, links, questions…" />
     </section>
   );
 }

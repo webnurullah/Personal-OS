@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
+import Link from "@tiptap/extension-link";
 import { Placeholder } from "@tiptap/extensions";
 import { webAddress } from "@/lib/web-address";
 import { Bold, Heading2, Heading3, Italic, Link2, List, ListOrdered, Quote, Redo2, Underline as UnderlineIcon, Undo2 } from "lucide-react";
@@ -11,10 +12,10 @@ const NONE = { bold: false, italic: false, underline: false, h2: false, h3: fals
 
 /**
  * A small text editor: bold, italic, underline, headings, lists, a quote and links, with undo and redo. It holds and gives back HTML,
- * which is only ever shown through the editor itself (anything it does not know is dropped when it is opened).
+ * which is only ever shown through the editor itself (anything it does not know is dropped when it is opened). `value` is the text it
+ * starts with: to load other text, give it a new `key` (a fresh editor, with a fresh undo history).
  */
 export default function RichEditor({ value, onChange, label, placeholder }: { value: string; onChange: (html: string) => void; label: string; placeholder: string }) {
-  const emitted = useRef(value); // the last text this editor gave out: what comes back in as `value` is not loaded again
   const [linkOpen, setLinkOpen] = useState(false);
   const [address, setAddress] = useState("");
   const [linkProblem, setLinkProblem] = useState(false);
@@ -29,25 +30,37 @@ export default function RichEditor({ value, onChange, label, placeholder }: { va
         strike: false,
         horizontalRule: false,
         trailingNode: false, // (an empty paragraph is not added after a heading or a list: a toggle on everything would pile them up)
-        link: { openOnClick: false, autolink: true, defaultProtocol: "https", protocols: ["http", "https"], HTMLAttributes: { rel: "noopener noreferrer nofollow", target: "_blank" } },
+        link: false, // set up below
+      }),
+      // A link keeps only its address: class, title, target and rel of a pasted link are not kept, so they are always the ones given here.
+      Link.extend({ addAttributes: () => ({ href: { default: null, parseHTML: (element: HTMLElement) => element.getAttribute("href") } }) }).configure({
+        openOnClick: false,
+        autolink: true,
+        // Only real addresses become links by themselves (not file names such as main.py or README.md).
+        shouldAutoLink: (url: string) => /^(https?:\/\/|www\.)/i.test(url),
+        defaultProtocol: "https",
+        protocols: ["http", "https"],
+        HTMLAttributes: { rel: "noopener noreferrer nofollow", target: "_blank" },
       }),
       Placeholder.configure({ placeholder }),
     ],
     content: value,
-    editorProps: { attributes: { class: "rich-text", role: "textbox", "aria-multiline": "true", "aria-label": label } },
+    parseOptions: { preserveWhitespace: true }, // runs of spaces and indents are kept when the notes are opened again
+    editorProps: {
+      attributes: { class: "rich-text", role: "textbox", "aria-multiline": "true", "aria-label": label },
+      // Ctrl or Cmd and a click opens a link (a plain click only puts the cursor there, as in any editor).
+      handleClick: (_view, _position, event) => {
+        if (!(event.ctrlKey || event.metaKey)) return false;
+        const link = (event.target as HTMLElement | null)?.closest("a");
+        if (!link) return false;
+        window.open(link.href, "_blank", "noopener,noreferrer");
+        return true;
+      },
+    },
     onUpdate: ({ editor: e }) => {
-      const html = e.isEmpty ? "" : e.getHTML();
-      emitted.current = html;
-      onChange(html);
+      onChange(e.isEmpty ? "" : e.getHTML());
     },
   });
-
-  // Text that arrives from outside (the notes changed in another tab) is loaded, but not what the editor itself just gave out.
-  useEffect(() => {
-    if (!editor || value === emitted.current) return;
-    emitted.current = value;
-    editor.commands.setContent(value, { emitUpdate: false });
-  }, [editor, value]);
 
   const on = useEditorState({
     editor,
@@ -68,14 +81,14 @@ export default function RichEditor({ value, onChange, label, placeholder }: { va
 
   if (!editor) return <div className="skeleton h-52 rounded-xl" aria-busy="true" aria-label="Loading the editor" />;
 
-  const button = (name: string, icon: ReactNode, active: boolean, run: () => void, disabled = false) => (
+  const button = (name: string, icon: ReactNode, active: boolean, run: () => void, disabled = false, toggle = true) => (
     <button
       key={name}
       type="button"
       className={`btn btn-ghost btn-sm btn-icon ${active ? "bg-blue-50 text-blue-700" : "text-slate-600"}`}
       aria-label={name}
       title={name}
-      aria-pressed={active}
+      aria-pressed={toggle ? active : undefined}
       disabled={disabled}
       // The editor keeps its cursor and selection when a button is pressed.
       onMouseDown={(e) => e.preventDefault()}
@@ -98,7 +111,12 @@ export default function RichEditor({ value, onChange, label, placeholder }: { va
     }
     const href = webAddress(address);
     if (!href) return setLinkProblem(true);
-    editor.chain().focus().extendMarkRange("link").setLink({ href }).run();
+    if (editor.state.selection.empty && !on.link) {
+      // Nothing is selected: the address itself is written as the link.
+      editor.chain().focus().insertContent({ type: "text", text: address.trim(), marks: [{ type: "link", attrs: { href } }] }).run();
+    } else {
+      editor.chain().focus().extendMarkRange("link").setLink({ href }).run();
+    }
     setLinkOpen(false);
   };
 
@@ -115,10 +133,10 @@ export default function RichEditor({ value, onChange, label, placeholder }: { va
         {button("Bullet list", <List className="size-4" />, on.bullet, () => editor.chain().focus().toggleBulletList().run())}
         {button("Numbered list", <ListOrdered className="size-4" />, on.ordered, () => editor.chain().focus().toggleOrderedList().run())}
         {button("Quote", <Quote className="size-4" />, on.quote, () => editor.chain().focus().toggleBlockquote().run())}
-        {button("Link", <Link2 className="size-4" />, on.link, openLink)}
+        {button("Link", <Link2 className="size-4" />, on.link, openLink, false, false)}
         <span className="mx-1 h-5 w-px bg-slate-200" aria-hidden />
-        {button("Undo", <Undo2 className="size-4" />, false, () => editor.chain().focus().undo().run(), !on.undo)}
-        {button("Redo", <Redo2 className="size-4" />, false, () => editor.chain().focus().redo().run(), !on.redo)}
+        {button("Undo", <Undo2 className="size-4" />, false, () => editor.chain().focus().undo().run(), !on.undo, false)}
+        {button("Redo", <Redo2 className="size-4" />, false, () => editor.chain().focus().redo().run(), !on.redo, false)}
       </div>
       {linkOpen && (
         <form
@@ -142,8 +160,11 @@ export default function RichEditor({ value, onChange, label, placeholder }: { va
             autoComplete="off"
             autoFocus
           />
-          <span className="flex gap-2">
+          <span className="flex flex-wrap gap-2">
             <button type="submit" className="btn btn-primary btn-sm">{on.link ? "Update link" : "Add link"}</button>
+            {on.link && webAddress(address) && (
+              <a href={webAddress(address) ?? undefined} target="_blank" rel="noopener noreferrer nofollow" className="btn btn-secondary btn-sm">Open link</a>
+            )}
             <button type="button" className="btn btn-secondary btn-sm" onClick={() => { setLinkOpen(false); editor.commands.focus(); }}>Cancel</button>
           </span>
           {linkProblem && <p role="alert" className="text-xs text-rose-600">That does not look like a web address.</p>}
