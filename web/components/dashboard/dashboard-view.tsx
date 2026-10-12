@@ -10,7 +10,7 @@ import { firstName, greeting } from "@/lib/format";
 import type { Dashboard } from "@/lib/types";
 import { useFeedback } from "../ui/feedback";
 import { LoadError, PageSkeleton } from "../ui/states";
-import { BudgetWidget, GoalsWidget, HabitsWidget, HealthWidget, JobsWidget, LearningWidget, ProductivityWidget, ProjectsWidget, RemindersWidget, ScheduleWidget, TasksWidget } from "./widgets";
+import { BudgetWidget, GoalsWidget, HabitsTracker, HealthWidget, JobsWidget, LearningWidget, ProductivityWidget, ProjectsWidget, RemindersWidget, ScheduleWidget, TasksWidget } from "./widgets";
 
 export function DashboardView() {
   const { data, error, mutate } = useSWR<Dashboard>("/dashboard");
@@ -44,15 +44,17 @@ export function DashboardView() {
 
       {isEmpty && <Welcome />}
 
-      {/* Tasks, projects, learning and notes first; then everything else. */}
+      {/* The habit tracker first, full width; then tasks, projects, learning and notes; then everything else. */}
       <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+        <div className="md:col-span-2 xl:col-span-3">
+          <HabitsTracker />
+        </div>
         <TasksWidget data={data} />
         <ProjectsWidget />
         <LearningWidget />
         <RemindersWidget data={data} />
         <JobsWidget today={data.today} />
         <ScheduleWidget data={data} />
-        <HabitsWidget data={data} />
         <GoalsWidget data={data} />
         <BudgetWidget data={data} />
         <HealthWidget data={data} />

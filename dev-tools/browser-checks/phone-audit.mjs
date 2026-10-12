@@ -546,7 +546,7 @@ const confirmScene = (name, open) =>
   });
 const heading = (page) => page.locator("main h1").first().waitFor({ timeout: 12000 });
 
-unit("dashboard", "/", heading, () => ({ "/dashboard": dashboard, "/notes": notes, "/resources": resources, "/jobs": jobs, "/learning/week": learningWeek, "/projects": { today: TODAY, items: projects } }), [
+unit("dashboard", "/", heading, () => ({ "/dashboard": dashboard, "/notes": notes, "/resources": resources, "/jobs": jobs, "/learning/week": learningWeek, "/projects": { today: TODAY, items: projects }, "/habits?days=7": habitsResponse }), [
   scene("tasks widget tabs", async (page, snap) => {
     await press(tab(page, "This Week"));
     await snap("This Week");

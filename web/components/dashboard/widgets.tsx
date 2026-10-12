@@ -3,7 +3,7 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
 import useSWR from "swr";
-import { ArrowRight, BriefcaseBusiness, CalendarDays, ChartNoAxesColumn, ChartColumn, Clock, FileText, Footprints, FolderKanban, GraduationCap, HeartPulse, Leaf, Moon, Pin, Plus, SquareCheck, Sun, Target, TrendingUp, Wallet } from "lucide-react";
+import { ArrowRight, BriefcaseBusiness, CalendarDays, ChartNoAxesColumn, Clock, FileText, Footprints, FolderKanban, GraduationCap, HeartPulse, Leaf, Moon, Pin, Plus, SquareCheck, Sun, Target, TrendingUp, Wallet } from "lucide-react";
 import { api, errorMessage, refresh } from "@/lib/api";
 import { colorOf } from "@/lib/colors";
 import { timeLeft } from "@/lib/course";
@@ -16,7 +16,8 @@ import { taskDateLabel } from "@/lib/tasks";
 import { deadlineLabel, isOpen } from "@/lib/jobs";
 import { compareUpNext, stepWord } from "@/lib/library";
 import { reasonText } from "@/lib/study";
-import type { Dashboard, JobApplication, LearningResource, LearningWeek, List, Note, Project, Task } from "@/lib/types";
+import type { Dashboard, HabitsResponse, JobApplication, LearningResource, LearningWeek, List, Note, Project, Task } from "@/lib/types";
+import { HABITS_KEY, HabitTracker } from "../habits/habit-tracker";
 import { Donut, Progress } from "../ui/charts";
 import { Segmented } from "../ui/controls";
 import { useFeedback } from "../ui/feedback";
@@ -237,56 +238,20 @@ export function ProjectsWidget() {
   );
 }
 
-// ---------- Habits ----------
-export function HabitsWidget({ data }: Props) {
-  const act = useAction();
-  const { days, items } = data.habits;
-  const toggle = (habitId: string, date: string, done: boolean) => act(() => api(`/habits/${habitId}/logs/${date}`, { method: done ? "DELETE" : "PUT" }), "/habits");
-
-  return (
-    <Widget icon={<ChartColumn className="size-4.5" />} tile="bg-indigo-50 text-indigo-600" title="Habit Tracker" link={{ href: "/habits", label: "View All" }}>
-      {items.length ? (
-        <>
-          <div className="mt-4 flex items-center gap-2.5 text-[11px] font-medium text-slate-400">
-            <span className="flex-1">
-              {data.habits.done_today} of {items.length} done today
-            </span>
-            <div className="flex gap-1">
-              {days.map((d) => (
-                <span key={d} className="w-4.5 text-center">{formatDate(d, "weekday").charAt(0)}</span>
-              ))}
-            </div>
-            <span className="w-7" />
-          </div>
-          <ul className="mt-2 space-y-3">
-            {items.map((habit) => (
-              <li key={habit.id} className="flex items-center gap-2.5">
-                <Icon name={habit.icon} className="size-4 shrink-0 text-slate-500" />
-                <span className="min-w-0 flex-1 truncate text-[13px] text-slate-700">{habit.name}</span>
-                <div className="flex gap-1">
-                  {habit.done.map((done, i) => (
-                    <button
-                      key={days[i]}
-                      type="button"
-                      className={`habit-dot habit-dot-sm ${i === days.length - 1 ? "is-today" : ""}`}
-                      aria-pressed={done}
-                      title={`${habit.name} · ${i === days.length - 1 ? "Today" : formatDate(days[i], "long")}`}
-                      onClick={() => toggle(habit.id, days[i], done)}
-                    />
-                  ))}
-                </div>
-                <span className="min-w-7 shrink-0 whitespace-nowrap text-right text-xs font-semibold text-slate-500">{habit.streak}d</span>
-              </li>
-            ))}
-          </ul>
-        </>
-      ) : (
-        <p className="py-8 text-center text-sm text-slate-500">
-          No habits yet. <Link href="/habits?new=1" className="font-medium text-blue-600">Add your first</Link>
-        </p>
-      )}
-    </Widget>
-  );
+// ---------- Habits: the "Last 7 days" tracker, full width at the top ----------
+export function HabitsTracker() {
+  const { data, mutate } = useSWR<HabitsResponse>(HABITS_KEY);
+  if (!data) {
+    return (
+      <section className="card p-5" aria-busy="true" aria-label="Loading the habit tracker">
+        <div className="h-5 w-32 animate-pulse rounded bg-slate-100" />
+        <div className="mt-4 space-y-3">
+          {[0, 1, 2].map((i) => <div key={i} className="h-12 animate-pulse rounded-xl bg-slate-100" />)}
+        </div>
+      </section>
+    );
+  }
+  return <HabitTracker data={data} mutate={mutate} link={{ href: "/habits", label: "View All" }} />;
 }
 
 // ---------- Goals ----------

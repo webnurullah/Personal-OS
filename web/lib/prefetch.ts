@@ -5,7 +5,7 @@ import { fetcher } from "./api";
 
 // The SWR keys each page asks for first (must match the keys in the page views).
 const PAGE_DATA: Record<string, string[]> = {
-  "/": ["/dashboard", "/projects"],
+  "/": ["/dashboard", "/projects", "/habits?days=7"],
   "/tasks": ["/tasks", "/categories", "/projects?lite=1"],
   "/projects": ["/projects"],
   "/archive": ["/archive"],

@@ -1,53 +1,30 @@
 "use client";
 
 import { toArchive } from "@/lib/archive";
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import useSWR from "swr";
-import { ChartPie, CircleCheck, Flame, Lightbulb, Pencil, Plus, Repeat, Sparkles, Trash2, TriangleAlert, Trophy } from "lucide-react";
+import { ChartPie, CircleCheck, Flame, Lightbulb, Plus, Sparkles, TriangleAlert, Trophy } from "lucide-react";
 import { api, errorMessage, refresh } from "@/lib/api";
-import { colorOf } from "@/lib/colors";
 import { formatDate } from "@/lib/dates";
 import { useNewAction } from "@/lib/new-action";
 import type { Habit, HabitsResponse } from "@/lib/types";
-import { Progress } from "@/components/ui/charts";
+import { HABITS_KEY, HabitTracker } from "@/components/habits/habit-tracker";
 import { ColorPicker, Field, IconPicker } from "@/components/ui/controls";
 import { useFeedback } from "@/components/ui/feedback";
-import { HABIT_ICONS, Icon } from "@/components/ui/icon";
+import { HABIT_ICONS } from "@/components/ui/icon";
 import { Modal, ModalActions } from "@/components/ui/modal";
-import { EmptyState, LoadError, PageHeader, PageSkeleton } from "@/components/ui/states";
-
-const KEY = "/habits?days=7";
+import { LoadError, PageHeader, PageSkeleton } from "@/components/ui/states";
 
 export function HabitsView() {
-  const { data, error, mutate } = useSWR<HabitsResponse>(KEY);
+  const { data, error, mutate } = useSWR<HabitsResponse>(HABITS_KEY);
   const { toast, confirm } = useFeedback();
   const [editing, setEditing] = useState<Habit | "new" | null>(null);
-  const scroller = useRef<HTMLDivElement>(null);
-  // On a phone the table is wider than the screen: start with today's column in view (the habit names stay put on the left).
-  const habitCount = data?.items.length ?? 0;
-  useEffect(() => {
-    const box = scroller.current;
-    const today = box?.querySelector<HTMLElement>("[data-today]");
-    if (box && today) box.scrollLeft = Math.max(0, today.offsetLeft + today.offsetWidth - box.clientWidth + 24);
-  }, [habitCount]);
   useNewAction(() => setEditing("new"));
 
   if (error && !data) return <LoadError error={error} retry={() => mutate()} />;
   if (!data) return <PageSkeleton />;
 
   const { summary, days } = data;
-
-  // Instant tick: flip the dot on screen first, then save and reload the streaks.
-  const toggle = async (habit: Habit, index: number) => {
-    const done = habit.done[index];
-    await mutate({ ...data, items: data.items.map((h) => (h.id === habit.id ? { ...h, done: h.done.map((d, i) => (i === index ? !done : d)) } : h)) }, { revalidate: false });
-    try {
-      await api(`/habits/${habit.id}/logs/${days[index]}`, { method: done ? "DELETE" : "PUT" });
-    } catch (e) {
-      toast(errorMessage(e), "error");
-    }
-    await refresh("/habits");
-  };
 
   const remove = async (habit: Habit) => {
     if (!(await confirm({ title: "Delete this habit?", message: toArchive(`“${habit.name}” and all its history`) }))) return;
@@ -84,99 +61,7 @@ export function HabitsView() {
         <Summary icon={<Sparkles className="size-5" />} tile="bg-violet-50 text-violet-600" label="Perfect days" value={`${summary.perfect_days} of ${days.length}`} />
       </div>
 
-      <section className="card mt-6 p-5" aria-labelledby="tracker-title">
-        <header className="flex flex-wrap items-center justify-between gap-2">
-          <h2 id="tracker-title" className="card-title">Last 7 days</h2>
-          <p className="text-xs text-slate-500">Tap a day to tick or untick it. Streaks update straight away.</p>
-        </header>
-        {data.items.length ? (
-          <div ref={scroller} className="relative mt-4 overflow-x-auto">
-            <table className="w-full min-w-[760px] text-sm">
-              <thead>
-                <tr className="text-xs text-slate-500">
-                  <th className="sticky left-0 z-10 bg-white pb-3 text-left font-medium">Habit</th>
-                  {days.map((day, i) => {
-                    const isToday = i === days.length - 1;
-                    return (
-                      <th key={day} data-today={isToday ? "" : undefined} className="pb-3 text-center font-medium">
-                        <span className={`block ${isToday ? "text-blue-600" : ""}`}>{isToday ? "Today" : formatDate(day, "weekday")}</span>
-                        <span className={`mt-0.5 inline-grid size-6 place-items-center rounded-full text-[11px] ${isToday ? "bg-blue-600 text-white" : "text-slate-400"}`}>{Number(day.slice(8))}</span>
-                      </th>
-                    );
-                  })}
-                  <th className="pb-3 text-center font-medium">Streak</th>
-                  <th className="pb-3 pl-4 text-left font-medium">This week</th>
-                  <th className="pb-3" />
-                </tr>
-              </thead>
-              <tbody>
-                {data.items.map((habit) => (
-                  <tr key={habit.id} className="group border-t border-slate-100">
-                    <td className="sticky left-0 z-10 w-40 bg-white py-3 pr-3 sm:static sm:w-auto sm:pr-4">
-                      <div className="flex items-center gap-3">
-                        <span className={`icon-tile max-sm:hidden ${colorOf(habit.color).tile}`}>
-                          <Icon name={habit.icon} className="size-4.5" />
-                        </span>
-                        <div className="min-w-0">
-                          <p className="font-medium text-slate-800">{habit.name}</p>
-                          {habit.goal_text && <p className="text-xs text-slate-500">{habit.goal_text}</p>}
-                          <span className="-ml-2 mt-1 flex sm:hidden">
-                            <button type="button" className="btn btn-ghost btn-sm btn-icon" onClick={() => setEditing(habit)} aria-label={`Edit ${habit.name}`}>
-                              <Pencil className="size-4" />
-                            </button>
-                            <button type="button" className="btn btn-ghost btn-sm btn-icon" onClick={() => remove(habit)} aria-label={`Delete ${habit.name}`}>
-                              <Trash2 className="size-4" />
-                            </button>
-                          </span>
-                        </div>
-                      </div>
-                    </td>
-                    {habit.done.map((done, i) => (
-                      <td key={days[i]} className="text-center">
-                        <button
-                          type="button"
-                          className={`habit-dot habit-dot-lg ${i === days.length - 1 ? "is-today" : ""}`}
-                          aria-pressed={done}
-                          aria-label={`${habit.name} · ${i === days.length - 1 ? "Today" : formatDate(days[i], "long")}`}
-                          onClick={() => toggle(habit, i)}
-                        />
-                      </td>
-                    ))}
-                    <td className="text-center">
-                      <span className="inline-flex items-center gap-1 font-semibold text-slate-800">
-                        <Flame className="size-4 text-orange-500" />
-                        {habit.streak}
-                      </span>
-                    </td>
-                    <td className="pl-4">
-                      <div className="flex w-36 items-center gap-2">
-                        <Progress value={habit.share} fill="bg-emerald-500" className="h-1.5 flex-1" />
-                        <span className="w-9 text-right text-xs font-semibold text-slate-600">{habit.share}%</span>
-                      </div>
-                    </td>
-                    <td className="w-20 text-right">
-                      <span className="reveal hidden sm:inline-flex">
-                        <button type="button" className="btn btn-ghost btn-sm btn-icon" onClick={() => setEditing(habit)} aria-label={`Edit ${habit.name}`}>
-                          <Pencil className="size-4" />
-                        </button>
-                        <button type="button" className="btn btn-ghost btn-sm btn-icon" onClick={() => remove(habit)} aria-label={`Delete ${habit.name}`}>
-                          <Trash2 className="size-4" />
-                        </button>
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <EmptyState icon={Repeat} title="No habits yet" text="Start with one small habit. You can always add more.">
-            <button type="button" className="btn btn-primary btn-sm" onClick={() => setEditing("new")}>
-              <Plus className="size-4" /> New habit
-            </button>
-          </EmptyState>
-        )}
-      </section>
+      <HabitTracker className="mt-6" data={data} mutate={mutate} onEdit={setEditing} onDelete={remove} onNew={() => setEditing("new")} />
 
       <div className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <section className="card p-5" aria-labelledby="heat-title">
