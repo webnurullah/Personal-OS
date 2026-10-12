@@ -10,7 +10,7 @@ import { firstName, greeting } from "@/lib/format";
 import type { Dashboard } from "@/lib/types";
 import { useFeedback } from "../ui/feedback";
 import { LoadError, PageSkeleton } from "../ui/states";
-import { BudgetWidget, GoalsWidget, HabitsWidget, HealthWidget, JobsWidget, LearningWidget, ProductivityWidget, RemindersWidget, ScheduleWidget, TasksWidget } from "./widgets";
+import { BudgetWidget, GoalsWidget, HabitsWidget, HealthWidget, JobsWidget, LearningWidget, ProductivityWidget, ProjectsWidget, RemindersWidget, ScheduleWidget, TasksWidget } from "./widgets";
 
 export function DashboardView() {
   const { data, error, mutate } = useSWR<Dashboard>("/dashboard");
@@ -44,9 +44,10 @@ export function DashboardView() {
 
       {isEmpty && <Welcome />}
 
-      {/* Tasks, learning and notes first; then everything else. */}
+      {/* Tasks, projects, learning and notes first; then everything else. */}
       <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
         <TasksWidget data={data} />
+        <ProjectsWidget />
         <LearningWidget />
         <RemindersWidget data={data} />
         <JobsWidget today={data.today} />

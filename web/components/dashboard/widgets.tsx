@@ -3,7 +3,7 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
 import useSWR from "swr";
-import { ArrowRight, BriefcaseBusiness, CalendarDays, ChartNoAxesColumn, ChartColumn, Clock, FileText, Footprints, GraduationCap, HeartPulse, Leaf, Moon, Pin, Plus, SquareCheck, Sun, Target, TrendingUp, Wallet } from "lucide-react";
+import { ArrowRight, BriefcaseBusiness, CalendarDays, ChartNoAxesColumn, ChartColumn, Clock, FileText, Footprints, FolderKanban, GraduationCap, HeartPulse, Leaf, Moon, Pin, Plus, SquareCheck, Sun, Target, TrendingUp, Wallet } from "lucide-react";
 import { api, errorMessage, refresh } from "@/lib/api";
 import { colorOf } from "@/lib/colors";
 import { timeLeft } from "@/lib/course";
@@ -11,11 +11,12 @@ import { daysBetween, formatDate } from "@/lib/dates";
 import { count, hm, minutesOf, pct } from "@/lib/format";
 import { useCategories, useNowMinutes } from "@/lib/hooks";
 import { useProfile } from "@/lib/profile";
+import { compareProjects } from "@/lib/projects";
 import { taskDateLabel } from "@/lib/tasks";
 import { deadlineLabel, isOpen } from "@/lib/jobs";
 import { compareUpNext, stepWord } from "@/lib/library";
 import { reasonText } from "@/lib/study";
-import type { Dashboard, JobApplication, LearningResource, LearningWeek, List, Note, Task } from "@/lib/types";
+import type { Dashboard, JobApplication, LearningResource, LearningWeek, List, Note, Project, Task } from "@/lib/types";
 import { Donut, Progress } from "../ui/charts";
 import { Segmented } from "../ui/controls";
 import { useFeedback } from "../ui/feedback";
@@ -168,6 +169,68 @@ export function TasksWidget({ data }: Props) {
         <p className="py-8 text-center text-sm text-slate-500">
           Nothing here. Nice work!{" "}
           <Link href="/tasks?new=1" className="font-medium text-blue-600">Add a task</Link>
+        </p>
+      )}
+    </Widget>
+  );
+}
+
+// ---------- Projects: a short overview ----------
+/** How many projects the box lists; the rest are one tap away on the Projects page. */
+const PROJECTS_SHOWN = 4;
+
+export function ProjectsWidget() {
+  const { data } = useSWR<List<Project>>("/projects");
+  const projects = data?.items ?? [];
+  // The ones you are working on, the nearest due date first (ongoing ones after them).
+  const active = projects.filter((p) => p.status === "active").sort(compareProjects);
+  const count = (status: string) => projects.filter((p) => p.status === status).length;
+
+  return (
+    <Widget icon={<FolderKanban className="size-4.5" />} tile="bg-teal-50 text-teal-600" title="Projects" link={{ href: "/projects", label: "View All" }}>
+      {!data ? (
+        <div className="mt-4 space-y-3" aria-busy="true">
+          {[0, 1, 2].map((i) => <div key={i} className="h-10 animate-pulse rounded-xl bg-slate-100" />)}
+        </div>
+      ) : active.length ? (
+        <>
+          <ul className="mt-3 divide-y divide-slate-100">
+            {active.slice(0, PROJECTS_SHOWN).map((project) => {
+              const color = colorOf(project.color);
+              const { timeframe } = project;
+              return (
+                <li key={project.id}>
+                  <Link href={`/projects/${project.id}`} className="block py-2.5">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="flex min-w-0 items-center gap-2 text-sm font-medium text-slate-800">
+                        <span className={`size-2 shrink-0 rounded-full ${color.dot}`} aria-hidden />
+                        <span className="truncate">{project.name}</span>
+                      </p>
+                      <span className={`shrink-0 whitespace-nowrap text-xs font-semibold ${project.tasks_total ? color.text : "text-slate-400"}`}>{project.tasks_total ? `${project.percent}%` : "No tasks"}</span>
+                    </div>
+                    <Progress value={project.percent} fill={color.bar} track="bg-slate-100" className="mt-1.5 h-1.5" />
+                    <p className="mt-1 flex items-center justify-between gap-3 text-xs text-slate-400">
+                      <span className="min-w-0 truncate">{project.tasks_total ? `${project.tasks_done} of ${project.tasks_total} tasks done` : "Add tasks to see progress"}</span>
+                      <span className={`shrink-0 whitespace-nowrap ${timeframe.tone === "late" ? "font-medium text-rose-600" : timeframe.tone === "soon" ? "font-medium text-amber-600" : ""}`}>
+                        {timeframe.kind === "ongoing" ? "Ongoing" : timeframe.label}
+                      </span>
+                    </p>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+          <p className="mt-auto pt-3 text-xs text-slate-400">
+            {active.length > PROJECTS_SHOWN && (
+              <Link href="/projects" className="mr-2 font-medium text-blue-600">+{active.length - PROJECTS_SHOWN} more</Link>
+            )}
+            {active.length} active{count("paused") > 0 && ` · ${count("paused")} paused`}{count("done") > 0 && ` · ${count("done")} done`}
+          </p>
+        </>
+      ) : (
+        <p className="py-6 text-center text-sm text-slate-500">
+          {projects.length ? "No active projects. " : "No projects yet. "}
+          <Link href="/projects" className="font-medium text-blue-600">{projects.length ? "Open Projects" : "Add a project"}</Link>
         </p>
       )}
     </Widget>
