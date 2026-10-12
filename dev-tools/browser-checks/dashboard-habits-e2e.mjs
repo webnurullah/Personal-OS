@@ -65,8 +65,16 @@ for (const width of [390, 320, 1280]) {
 
   // ---- what it shows
   {
-    const facts = { rows: await card.locator("tbody tr").count(), dots: await card.locator("button.habit-dot").count(), goal: await card.getByText("2 hours Daily", { exact: true }).count(), share: await card.getByText("71%", { exact: true }).count(), streak12: await card.locator("tbody tr", { hasText: "12" }).count() };
-    check(`${width}px: every habit has a row with its goal, a dot for each of the 7 days, its streak and its share of the week`, facts.rows === 5 && facts.dots === 35 && facts.goal === 1 && facts.share === 1, JSON.stringify(facts));
+    const facts = { rows: await card.locator("tbody tr").count(), dots: await card.locator("button.habit-dot").count(), goal: await card.getByText("· 2 hours Daily", { exact: true }).isVisible(), share: await card.getByText("71%", { exact: true }).count() };
+    check(`${width}px: every habit has a row with a dot for each of the 7 days and its share of the week (and its goal on a wide screen)`, facts.rows === 5 && facts.dots === 35 && facts.goal === wide && facts.share === 1, JSON.stringify(facts));
+  }
+  check(`${width}px: the line "Tap a day to tick or untick it. Streaks update straight away." is not on the dashboard`, (await page.getByText("Tap a day to tick or untick it").count()) === 0);
+  {
+    const rows = await card.locator("tbody tr").evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height)));
+    const dot = await card.locator("button.habit-dot").first().boundingBox();
+    const cardBox = await card.boundingBox();
+    check(`${width}px: the card is small: rows of at most 44px, dots of 26px (it was 61px and 36px)`, rows.every((h) => h <= 44) && Math.round(dot.width) === 26, JSON.stringify({ rows, dot: Math.round(dot.width), card: Math.round(cardBox.height) }));
+    if (wide) check(`${width}px: with 5 habits the whole card is under 300px tall`, cardBox.height < 300, String(Math.round(cardBox.height)));
   }
   check(`${width}px: the days are labelled and today is marked`, (await card.locator("th[data-today]").innerText()).includes("Today") && (await card.locator("thead th").count()) === 11);
   check(`${width}px: ticked days show as pressed`, (await card.getByRole("button", { name: /^Office Work · / }).evaluateAll((els) => els.map((e) => e.getAttribute("aria-pressed")))).join() === "true,true,false,true,true,true,false");
@@ -103,6 +111,7 @@ for (const width of [390, 320, 1280]) {
   await page.goto(`${BASE}/habits`);
   const card = page.locator("section", { has: page.getByRole("heading", { name: "Last 7 days", exact: true }) });
   await card.locator("table").waitFor();
+  check("the Habits page keeps the line that tells how to tick a day, and its larger rows", (await page.getByText("Tap a day to tick or untick it. Streaks update straight away.").count()) === 1 && Math.round((await card.locator("button.habit-dot").first().boundingBox()).width) === 36);
   check("the Habits page has the same tracker, with Edit and Delete for each habit and no View All", (await card.getByRole("button", { name: /^Edit / }).count()) >= 5 && (await card.getByRole("button", { name: /^Delete / }).count()) >= 5 && (await card.getByRole("link", { name: /View All/ }).count()) === 0);
   await card.getByRole("button", { name: "NWC Work · Today" }).evaluate((el) => el.click());
   const ticked = (await card.getByRole("button", { name: "NWC Work · Today" }).getAttribute("aria-pressed")) === "true"; // at once (the stand-in answers later with its unchanged list)

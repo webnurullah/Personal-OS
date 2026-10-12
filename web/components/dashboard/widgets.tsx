@@ -251,7 +251,7 @@ export function HabitsTracker() {
       </section>
     );
   }
-  return <HabitTracker data={data} mutate={mutate} link={{ href: "/habits", label: "View All" }} />;
+  return <HabitTracker compact data={data} mutate={mutate} link={{ href: "/habits", label: "View All" }} />;
 }
 
 // ---------- Goals ----------

@@ -388,6 +388,13 @@
     border-radius: 0.75rem;
     background-size: 1rem;
   }
+  /* The Dashboard's smaller tracker */
+  .habit-dot-md {
+    width: 1.625rem;
+    height: 1.625rem;
+    border-radius: 0.5rem;
+    background-size: 0.8125rem;
+  }
 
   /* ---------- Badges & progress ---------- */
   .badge {
