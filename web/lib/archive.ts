@@ -10,7 +10,7 @@ export const ARCHIVE_KINDS: Record<string, Kind> = {
   goal: { label: "Goal", href: "/goals", related: ["milestone", "milestones"] },
   milestone: { label: "Milestone", href: "/goals" },
   habit: { label: "Habit", href: "/habits", related: ["day of history", "days of history"] },
-  course: { label: "Course", href: "/learning", related: ["unit or topic", "units and topics"] },
+  course: { label: "Course", href: "/learning", related: ["item", "items"] },
   unit: { label: "Unit", href: "/learning", related: ["topic", "topics"] },
   topic: { label: "Topic", href: "/learning" },
   study_block: { label: "Study block", href: "/learning" },

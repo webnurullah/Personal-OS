@@ -1027,6 +1027,7 @@ export type Database = {
           topic_id: string | null;
           topic_ref: string | null;
           resource_id: string | null;
+          course_id: string | null;
         };
         Insert: {
           id?: string;
@@ -1040,6 +1041,7 @@ export type Database = {
           topic_id?: string | null;
           topic_ref?: string | null;
           resource_id?: string | null;
+          course_id?: string | null;
         };
         Update: {
           id?: string;
@@ -1053,6 +1055,7 @@ export type Database = {
           topic_id?: string | null;
           topic_ref?: string | null;
           resource_id?: string | null;
+          course_id?: string | null;
         };
         Relationships: [
 
@@ -1091,6 +1094,7 @@ export type Database = {
           title: string;
           category_id: string | null;
           project_id: string | null;
+          course_id: string | null;
           due_date: string | null;
           end_date: string | null;
           priority: string;
@@ -1105,6 +1109,7 @@ export type Database = {
           title: string;
           category_id?: string | null;
           project_id?: string | null;
+          course_id?: string | null;
           due_date?: string | null;
           end_date?: string | null;
           priority?: string;
@@ -1119,6 +1124,7 @@ export type Database = {
           title?: string;
           category_id?: string | null;
           project_id?: string | null;
+          course_id?: string | null;
           due_date?: string | null;
           end_date?: string | null;
           priority?: string;
@@ -1140,6 +1146,13 @@ export type Database = {
             columns: ['project_id'];
             isOneToOne: false;
             referencedRelation: 'projects';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'tasks_course_id_fkey';
+            columns: ['course_id'];
+            isOneToOne: false;
+            referencedRelation: 'courses';
             referencedColumns: ['id'];
           },
         ];

@@ -22,6 +22,6 @@ export async function tasksForWeek(db: Db, courseId: string, today: string, week
 
   const have = new Set(must(await db.from("tasks").select("title").is("done_at", null).in("title", titles)).map((t) => t.title));
   const fresh = titles.filter((title) => !have.has(title));
-  if (fresh.length) must(await db.from("tasks").insert(fresh.map((title) => ({ title, due_date: due, notes: `From the course: ${course.title}`.slice(0, 2000) }))).select("id"));
+  if (fresh.length) must(await db.from("tasks").insert(fresh.map((title) => ({ title, due_date: due, course_id: courseId, notes: `From the course: ${course.title}`.slice(0, 2000) }))).select("id"));
   return { created: fresh.length, skipped: titles.length - fresh.length, week: which, due_date: due };
 }

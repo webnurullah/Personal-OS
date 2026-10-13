@@ -163,3 +163,39 @@ test("what is left in a course, in words", () => {
   assert.equal(remainingText({ unit_count: 0, units_left: 0, topic_count: 0, topics_left: 0 }), "", "nothing yet: nothing to say");
   assert.equal(remainingText({ unit_count: 5, topic_count: 30 }), "", "an older saved answer without the counts says nothing");
 });
+
+// "Add this week's topics to my tasks": each task remembers its course, so deleting the course takes the tasks with it.
+test("tasks made from a course are tied to it (so they go with it) and a second press adds nothing", async () => {
+  const { tasksForWeek } = await import("../lib/server/study-tasks.ts");
+  type Row = Record<string, unknown>;
+  const tables: Record<string, Row[]> = {
+    courses: [{ id: "C1", title: "Digital Marketing", start_date: "2026-10-05", target_date: "2026-12-28" }],
+    course_topics: [
+      { id: "t1", course_id: "C1", code: "1.1", title: "SEO basics", status: "not-started", est_hours: 2, actual_hours: 0, planned_week: 1, position: 1 },
+      { id: "t2", course_id: "C1", code: "1.2", title: "Keywords", status: "done", est_hours: 2, actual_hours: 2, planned_week: 1, position: 2 },
+    ],
+    tasks: [],
+  };
+  const db = {
+    from(name: string) {
+      let rows = [...(tables[name] ?? [])];
+      let adding: Row[] | null = null;
+      const q: Record<string, unknown> = {
+        select: () => q,
+        eq: (column: string, value: unknown) => { rows = rows.filter((r) => r[column] === value); return q; },
+        is: (column: string, value: unknown) => { rows = rows.filter((r) => (r[column] ?? null) === value); return q; },
+        in: (column: string, values: unknown[]) => { rows = rows.filter((r) => values.includes(r[column])); return q; },
+        order: () => q,
+        single: () => Promise.resolve({ data: rows[0], error: null }),
+        insert: (list: Row[]) => { adding = list; tables[name].push(...list); return q; },
+        then: (resolve: (v: unknown) => unknown, reject: (e: unknown) => unknown) => Promise.resolve({ data: adding ?? rows, error: null }).then(resolve, reject),
+      };
+      return q;
+    },
+  } as never;
+  const first = await tasksForWeek(db, "C1", "2026-10-06", 1);
+  assert.equal(first.created, 1, "only the topic still to study");
+  assert.deepEqual(tables.tasks.map((t) => [t.title, t.course_id, t.due_date]), [["Study: 1.1 SEO basics", "C1", "2026-10-11"]]);
+  assert.equal((await tasksForWeek(db, "C1", "2026-10-06", 1)).created, 0);
+  assert.equal(tables.tasks.length, 1);
+});

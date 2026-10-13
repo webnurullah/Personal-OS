@@ -110,7 +110,7 @@ const browser = await launch();
   const { session } = await import("/home/user/Personal-OS/dev-tools/browser-checks/audit-lib.mjs");
   await ctx.addCookies([{ name: "sb-127-auth-token", value: "base64-" + Buffer.from(JSON.stringify(session)).toString("base64url"), url: BASE }]);
   const c = (id, title, over = {}) => ({ id, title, subtitle: "", category: "", status: "active", start_date: "2026-09-14", target_date: "2026-12-31", color: "blue", est_hours: 4, done_hours: 1, spent_hours: 1, percent: 25, topic_count: 2, unit_count: 2, days_left: 80, state: "on-track", behind_hours: 0, weeks_behind: 0, forecast: null, ...over });
-  const courseList = [c("c1", "Google Ads", { category: "Digital Marketing", unit_count: 5, units_left: 3, topic_count: 30, topics_left: 16 }), c("c2", "Meta Ads", { category: "Digital marketing", unit_count: 4, units_left: 0, topic_count: 12, topics_left: 1 }), c("c3", "SQL", { category: "Data", unit_count: 0, units_left: 0, topic_count: 0, topics_left: 0 }), c("c4", "English"), c("c5", "Old course", { status: "done", category: "Data" }), c("c6", "Paused course", { status: "paused", category: "Digital Marketing" })];
+  const courseList = [c("c1", "Google Ads", { category: "Digital Marketing", unit_count: 5, units_left: 3, topic_count: 30, topics_left: 16 }), c("c2", "Meta Ads", { category: "Digital marketing", unit_count: 4, units_left: 0, topic_count: 12, topics_left: 1 }), c("c3", "SQL", { category: "Data", unit_count: 0, units_left: 0, topic_count: 0, topics_left: 0 }), c("c4", "English"), c("c5", "Old course", { status: "done", category: "Data" }), c("c6", "Paused course", { status: "paused", category: "Digital Marketing" }), c("c7", "BCS", { status: "done", category: "BCS" })];
   await apiMock(ctx, { "/learning/week": { today: TODAY, week_start: "2026-10-05", topic: "", goal_hours: 6, blocks: [{ id: "b1", week_start: "2026-10-05", weekday: 4, hours: 1, activity: "Google Digital Marketing & E-commerce Certificate", done: false, topic_id: null, resource_id: null }], courses: courseList }, "/courses": { today: TODAY, items: courseList } });
   const calls = [];
   await ctx.route(/\/api\/learning\/blocks\/[^/]+$/, (route) => {
@@ -142,7 +142,7 @@ const browser = await launch();
   // Category and status, like the project list.
   const tabs = async (label) => (await page.getByRole("tablist", { name: label }).getByRole("tab").allInnerTexts()).map((t) => t.trim());
   check("the category tabs are All, then each category in use (spelled the same way once), then Other", JSON.stringify(await tabs("Category")) === JSON.stringify(["All", "Data", "Digital Marketing", "Other"]), JSON.stringify(await tabs("Category")));
-  check("the status tabs count every course", JSON.stringify(await tabs("Status")) === JSON.stringify(["Active (4)", "Paused (1)", "Done (1)"]), JSON.stringify(await tabs("Status")));
+  check("the status tabs count every course", JSON.stringify(await tabs("Status")) === JSON.stringify(["Active (4)", "Paused (1)", "Done (2)"]), JSON.stringify(await tabs("Status")));
   // The row under the title: the two sections, the status buttons and the buttons that add, on one line (the new header design).
   const toolbar = async () => {
     const y = async (loc) => Math.round((await loc.boundingBox()).y);
@@ -163,11 +163,14 @@ const browser = await launch();
   check("a category shows its courses (Google Ads and Meta Ads), with the category on the box", JSON.stringify(await titles()) === JSON.stringify(["Google Ads", "Meta Ads"]) && (await section.getByText(/^Digital Marketing · \d+ units/).count()) >= 1, JSON.stringify(await titles()));
   await page.getByRole("tablist", { name: "Status" }).getByRole("tab", { name: /Paused/ }).click();
   check("paused courses of that category", JSON.stringify(await titles()) === JSON.stringify(["Paused course"]));
-  await page.getByRole("tablist", { name: "Category" }).getByRole("tab", { name: "Data" }).click();
-  check("an empty list says so", (await section.getByText("No paused courses in this category.").count()) === 1);
+  check("on Paused, only the categories of paused courses are offered (Data has none paused)", JSON.stringify(await tabs("Category")) === JSON.stringify(["All", "Digital Marketing"]), JSON.stringify(await tabs("Category")));
   await page.getByRole("tablist", { name: "Category" }).getByRole("tab", { name: "All" }).click();
   await page.getByRole("tablist", { name: "Status" }).getByRole("tab", { name: /Done/ }).click();
-  check("finished courses are under Done", JSON.stringify(await titles()) === JSON.stringify(["Old course"]));
+  check("finished courses are under Done, with the categories they have", JSON.stringify(await titles()) === JSON.stringify(["BCS", "Old course"]) && JSON.stringify(await tabs("Category")) === JSON.stringify(["All", "BCS", "Data"]), JSON.stringify([await titles(), await tabs("Category")]));
+  await page.getByRole("tablist", { name: "Category" }).getByRole("tab", { name: "BCS" }).click();
+  await page.getByRole("tablist", { name: "Status" }).getByRole("tab", { name: /Active/ }).click();
+  check("a category whose only course is Done (BCS) is not offered with the active courses, and the list falls back to All", JSON.stringify(await tabs("Category")) === JSON.stringify(["All", "Data", "Digital Marketing", "Other"]) && (await section.locator("a").count()) === 4, JSON.stringify(await tabs("Category")));
+  await page.getByRole("tablist", { name: "Status" }).getByRole("tab", { name: /Done/ }).click();
   await page.getByRole("tablist", { name: "Status" }).getByRole("tab", { name: /Active/ }).click();
   await page.getByRole("tablist", { name: "Category" }).getByRole("tab", { name: "Other" }).click();
   check("courses without a category are under Other", JSON.stringify(await titles()) === JSON.stringify(["English"]));
@@ -177,7 +180,7 @@ const browser = await launch();
   await page.getByRole("button", { name: "Add a course" }).click();
   const dialog = page.getByRole("dialog");
   const options = await dialog.locator("#course-categories option").evaluateAll((els) => els.map((e) => e.value).sort());
-  check("the form suggests the categories already in use", JSON.stringify(options) === JSON.stringify(["Data", "Digital Marketing"]), JSON.stringify(options));
+  check("the form suggests the categories already in use", JSON.stringify(options) === JSON.stringify(["BCS", "Data", "Digital Marketing"]), JSON.stringify(options));
   check("a new course has no status field (it starts active)", (await dialog.locator("#course-status").count()) === 0);
   check("Add opens a blank course with the cursor in the name", await dialog.locator("#course-title").evaluate((el) => el === document.activeElement));
   await page.keyboard.press("Escape");

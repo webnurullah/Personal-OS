@@ -247,14 +247,19 @@ export function CourseView({ id }: { id: string }) {
   };
 
   const removeCourse = async () => {
-    const ok = await confirm({ title: "Delete this course?", message: toArchive(`“${course.title}” and all its units, topics and logged hours`), action: "Delete course" });
+    const topicCount = units.reduce((n, u) => n + u.topics.length, 0);
+    const ok = await confirm({
+      title: "Delete this course?",
+      message: toArchive(`“${course.title}” with its ${plural(units.length, "unit")} and ${plural(topicCount, "topic")}, the study sessions and tasks made for it, and its certificates, courses and playlists`),
+      action: "Delete course",
+    });
     if (!ok) return;
     try {
       await api(`/courses/${course.id}`, { method: "DELETE" });
       // Forget the saved copy of this page, so Back or another tab cannot bring the deleted course back.
       cacheMutate(`/courses/${course.id}`, undefined, { revalidate: false }).catch(() => undefined);
-      await refresh("/learning");
-      toast("Course moved to the Archive");
+      await refresh("/learning", "/resources", "/tasks", "/courses");
+      toast("Course and everything in it moved to the Archive");
       router.push("/learning");
     } catch (e) {
       toast(errorMessage(e), "error");

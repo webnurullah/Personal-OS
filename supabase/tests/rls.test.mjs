@@ -414,15 +414,13 @@ check("user B cannot delete A's item", (await qb('delete from learning_resources
 await expectError('user B cannot insert an item for A', () => qb(`insert into learning_resources (user_id, title) values ($1, 'x')`, [A]), 'row-level security');
 await expectError('signed-out visitor cannot read the library', () => qanon('select * from learning_resources'), 'permission denied');
 
-// Deleting a course (to the Archive) keeps the items, without the link; restoring the course links them again.
+// Deleting a course (to the Archive) takes its library items with it; restoring the course brings them back, with their unit.
 const arcCourse = await arch('course', lc);
-const kept = await one('select course_id, unit_id from learning_resources where id = $1', [res.id]);
-check('deleting a course keeps its library items, unlinked', (await count('courses', lc)) === 0 && kept.course_id === null && kept.unit_id === null, JSON.stringify(kept));
+check('deleting a course takes its library items (courses, playlists, certificates) with it', (await count('courses', lc)) === 0 && (await count('learning_resources', res.id)) === 0);
+check('and counts them in what went with it', Number((await qa('select related from archive_items where id = $1', [arcCourse]))[0].related) >= 2);
 await restore(arcCourse);
 const linked = await one('select course_id, unit_id from learning_resources where id = $1', [res.id]);
-// (A course's units are deleted with it, so the items lose the unit as well; only the course link comes back.)
-check('restoring the course links its items to it again', linked.course_id === lc && linked.unit_id === null, JSON.stringify(linked));
-await qa('update learning_resources set unit_id = $1 where id = $2', [lu, res.id]);
+check('restoring the course brings its library items back, in the same course and unit', linked.course_id === lc && linked.unit_id === lu, JSON.stringify(linked));
 
 // A deleted unit only clears the unit link.
 const arcUnit = await arch('unit', lu);
@@ -457,6 +455,100 @@ const practice = (await one(`insert into projects (name) values ('Practice: SEO'
 await qa('update learning_resources set practice_project_id = $1 where id = $2', [practice, res.id]);
 await qa('delete from projects where id = $1', [practice]);
 check('deleting the practice project keeps the item', (await one('select practice_project_id from learning_resources where id = $1', [res.id])).practice_project_id === null);
+
+// Deleting a course takes everything made for it: its tasks, its study sessions and its library items (20261020000000_course_delete_everything.sql)
+{
+  const migration = readFileSync(join(dir, '20261020000000_course_delete_everything.sql'), 'utf8');
+  const dc = (await one(`insert into courses (title, start_date, target_date) values ('Delete everything', '2026-10-05', '2026-12-28') returning id`)).id;
+  const du = (await one(`insert into course_units (course_id, code, title) values ($1, '1', 'U') returning id`, [dc])).id;
+  const dt = (await one(`insert into course_topics (course_id, unit_id, code, title, est_hours) values ($1, $2, '1.1', 'T', 2) returning id`, [dc, du])).id;
+  const keepProject = (await one(`insert into projects (name) values ('Real project') returning id`)).id;
+  const category = (await one(`insert into categories (name) values ('Temp category') returning id`)).id;
+  const courseTask = (await one(`insert into tasks (title, course_id, category_id, project_id) values ('Study: 1.1 T', $1, $2, $3) returning id`, [dc, category, keepProject])).id;
+  const courseTask2 = (await one(`insert into tasks (title, course_id) values ('Study: 1.2 T', $1) returning id`, [dc])).id;
+  const freeTask = (await one(`insert into tasks (title) values ('Buy bread') returning id`)).id;
+  const sessionTopic = await one(`insert into study_blocks (week_start, weekday, hours, activity, done, topic_id) values ('2026-10-05', 1, 1, 'T session', true, $1) returning id, course_id`, [dt]);
+  const itemC = (await one(`insert into learning_resources (title, course_id) values ('Course certificate', $1) returning id`, [dc])).id;
+  const sessionItem = await one(`insert into study_blocks (week_start, weekday, hours, activity, resource_id) values ('2026-10-05', 2, 1, 'Watched', $1) returning id, course_id`, [itemC]);
+  const freeBlock = await one(`insert into study_blocks (week_start, weekday, hours, activity) values ('2026-10-05', 3, 1, 'Free reading') returning id, course_id`);
+  const freeItem = (await one(`insert into learning_resources (title) values ('No course item') returning id`)).id;
+  const goal = (await one(`insert into goals (title, link_kind, course_id) values ('Follows the course', 'course', $1) returning id`, [dc])).id;
+
+  check('a study session takes the course of its topic', sessionTopic.course_id === dc);
+  check('or of its library item', sessionItem.course_id === dc);
+  check('and a free session has none', freeBlock.course_id === null);
+  const ou = (await one(`insert into course_units (course_id, code, title) values ($1, '1', 'U') returning id`, [lc2])).id;
+  const otherTopic = (await one(`insert into course_topics (course_id, unit_id, code, title, est_hours) values ($1, $2, '1.1', 'Other', 1) returning id`, [lc2, ou])).id;
+  await qa('update study_blocks set topic_id = $1 where id = $2', [otherTopic, freeBlock.id]);
+  check('a session moved to a topic follows the course of that topic', (await one('select course_id from study_blocks where id = $1', [freeBlock.id])).course_id === lc2);
+  await qa('update study_blocks set topic_id = null, topic_ref = null, course_id = null where id = $1', [freeBlock.id]);
+  check('and a session with no topic or item can be free again', (await one('select course_id from study_blocks where id = $1', [freeBlock.id])).course_id === null);
+  check('another person sees no tasks tied to my course', (await qb('select count(*)::int n from tasks where course_id is not null'))[0].n === 0);
+
+  // Delete the course: it all goes to the Archive in one entry.
+  const arcAll = await arch('course', dc);
+  const gone = async (table, id) => (await count(table, id)) === 0;
+  check('deleting the course deletes its units and topics', (await gone('courses', dc)) && (await gone('course_units', du)) && (await gone('course_topics', dt)));
+  check('and its tasks', (await gone('tasks', courseTask)) && (await gone('tasks', courseTask2)));
+  check('and its study sessions (by topic and by library item)', (await gone('study_blocks', sessionTopic.id)) && (await gone('study_blocks', sessionItem.id)));
+  check('and its certificates, courses and playlists', await gone('learning_resources', itemC));
+  check('but not a task, a session or an item that has no course', (await count('tasks', freeTask)) === 1 && (await count('study_blocks', freeBlock.id)) === 1 && (await count('learning_resources', freeItem)) === 1);
+  check('not the project or the category the tasks used', (await count('projects', keepProject)) === 1 && (await count('categories', category)) === 1);
+  check('and a goal that follows the course stays, unlinked', JSON.stringify(await one('select link_kind k, course_id c from goals where id = $1', [goal])) === JSON.stringify({ k: 'course', c: null }));
+  const archived = await entry(arcAll);
+  check('the Archive entry counts what went with it (unit, topic, 2 tasks, 2 sessions, 1 item)', Number(archived.related) === 7, JSON.stringify(archived));
+
+  // Bring it back: everything returns together, linked as before.
+  await restore(arcAll);
+  check('restoring brings back the units, topics, tasks, sessions and items', (await count('courses', dc)) === 1 && (await count('course_units', du)) === 1 && (await count('course_topics', dt)) === 1 && (await count('tasks', courseTask)) === 1 && (await count('tasks', courseTask2)) === 1 && (await count('study_blocks', sessionTopic.id)) === 1 && (await count('study_blocks', sessionItem.id)) === 1 && (await count('learning_resources', itemC)) === 1);
+  const backTask = await one('select course_id, category_id, project_id from tasks where id = $1', [courseTask]);
+  check('a task comes back with its course, category and project', backTask.course_id === dc && backTask.category_id === category && backTask.project_id === keepProject, JSON.stringify(backTask));
+  check('the sessions come back to the course', (await qa('select course_id from study_blocks where id in ($1, $2)', [sessionTopic.id, sessionItem.id])).every((b) => b.course_id === dc));
+  check('the goal follows the course again', (await one('select course_id from goals where id = $1', [goal])).course_id === dc);
+  check('and the topic is not counted twice for its restored session', (await one('select actual_hours::float h from course_topics where id = $1', [dt])).h === 1);
+
+  // Things the tasks pointed at may be gone when the course comes back: only those links are cleared.
+  const practiceProject = (await one(`insert into projects (name) values ('Practice') returning id`)).id;
+  await qa('update learning_resources set practice_project_id = $1 where id = $2', [practiceProject, itemC]);
+  const arcAll2 = await arch('course', dc);
+  await qa('delete from projects where id = $1', [keepProject]);
+  await qa('delete from projects where id = $1', [practiceProject]);
+  await qa('delete from categories where id = $1', [category]);
+  await restore(arcAll2);
+  const lateTask = await one('select course_id, category_id, project_id from tasks where id = $1', [courseTask]);
+  check('a task restored after its project and category were deleted comes back without them', lateTask.course_id === dc && lateTask.category_id === null && lateTask.project_id === null, JSON.stringify(lateTask));
+  check('and a certificate whose practice project was deleted comes back without it', (await one('select course_id, practice_project_id from learning_resources where id = $1', [itemC])).practice_project_id === null && (await count('learning_resources', itemC)) === 1);
+  check('and nothing comes back twice', (await qa('select id from tasks where course_id = $1', [dc])).length === 2);
+
+  // A task or session deleted alone, while its course is gone, comes back without the course.
+  const lonely = await arch('task', courseTask2);
+  const arcAll3 = await arch('course', dc);
+  await restore(lonely);
+  check('a task restored while its course is deleted comes back without the course', (await one('select course_id from tasks where id = $1', [courseTask2])).course_id === null);
+  await restore(arcAll3);
+  check('the course restored later does not take it back (it was not part of it)', (await count('tasks', courseTask)) === 1 && (await one('select course_id from tasks where id = $1', [courseTask2])).course_id === null);
+
+  // An old Archive copy of a course (made before tasks and sessions went with it) still restores.
+  const arcOld = await arch('course', dc);
+  await db.exec(`update archive_items set data = jsonb_set(data, '{children}', (data -> 'children') - 'tasks' - 'study_blocks') where id = '${arcOld}'`);
+  await restore(arcOld);
+  check('an old Archive copy of a course comes back as it was', (await count('courses', dc)) === 1 && (await count('course_topics', dt)) === 1);
+
+  // Tasks and sessions that already existed get their course from what they say (the backfill in the migration).
+  const old = (await one(`insert into courses (title, start_date, target_date) values ('Backfill A', '2026-10-05', '2026-12-28') returning id`)).id;
+  await qa(`insert into courses (title, start_date, target_date) values ('Twin', '2026-10-05', '2026-12-28'), ('Twin', '2026-10-05', '2026-12-28')`);
+  const oldTask = (await one(`insert into tasks (title, notes) values ('Study: old', 'From the course: Backfill A') returning id`)).id;
+  const twinTask = (await one(`insert into tasks (title, notes) values ('Study: twin', 'From the course: Twin') returning id`)).id;
+  const otherTask = (await one(`insert into tasks (title, notes) values ('Mine', 'Just a note') returning id`)).id;
+  const oldBlock = (await one(`insert into study_blocks (week_start, weekday, hours, activity, topic_id) values ('2026-10-05', 4, 1, 'Old session', $1) returning id`, [dt])).id;
+  await db.exec(`update public.study_blocks set course_id = null where id = '${oldBlock}'`);
+  const backfill = migration.slice(migration.indexOf('update public.study_blocks b'), migration.indexOf('-- A deleted course now takes'));
+  await db.exec(backfill);
+  check('old tasks made from a course find it again', (await one('select course_id from tasks where id = $1', [oldTask])).course_id === old);
+  check('but not when two courses have the same title', (await one('select course_id from tasks where id = $1', [twinTask])).course_id === null);
+  check('nor a task that is only similar', (await one('select course_id from tasks where id = $1', [otherTask])).course_id === null);
+  check('old sessions get the course of their topic', (await one('select course_id from study_blocks where id = $1', [oldBlock])).course_id === dc);
+}
 
 // One progress record: a topic's Spent hours = hours typed by hand + its finished sessions (20261010000000_study_topic_link.sql)
 {

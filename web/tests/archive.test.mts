@@ -46,7 +46,7 @@ test("what went with an item is said in words, and not at all when nothing did",
   assert.equal(relatedText("goal", 0), "");
   assert.equal(relatedText("project", 4), "4 tasks");
   assert.equal(relatedText("habit", 12), "12 days of history");
-  assert.equal(relatedText("course", 9), "9 units and topics");
+  assert.equal(relatedText("course", 9), "9 items");
   assert.equal(relatedText("task", 5), ""); // a task has nothing that goes with it
 });
 

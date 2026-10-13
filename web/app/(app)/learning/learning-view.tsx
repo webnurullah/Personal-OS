@@ -116,10 +116,12 @@ export function LearningView() {
     );
   // Courses by category (written by you in the course form) and by status, like the project list.
   const statusOf = (c: CourseSummary): CourseStatus => c.status ?? "active"; // (a copy saved before categories existed has neither)
-  const categories = courseCategories(data.courses);
-  const uncategorised = data.courses.some((c) => !(c.category ?? "").trim());
+  // The category buttons are the categories of the courses in the status on screen: a category whose only course is Done (or deleted) is not offered.
+  const inStatus = data.courses.filter((c) => statusOf(c) === statusPick);
+  const categories = courseCategories(inStatus);
+  const uncategorised = inStatus.some((c) => !(c.category ?? "").trim());
   const category = categoryPick === "all" || (categoryPick === "none" && categories.length && uncategorised) || categories.some((c) => c.key === categoryPick) ? categoryPick : "all";
-  const visibleCourses = data.courses.filter((c) => statusOf(c) === statusPick && (category === "all" || (category === "none" ? !(c.category ?? "").trim() : categoryKey(c.category) === category)));
+  const visibleCourses = inStatus.filter((c) => category === "all" || (category === "none" ? !(c.category ?? "").trim() : categoryKey(c.category) === category));
   const finishTopic = (item: StudyNextItem) =>
     run(() => api(`/topics/${item.topic_id}`, { method: "PATCH", body: { status: "done" } }), `${item.code} marked finished`);
 

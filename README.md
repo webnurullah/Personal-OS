@@ -48,6 +48,7 @@ Frontend and backend are **one Vercel project**. Every push to GitHub `main` put
    19. `20261016000000_job_images.sql` (Job Apply: one picture per job (a screenshot of the post): `job_applications.image_path` and the public Storage bucket `job-images`, one folder per person)
    20. `20261017000000_job_favourite.sql` (Job Apply: a favourite star on a job; starred jobs are listed first)
    21. `20261018000000_course_notes.sql` and `20261019000000_course_notes_simple.sql` (Learning: private notes on a course, written in a text editor that stores HTML; the first migration also had a public-link idea that the second switched off before anyone used it (the unused `notes_share` column and an empty, uncallable `public_course_notes()` are left in place))
+   22. `20261020000000_course_delete_everything.sql` (deleting a course takes everything made for it: its tasks (`tasks.course_id`), its study sessions (`study_blocks.course_id`, kept by a trigger from the topic or library item) and its certificates, courses and playlists in the Learning library; it all goes to the Archive in one entry and comes back together; goals that follow the course and projects are kept)
 
    Already set up? Only run the files you have not run yet. Each new file is listed here when it is added.
 3. **Authentication → URL Configuration**
