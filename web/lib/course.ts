@@ -91,3 +91,16 @@ export function courseStats<T extends TopicFacts, U extends UnitFacts<T>>(course
     pace: left > 0 && daysLeft > 0 ? left / (daysLeft / 7) : null,
   };
 }
+
+/**
+ * What is left to finish in a course, in words: "3 of 5 units left · 16 of 30 topics left", "All 5 units done · 2 of 30 topics left".
+ * Empty when there is nothing to say (no units and no topics yet, or an older saved answer without the counts).
+ */
+export function remainingText(c: { unit_count: number; units_left?: number; topic_count: number; topics_left?: number }) {
+  const part = (total: number, left: number | undefined, word: string) => {
+    if (total === 0 || left === undefined) return null;
+    if (left === 0) return total === 1 ? `1 ${word} done` : `All ${total} ${word}s done`;
+    return `${left} of ${total} ${word}${total === 1 ? "" : "s"} left`;
+  };
+  return [part(c.unit_count, c.units_left, "unit"), part(c.topic_count, c.topics_left, "topic")].filter(Boolean).join(" · ");
+}

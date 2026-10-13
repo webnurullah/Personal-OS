@@ -218,7 +218,7 @@ const jobAnalysis = {
 
 const courseSummary = (i, over = {}) => ({
   id: `c${i}`, title: H(i, 300), subtitle: H(i + 1, 120), start_date: D(-30), target_date: D(60 + i), color: COLORS[i], est_hours: 1234.5, done_hours: 456.25, spent_hours: 500, percent: 37,
-  topic_count: 240, unit_count: 12, days_left: 64, state: ["behind", "on-track", "not-started"][i % 3], behind_hours: 99.5, weeks_behind: 12, forecast: { date: D(100), days_late: 40 }, ...over,
+  topic_count: 240, unit_count: 12, topics_done: 118, topics_left: 122, units_done: 5, units_left: 7, days_left: 64, state: ["behind", "on-track", "not-started"][i % 3], behind_hours: 99.5, weeks_behind: 12, forecast: { date: D(100), days_late: 40 }, ...over,
 });
 // Courses in different categories (one with a very long name) and statuses.
 const courses = range(5).map((i) => courseSummary(i, { category: i === 0 ? cut(WORD, 60) : i === 3 ? "" : ["Digital Marketing", "Data"][i % 2], status: ["active", "active", "active", "active", "paused"][i] }));

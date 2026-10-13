@@ -140,6 +140,11 @@ export type CourseSummary = {
   percent: number;
   topic_count: number;
   unit_count: number;
+  /** How many topics and units are done and how many are left (older saved answers may not have them). */
+  topics_done?: number;
+  topics_left?: number;
+  units_done?: number;
+  units_left?: number;
   days_left: number;
   /** Behind = something planned for an earlier week is not finished (see lib/study.ts). */
   state: CourseState;

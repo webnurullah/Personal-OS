@@ -110,7 +110,7 @@ const browser = await launch();
   const { session } = await import("/home/user/Personal-OS/dev-tools/browser-checks/audit-lib.mjs");
   await ctx.addCookies([{ name: "sb-127-auth-token", value: "base64-" + Buffer.from(JSON.stringify(session)).toString("base64url"), url: BASE }]);
   const c = (id, title, over = {}) => ({ id, title, subtitle: "", category: "", status: "active", start_date: "2026-09-14", target_date: "2026-12-31", color: "blue", est_hours: 4, done_hours: 1, spent_hours: 1, percent: 25, topic_count: 2, unit_count: 2, days_left: 80, state: "on-track", behind_hours: 0, weeks_behind: 0, forecast: null, ...over });
-  const courseList = [c("c1", "Google Ads", { category: "Digital Marketing" }), c("c2", "Meta Ads", { category: "Digital marketing" }), c("c3", "SQL", { category: "Data" }), c("c4", "English"), c("c5", "Old course", { status: "done", category: "Data" }), c("c6", "Paused course", { status: "paused", category: "Digital Marketing" })];
+  const courseList = [c("c1", "Google Ads", { category: "Digital Marketing", unit_count: 5, units_left: 3, topic_count: 30, topics_left: 16 }), c("c2", "Meta Ads", { category: "Digital marketing", unit_count: 4, units_left: 0, topic_count: 12, topics_left: 1 }), c("c3", "SQL", { category: "Data", unit_count: 0, units_left: 0, topic_count: 0, topics_left: 0 }), c("c4", "English"), c("c5", "Old course", { status: "done", category: "Data" }), c("c6", "Paused course", { status: "paused", category: "Digital Marketing" })];
   await apiMock(ctx, { "/learning/week": { today: TODAY, week_start: "2026-10-05", topic: "", goal_hours: 6, blocks: [{ id: "b1", week_start: "2026-10-05", weekday: 4, hours: 1, activity: "Google Digital Marketing & E-commerce Certificate", done: false, topic_id: null, resource_id: null }], courses: courseList }, "/courses": { today: TODAY, items: courseList } });
   const calls = [];
   await ctx.route(/\/api\/learning\/blocks\/[^/]+$/, (route) => {
@@ -126,6 +126,12 @@ const browser = await launch();
   check("wide: My courses spans the page width", box && main && box.width >= main.width - 70, JSON.stringify({ card: box?.width, main: main?.width }));
   const links = await section.locator("a").evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return { top: Math.round(r.top), left: Math.round(r.left), width: Math.round(r.width) }; }));
   check("wide: only the active courses are listed, two in the first row", links.length === 4 && links[0].top === links[1].top && links[1].left > links[0].left && links[2].top > links[0].top && links[2].top === links[3].top, JSON.stringify(links));
+  // How much is left to finish: units and topics.
+  const boxOf = (title) => section.locator("li", { hasText: title }).first();
+  check("a course box says how many units and topics are left", (await boxOf("Google Ads").getByText("3 of 5 units left · 16 of 30 topics left", { exact: true }).count()) === 1);
+  check("and says when all units are done and one topic is left", (await boxOf("Meta Ads").getByText("All 4 units done · 1 of 12 topics left", { exact: true }).count()) === 1);
+  check("a course with no units or topics yet says nothing extra (it still says 'No topics yet')", (await boxOf("SQL").getByText("No topics yet").count()) === 1 && (await boxOf("SQL").getByText(/left|done · /).count()) === 0);
+  check("an older answer without the counts shows no 'left' line (English)", (await boxOf("English").getByText(/ left$/).count()) === 0);
   check("wide: both are about the same width (half the width)", Math.abs(links[0].width - links[1].width) <= 2, JSON.stringify(links));
   if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/learning-wide.png`, fullPage: true });
   // Like a project box: no white card around the boxes, and no archive button on them.
@@ -154,7 +160,7 @@ const browser = await launch();
   check("the course boxes have no 'New' button of their own any more", (await section.getByRole("button", { name: "New" }).count()) === 0);
   const titles = async () => (await section.locator("a").evaluateAll((els) => els.map((e) => e.querySelector("span.truncate")?.textContent ?? ""))).sort();
   await page.getByRole("tablist", { name: "Category" }).getByRole("tab", { name: "Digital Marketing" }).click();
-  check("a category shows its courses (Google Ads and Meta Ads), with the category on the box", JSON.stringify(await titles()) === JSON.stringify(["Google Ads", "Meta Ads"]) && (await section.getByText(/^Digital Marketing · 2 units/).count()) >= 1, JSON.stringify(await titles()));
+  check("a category shows its courses (Google Ads and Meta Ads), with the category on the box", JSON.stringify(await titles()) === JSON.stringify(["Google Ads", "Meta Ads"]) && (await section.getByText(/^Digital Marketing · \d+ units/).count()) >= 1, JSON.stringify(await titles()));
   await page.getByRole("tablist", { name: "Status" }).getByRole("tab", { name: /Paused/ }).click();
   check("paused courses of that category", JSON.stringify(await titles()) === JSON.stringify(["Paused course"]));
   await page.getByRole("tablist", { name: "Category" }).getByRole("tab", { name: "Data" }).click();

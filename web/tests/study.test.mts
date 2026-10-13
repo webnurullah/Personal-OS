@@ -326,6 +326,17 @@ test("a course's numbers say whether it is behind", () => {
   assert.deepEqual([b.state, b.topic_count, b.unit_count], ["on-track", 1, 1]);
 });
 
+test("a course says how many topics and units are left", () => {
+  const [a, b] = summariseCourses({ courses: courseRows as never, topics: topicRows as never, units: unitRows as never }, TODAY);
+  // A: topics a1 (not started), a2 (done), a3 (in progress); units u1 (a2 done + a3 in progress: not finished) and u2 (a1: not finished)
+  assert.deepEqual([a.topics_done, a.topics_left, a.units_done, a.units_left], [1, 2, 0, 2]);
+  assert.deepEqual([b.topics_done, b.topics_left, b.units_done, b.units_left], [0, 1, 0, 1]);
+  // Finishing every topic of a unit finishes the unit; a unit with no topics is never finished.
+  const finished = topicRows.map((t) => (t.course_id === "A" && t.unit_id === "u1" ? { ...t, status: "done" } : t));
+  const [a2] = summariseCourses({ courses: courseRows as never, topics: finished as never, units: [...unitRows, { id: "u9", course_id: "A", position: 2 }] as never }, TODAY);
+  assert.deepEqual([a2.topics_done, a2.topics_left, a2.units_done, a2.units_left, a2.unit_count], [2, 1, 1, 2, 3]);
+});
+
 test("a session may only name a topic and a library item that are yours", async () => {
   const db = fakeDb({ course_topics: [{ id: "T1" }], learning_resources: [{ id: "R1" }] });
   await checkBlockLinks(db, {});

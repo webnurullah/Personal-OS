@@ -13,7 +13,7 @@ import { COURSE_TEMPLATES, templateWeeks } from "@/lib/course-templates";
 import { hm, num, plural } from "@/lib/format";
 import { useNewAction } from "@/lib/new-action";
 import { OUTLINE_LIMITS, parseOutline } from "@/lib/outline";
-import { COURSE_STATUSES } from "@/lib/course";
+import { COURSE_STATUSES, remainingText } from "@/lib/course";
 import { useProfile } from "@/lib/profile";
 import { clock } from "@/lib/focus";
 import { REVISION_DAYS } from "@/lib/revision";
@@ -225,6 +225,7 @@ export function LearningView() {
                       <span className="mt-1.5 block text-xs text-slate-500">
                         {course.topic_count === 0 ? "No topics yet" : `${num(course.done_hours)}h of ${num(course.est_hours)}h done`}
                       </span>
+                      {remainingText(course) && <span className="mt-0.5 block text-xs font-medium text-slate-600">{remainingText(course)}</span>}
                     </span>
                   </Link>
                 </li>

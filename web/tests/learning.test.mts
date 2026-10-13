@@ -1,7 +1,7 @@
 // Learning: course numbers, wording, date limits and the request schemas. Run with: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
-import { courseStats, courseWeeks, currentWeek, doneHours, MAX_COURSE_WEEKS, nextNumber, nextPosition, timeLeft } from "../lib/course.ts";
+import { courseStats, courseWeeks, currentWeek, doneHours, MAX_COURSE_WEEKS, nextNumber, nextPosition, remainingText, timeLeft } from "../lib/course.ts";
 import { hm, num, plural } from "../lib/format.ts";
 import { HttpError } from "../lib/server/http.ts";
 import { checkDates, checkPlannedWeek, CourseFields, TopicFields, UnitFields } from "../lib/server/schemas.ts";
@@ -152,4 +152,14 @@ test("learning requests: strict and bounded", () => {
   assert.equal(TopicFields.safeParse({ ...t, est_hours: 0 }).success, false);
   assert.equal(TopicFields.safeParse({ ...t, planned_week: 157 }).success, false);
   assert.equal(TopicFields.safeParse({ ...t, planned_week: null }).success, true);
+});
+
+test("what is left in a course, in words", () => {
+  assert.equal(remainingText({ unit_count: 5, units_left: 3, topic_count: 30, topics_left: 16 }), "3 of 5 units left · 16 of 30 topics left");
+  assert.equal(remainingText({ unit_count: 5, units_left: 0, topic_count: 30, topics_left: 2 }), "All 5 units done · 2 of 30 topics left");
+  assert.equal(remainingText({ unit_count: 1, units_left: 0, topic_count: 1, topics_left: 0 }), "1 unit done · 1 topic done");
+  assert.equal(remainingText({ unit_count: 2, units_left: 2, topic_count: 1, topics_left: 1 }), "2 of 2 units left · 1 of 1 topic left");
+  assert.equal(remainingText({ unit_count: 3, units_left: 3, topic_count: 0, topics_left: 0 }), "3 of 3 units left", "units but no topics yet: only the units");
+  assert.equal(remainingText({ unit_count: 0, units_left: 0, topic_count: 0, topics_left: 0 }), "", "nothing yet: nothing to say");
+  assert.equal(remainingText({ unit_count: 5, topic_count: 30 }), "", "an older saved answer without the counts says nothing");
 });

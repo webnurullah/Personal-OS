@@ -37,6 +37,17 @@ export function summariseCourses({ courses, topics, units }: CourseFacts, today:
     const est = mine.reduce((sum, t) => sum + Number(t.est_hours), 0);
     const done = mine.reduce((sum, t) => sum + doneHours(t), 0);
     const health = courseHealth(course, mine, today);
+    // What is left to finish: topics not done, and units that are not finished (a unit is finished when it has topics and all of them are done).
+    const myUnits = units.filter((u) => u.course_id === course.id);
+    const inUnit = new Map<string, { all: number; done: number }>();
+    for (const t of mine) {
+      const c = inUnit.get(t.unit_id) ?? { all: 0, done: 0 };
+      c.all++;
+      if (t.status === "done") c.done++;
+      inUnit.set(t.unit_id, c);
+    }
+    const topicsDone = mine.filter((t) => t.status === "done").length;
+    const unitsDone = myUnits.filter((u) => { const c = inUnit.get(u.id); return c !== undefined && c.all > 0 && c.done === c.all; }).length;
     return {
       ...course,
       est_hours: round3(est),
@@ -45,7 +56,11 @@ export function summariseCourses({ courses, topics, units }: CourseFacts, today:
       percent: est ? Math.round((done / est) * 100) : 0,
       topic_count: mine.length,
       // Counted from the units themselves, so a unit with no topics yet is still a unit.
-      unit_count: units.filter((u) => u.course_id === course.id).length,
+      unit_count: myUnits.length,
+      topics_done: topicsDone,
+      topics_left: mine.length - topicsDone,
+      units_done: unitsDone,
+      units_left: myUnits.length - unitsDone,
       days_left: daysBetween(today, course.target_date),
       state: health.state,
       behind_hours: health.behindHours,
