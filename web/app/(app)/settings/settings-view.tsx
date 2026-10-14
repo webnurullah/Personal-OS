@@ -4,7 +4,7 @@ import { toArchive } from "@/lib/archive";
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import useSWR from "swr";
-import { Bell, Camera, Database, Download, KeyRound, Pencil, Plus, ShieldCheck, SlidersHorizontal, Sparkles, Tag, Trash2, User, X, type LucideIcon } from "lucide-react";
+import { Bell, Camera, Database, Plug, Download, KeyRound, Pencil, Plus, ShieldCheck, SlidersHorizontal, Sparkles, Tag, Trash2, User, X, type LucideIcon } from "lucide-react";
 import { api, download, errorMessage, refresh, refreshAll } from "@/lib/api";
 import { colorOf } from "@/lib/colors";
 import { createClient } from "@/lib/supabase/client";
@@ -15,12 +15,14 @@ import { Modal, ModalActions } from "@/components/ui/modal";
 import { LoadError, PageHeader, PageSkeleton } from "@/components/ui/states";
 import { Avatar } from "@/components/shell/topbar";
 import { AvatarEditor } from "./avatar-editor";
+import { IntegrationsTab } from "./integrations-tab";
 
 const TABS: { id: string; label: string; icon: LucideIcon }[] = [
   { id: "profile", label: "Profile", icon: User },
   { id: "preferences", label: "Preferences", icon: SlidersHorizontal },
   { id: "categories", label: "Categories", icon: Tag },
   { id: "notifications", label: "Notifications", icon: Bell },
+  { id: "integrations", label: "Integrations", icon: Plug },
   { id: "data", label: "Data & privacy", icon: ShieldCheck },
 ];
 
@@ -98,6 +100,7 @@ export function SettingsView() {
           {tab === "preferences" && <PreferencesTab profile={profile} />}
           {tab === "categories" && <CategoriesTab />}
           {tab === "notifications" && <NotificationsTab profile={profile} />}
+          {tab === "integrations" && <IntegrationsTab />}
           {tab === "data" && <DataTab />}
         </div>
       </div>

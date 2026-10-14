@@ -1,5 +1,7 @@
 import { handle } from "@/lib/server/api";
 import { addDays, daysBetween, mondayOf } from "@/lib/server/dates";
+import type { GoogleEvent, GoogleStatus } from "@/lib/google-calendar";
+import { googleEvents } from "@/lib/server/google";
 import { HttpError, must } from "@/lib/server/http";
 import { fetchAll } from "@/lib/server/paging";
 import { byTime, occurrences } from "@/lib/server/recurrence";
@@ -7,13 +9,17 @@ import { checkTimes, EventFields } from "@/lib/server/schemas";
 import { parse, s, z } from "@/lib/server/validate";
 
 // Every day an event happens between ?from and ?to (repeating events expanded).
-export const GET = handle(async ({ db, query, today }) => {
+export const GET = handle(async ({ db, query, today, user, profile }) => {
   const range = parse(z.object({ from: s.date, to: s.date }).partial(), query);
   const from = range.from || (await today());
   const to = range.to || addDays(from, 41);
   const span = daysBetween(from, to);
   if (span < 0 || span > 93) throw new HttpError(400, "Ask for at most three months at a time.");
 
+  // Your Google Calendar events: asked at the same time as the rest, and never able to break the page (it only says what went wrong).
+  const googleAsked = profile()
+    .then((p) => googleEvents(db, user.id, p.timezone, from, to))
+    .catch((): { status: GoogleStatus; events: GoogleEvent[] } => ({ status: "error", events: [] }));
   const events = await fetchAll(() =>
     db.from("events").select("*")
       .lte("event_date", to)
@@ -37,7 +43,8 @@ export const GET = handle(async ({ db, query, today }) => {
   const items = events
     .flatMap((event) => occurrences(event, from, to).map((date) => ({ ...event, date })))
     .sort((a, b) => a.date.localeCompare(b.date) || byTime(a, b));
-  return { today: await today(), from, to, items, deadlines, project_dates, study };
+  const google = await googleAsked;
+  return { today: await today(), from, to, items, deadlines, project_dates, study, google: google.events, google_status: google.status };
 });
 
 export const POST = handle(async ({ db, body }) => {

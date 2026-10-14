@@ -456,6 +456,29 @@ await qa('update learning_resources set practice_project_id = $1 where id = $2',
 await qa('delete from projects where id = $1', [practice]);
 check('deleting the practice project keeps the item', (await one('select practice_project_id from learning_resources where id = $1', [res.id])).practice_project_id === null);
 
+// Calendar -> Google Calendar link (20261021000000_google_connections.sql)
+{
+  await qa(`insert into google_connections (google_email, refresh_token_enc, scope) values ('me@gmail.com', 'v1.a.b.c', 'calendar.readonly')`);
+  const mine = await one('select user_id::text u, google_email e, status s from google_connections');
+  check('a person can keep one Google link, "ok" by default', mine.u === A && mine.e === 'me@gmail.com' && mine.s === 'ok', JSON.stringify(mine));
+  await expectError('only one link per person', () => qa(`insert into google_connections (refresh_token_enc) values ('v1.x.y.z')`), 'duplicate key');
+  check("nobody else sees my Google link", (await qb('select count(*)::int n from google_connections'))[0].n === 0);
+  check("and cannot change or remove it", (await qb(`update google_connections set status = 'reconnect' returning user_id`)).length === 0 && (await qb('delete from google_connections returning user_id')).length === 0);
+  await expectError('nobody can add a link for someone else', () => qb(`insert into google_connections (user_id, refresh_token_enc) values ($1, 'x')`, [A]), 'row-level security');
+  await expectError('a signed-out visitor cannot read it', () => qanon('select * from google_connections'), 'permission denied');
+  await expectError('the status is ok or reconnect', () => qa(`update google_connections set status = 'broken'`), 'check constraint');
+  await expectError('an empty token is refused', () => qa(`update google_connections set refresh_token_enc = ''`), 'check constraint');
+  await qa(`update google_connections set status = 'reconnect'`);
+  const moved = await one('select updated_at > connected_at as moved, status from google_connections');
+  check('"last edited" moves and the status can say reconnect', moved.moved === true && moved.status === 'reconnect');
+  await qb(`insert into google_connections (refresh_token_enc) values ('v1.b.b.b')`);
+  await db.exec(`delete from auth.users where id = '${B}'`);
+  check("removing a person's account removes their link and only theirs", (await db.query('select user_id::text u from google_connections')).rows.map((r) => r.u).join() === A);
+  await qa('delete from google_connections');
+  check('the link can be removed', (await one('select count(*)::int n from google_connections')).n === 0);
+  await db.exec(`insert into auth.users (id, email, raw_user_meta_data) values ('${B}', 'b@x.com', '{}') on conflict do nothing`);
+}
+
 // Deleting a course takes everything made for it: its tasks, its study sessions and its library items (20261020000000_course_delete_everything.sql)
 {
   const migration = readFileSync(join(dir, '20261020000000_course_delete_everything.sql'), 'utf8');

@@ -1,4 +1,5 @@
 import { forgetProfile, handle, ok } from "@/lib/server/api";
+import { forgetGoogle } from "@/lib/server/google";
 import { must } from "@/lib/server/http";
 import { removeAllJobImages } from "@/lib/server/job-image";
 import { parse, z } from "@/lib/server/validate";
@@ -16,6 +17,9 @@ export const POST = handle(async ({ db, body, user }) => {
   must(await db.from("learning_resources").delete().not("id", "is", null));
   // Projects too (their tasks go with them).
   must(await db.from("projects").delete().not("id", "is", null));
+  // The link to Google Calendar (the calendars themselves stay in Google).
+  must(await db.from("google_connections").delete().eq("user_id", user.id));
+  forgetGoogle(user.id);
   // The Archive too: "delete all" means all.
   must(await db.from("archive_items").delete().not("id", "is", null));
   must(await db.rpc("delete_my_data"));

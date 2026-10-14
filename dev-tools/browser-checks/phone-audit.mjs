@@ -195,6 +195,9 @@ const eventsResponse = (_method, url) => {
     deadlines: days.map((date, i) => ({ id: `jd${i}`, title: H(i, 200), company: H(i + 1, 200), date })),
     project_dates: days.map((date, i) => ({ id: `pd${i}`, project_id: `p${i}`, title: H(i + 2, 120), kind: "deadline", date, color: COLORS[i] })),
     study: days.flatMap((date, i) => [{ id: `s${i}a`, date, hours: 1.5, activity: H(i, 200) }, { id: `s${i}b`, date, hours: 12.25, activity: H(i + 3, 200) }]),
+    // Google Calendar events with very long titles, calendar names and places, several on one day.
+    google: days.flatMap((date, i) => [0, 1, 2, 3].map((n) => ({ id: `g${i}-${n}@main@${date}`, date, title: H(i + n, 200), all_day: n === 0, start_time: n === 0 ? null : "09:30", end_time: n === 0 ? null : "10:30", location: H(n, 200), link: "https://www.google.com/calendar/event?eid=x", calendar: H(n + 5, 100), color: ["#4285f4", "#0b8043", "#d50000", "#f6bf26"][n] }))),
+    google_status: "ok",
   };
 };
 
@@ -743,7 +746,7 @@ unit("jobs", "/jobs", heading, () => ({ "/jobs": jobs, "/companies": companies, 
   }),
 ]);
 
-unit("settings", "/settings", heading, () => ({}), [
+unit("settings", "/settings", heading, () => ({ "/google/status": { configured: true, connected: true, email: `${WORD}@gmail.com`, status: "ok", connected_at: "2026-10-01T00:00:00Z" } }), [
   scene("Profile tab", async (page, snap) => {
     await fillAll(page, page.locator("[role=tabpanel]"));
     await snap("long text typed");
@@ -772,6 +775,11 @@ unit("settings", "/settings", heading, () => ({}), [
   scene("Notifications tab", async (page, snap) => {
     await press(tab(page, "Notifications"));
     await snap("notifications");
+  }),
+  scene("Integrations tab", async (page, snap) => {
+    await press(tab(page, "Integrations"));
+    await settle(page);
+    await snap("google connected, long email");
   }),
   scene("Data & privacy tab", async (page, snap) => {
     await press(tab(page, "Data & privacy"));

@@ -4,7 +4,7 @@ import { toArchive } from "@/lib/archive";
 import { useState, type FormEvent } from "react";
 import useSWR from "swr";
 import Link from "next/link";
-import { BriefcaseBusiness, ChevronLeft, FolderKanban, ChevronRight, GraduationCap, Plus, Repeat, Trash2 } from "lucide-react";
+import { BriefcaseBusiness, CalendarDays, ChevronLeft, CircleAlert, FolderKanban, ChevronRight, GraduationCap, Plus, Repeat, Trash2 } from "lucide-react";
 import { api, errorMessage, refresh } from "@/lib/api";
 import { colorOf } from "@/lib/colors";
 import { addDays, addMonths, daysBetween, formatDate, monthGrid, relativeDay, weekdayNames } from "@/lib/dates";
@@ -12,8 +12,9 @@ import { hm, minutesOf, shortTime } from "@/lib/format";
 import { useCategories, useNowMinutes } from "@/lib/hooks";
 import { useNewAction } from "@/lib/new-action";
 import { useProfile } from "@/lib/profile";
+import type { GoogleEvent, GoogleStatus } from "@/lib/google-calendar";
 import type { CalendarEvent, List, Repeat as RepeatKind } from "@/lib/types";
-import { Field } from "@/components/ui/controls";
+import { Field, Switch } from "@/components/ui/controls";
 import { useFeedback } from "@/components/ui/feedback";
 import { Modal, ModalActions } from "@/components/ui/modal";
 import { LoadError, PageHeader, PageSkeleton } from "@/components/ui/states";
@@ -24,7 +25,17 @@ type JobDeadline = { id: string; title: string; company: string; date: string };
 type ProjectDate = { id: string; project_id: string; title: string; kind: "deadline"; date: string; color: string };
 /** A study session planned for a day (not done yet). */
 type StudyDate = { id: string; date: string; hours: number; activity: string };
-type EventsResponse = List<CalendarEvent> & { today: string; from: string; to: string; deadlines?: JobDeadline[]; project_dates?: ProjectDate[]; study?: StudyDate[] };
+type EventsResponse = List<CalendarEvent> & { today: string; from: string; to: string; deadlines?: JobDeadline[]; project_dates?: ProjectDate[]; study?: StudyDate[]; google?: GoogleEvent[]; google_status?: GoogleStatus };
+
+const HIDE_GOOGLE_KEY = "calendar-hide-google";
+/** Whether the person hid the Google events on this device (a convenience kept in the browser). */
+function googleHidden() {
+  try {
+    return typeof window !== "undefined" && window.localStorage.getItem(HIDE_GOOGLE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
 const byTime = (a: CalendarEvent, b: CalendarEvent) => (a.all_day === b.all_day ? (a.start_time ?? "").localeCompare(b.start_time ?? "") : a.all_day ? -1 : 1);
 
 export function CalendarView() {
@@ -40,6 +51,7 @@ export function CalendarView() {
   const [chosenMonth, setMonth] = useState<string | null>(null);
   const [chosenDay, setSelected] = useState<string | null>(null);
   const [editing, setEditing] = useState<CalendarEvent | "new" | null>(null);
+  const [hideGoogle, setHideGoogle] = useState(googleHidden);
   useNewAction(() => setEditing("new"));
 
   const start = requested ?? today;
@@ -57,15 +69,23 @@ export function CalendarView() {
   const deadlinesOn = (day: string) => (data.deadlines ?? []).filter((j) => j.date === day);
   const projectDatesOn = (day: string) => (data.project_dates ?? []).filter((p) => p.date === day);
   const studyOn = (day: string) => (data.study ?? []).filter((b) => b.date === day);
+  const googleOn = (day: string) => (hideGoogle ? [] : (data.google ?? []).filter((g) => g.date === day));
+  const googleConnected = data.google_status !== undefined && data.google_status !== "off";
   const agenda = eventsOn(selected);
   const agendaDeadlines = deadlinesOn(selected);
   const agendaProjects = projectDatesOn(selected);
   const agendaStudy = studyOn(selected);
+  const agendaGoogle = googleOn(selected);
   const diff = daysBetween(today, selected);
-  const comingUp = (upcoming?.items ?? [])
-    .filter((e) => e.date > today || (!e.all_day && e.start_time && minutesOf(e.start_time) > now))
-    .slice(0, 6);
   const color = (e: CalendarEvent) => colorOf(e.category_id ? byId.get(e.category_id)?.color : "slate");
+  type Soon = { key: string; date: string; title: string; all_day: boolean; start_time: string | null; dot: string; dotColor?: string };
+  const comingUp: Soon[] = [
+    ...(upcoming?.items ?? []).map((e): Soon => ({ key: `${e.id}-${e.date}-up`, date: e.date, title: e.title, all_day: e.all_day, start_time: e.start_time, dot: color(e).dot })),
+    ...(hideGoogle ? [] : (upcoming?.google ?? [])).map((g): Soon => ({ key: `${g.id}-up`, date: g.date, title: g.title, all_day: g.all_day, start_time: g.start_time, dot: "", dotColor: g.color })),
+  ]
+    .filter((e) => e.date > today || (!e.all_day && e.start_time && minutesOf(e.start_time) > now))
+    .sort((a, b) => a.date.localeCompare(b.date) || Number(b.all_day) - Number(a.all_day) || (a.start_time ?? "").localeCompare(b.start_time ?? ""))
+    .slice(0, 6);
 
   const pick = (day: string) => {
     setSelected(day);
@@ -80,6 +100,19 @@ export function CalendarView() {
           New Event
         </button>
       </PageHeader>
+
+      {data.google_status === "reconnect" && (
+        <p className="mt-5 flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800" role="alert">
+          <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
+          <span>Google Calendar needs to be connected again. <Link href="/settings?tab=integrations" className="font-semibold underline">Open Settings</Link></span>
+        </p>
+      )}
+      {data.google_status === "error" && (
+        <p className="mt-5 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="status">
+          <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
+          <span>Google Calendar could not be reached just now, so only your own events are shown. It will come back by itself.</span>
+        </p>
+      )}
 
       <div className="mt-6 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <section className="card overflow-hidden" aria-label="Month view">
@@ -97,6 +130,25 @@ export function CalendarView() {
               </button>
             </div>
             <ul className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600">
+              {googleConnected && (
+                <li className="flex items-center gap-2">
+                  <CalendarDays className="size-3.5 text-blue-600" aria-hidden />
+                  Google
+                  <Switch
+                    checked={!hideGoogle}
+                    label="Show Google Calendar events"
+                    onChange={(show) => {
+                      setHideGoogle(!show);
+                      try {
+                        if (show) window.localStorage.removeItem(HIDE_GOOGLE_KEY);
+                        else window.localStorage.setItem(HIDE_GOOGLE_KEY, "1");
+                      } catch {
+                        // Only a convenience: it still works for this visit.
+                      }
+                    }}
+                  />
+                </li>
+              )}
               {categories.map((c) => (
                 <li key={c.id} className="flex items-center gap-1.5">
                   <span className={`size-2.5 rounded-full ${colorOf(c.color).dot}`} />
@@ -116,6 +168,7 @@ export function CalendarView() {
               const due = deadlinesOn(day);
               const projectDue = projectDatesOn(day);
               const studying = studyOn(day);
+              const gList = googleOn(day);
               const inMonth = day.slice(0, 7) === month;
               const isSelected = day === selected;
               return (
@@ -124,7 +177,7 @@ export function CalendarView() {
                   type="button"
                   onClick={() => pick(day)}
                   aria-pressed={isSelected}
-                  aria-label={`${formatDate(day, "long")}${list.length ? `, ${list.length} events` : ""}${due.length ? `, ${due.length} job deadlines` : ""}${projectDue.length ? `, ${projectDue.length} project due` : ""}${studying.length ? `, ${studying.length} study sessions` : ""}`}
+                  aria-label={`${formatDate(day, "long")}${list.length ? `, ${list.length} events` : ""}${due.length ? `, ${due.length} job deadlines` : ""}${projectDue.length ? `, ${projectDue.length} project due` : ""}${studying.length ? `, ${studying.length} study sessions` : ""}${gList.length ? `, ${gList.length} Google events` : ""}`}
                   className={`flex min-h-20 min-w-0 flex-col gap-1 border-slate-100 p-1.5 text-left transition hover:bg-slate-50 sm:min-h-28 sm:p-2 ${i % 7 === 6 ? "" : "border-r"} ${i < 35 ? "border-b" : ""} ${isSelected ? "bg-blue-50/70 ring-2 ring-inset ring-blue-200" : inMonth ? "" : "bg-slate-50/60"}`}
                 >
                   <span className={`grid size-7 shrink-0 place-items-center rounded-full text-sm font-medium ${day === today ? "bg-blue-600 text-white" : inMonth ? "text-slate-700" : "text-slate-300"}`}>{Number(day.slice(8))}</span>
@@ -150,7 +203,14 @@ export function CalendarView() {
                     </span>
                   ))}
                   {list.length > 3 && <span className="hidden px-1.5 text-[11px] font-medium text-slate-500 sm:block">+{list.length - 3} more</span>}
-                  {(list.length > 0 || due.length > 0 || projectDue.length > 0 || studying.length > 0) && (
+                  {gList.slice(0, 2).map((g) => (
+                    <span key={g.id} className="hidden truncate rounded-md border-l-[3px] bg-slate-50 px-1.5 py-0.5 text-[11px] font-medium text-slate-700 sm:block" style={{ borderLeftColor: g.color }} title={`${g.title} (${g.calendar})`}>
+                      {!g.all_day && g.start_time && <span className="opacity-70">{shortTime(g.start_time, profile?.time_format)} </span>}
+                      {g.title}
+                    </span>
+                  ))}
+                  {gList.length > 2 && <span className="hidden px-1.5 text-[11px] font-medium text-slate-500 sm:block">+{gList.length - 2} Google</span>}
+                  {(list.length > 0 || due.length > 0 || projectDue.length > 0 || studying.length > 0 || gList.length > 0) && (
                     <span className="flex flex-wrap gap-0.5 sm:hidden">
                       {studying.slice(0, 1).map((b) => (
                         <span key={`${b.id}-dot-study`} className="size-1.5 rounded-full bg-indigo-500" />
@@ -163,6 +223,9 @@ export function CalendarView() {
                       ))}
                       {list.slice(0, 4).map((e) => (
                         <span key={`${e.id}-dot`} className={`size-1.5 rounded-full ${color(e).dot}`} />
+                      ))}
+                      {gList.slice(0, 3).map((g) => (
+                        <span key={`${g.id}-dot`} className="size-1.5 rounded-full" style={{ backgroundColor: g.color }} />
                       ))}
                     </span>
                   )}
@@ -245,8 +308,45 @@ export function CalendarView() {
                   </li>
                 ))}
               </ol>
-            ) : agendaDeadlines.length || agendaProjects.length ? null : (
+            ) : agendaDeadlines.length || agendaProjects.length || agendaStudy.length || agendaGoogle.length ? null : (
               <p className="mt-4 rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">Nothing planned. Enjoy the free time!</p>
+            )}
+            {agendaGoogle.length > 0 && (
+              <div className={agenda.length ? "mt-3 border-t border-slate-100 pt-3" : "mt-4"}>
+                <h3 className="flex items-center gap-1.5 px-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <CalendarDays className="size-3.5" aria-hidden />
+                  Google Calendar
+                </h3>
+                <ol className="mt-1 space-y-1">
+                  {agendaGoogle.map((g) => {
+                    const inner = (
+                      <>
+                        <span className="pt-0.5 text-xs font-medium text-slate-500">{g.all_day || !g.start_time ? "All day" : time(g.start_time)}</span>
+                        <span className="mt-0.5 h-9 w-1 rounded-full" style={{ backgroundColor: g.color }} />
+                        <span className="min-w-0">
+                          <span className="block min-w-0 line-clamp-2 text-sm font-semibold text-slate-800">{g.title}</span>
+                          <span className="block truncate text-xs text-slate-500">
+                            {g.calendar}
+                            {g.location && ` · ${g.location}`}
+                          </span>
+                        </span>
+                      </>
+                    );
+                    const row = "grid w-full grid-cols-[4.25rem_auto_1fr] items-start gap-3 rounded-xl px-2 py-2 text-left transition hover:bg-slate-50";
+                    return (
+                      <li key={`${g.id}-agenda`}>
+                        {g.link ? (
+                          <a href={g.link} target="_blank" rel="noopener noreferrer" className={row} aria-label={`${g.title}, open in Google Calendar`}>
+                            {inner}
+                          </a>
+                        ) : (
+                          <div className={row}>{inner}</div>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ol>
+              </div>
             )}
           </section>
 
@@ -255,7 +355,7 @@ export function CalendarView() {
             {comingUp.length ? (
               <ol className="mt-3 divide-y divide-slate-100">
                 {comingUp.map((e) => (
-                  <li key={`${e.id}-${e.date}-up`}>
+                  <li key={e.key}>
                     <button type="button" className="flex w-full items-center gap-3 py-2.5 text-left" onClick={() => pick(e.date)}>
                       <span className="w-11 shrink-0 rounded-lg bg-slate-50 py-1 text-center ring-1 ring-slate-100">
                         <span className="block text-[10px] font-semibold uppercase text-slate-500">{formatDate(e.date, "weekday")}</span>
@@ -263,9 +363,9 @@ export function CalendarView() {
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-medium text-slate-800">{e.title}</span>
-                        <span className="block text-xs text-slate-500">{relativeDay(e.date, today)} · {e.all_day ? "All day" : time(e.start_time!)}</span>
+                        <span className="block text-xs text-slate-500">{relativeDay(e.date, today)} · {e.all_day || !e.start_time ? "All day" : time(e.start_time)}</span>
                       </span>
-                      <span className={`size-2 shrink-0 rounded-full ${color(e).dot}`} />
+                      <span className={`size-2 shrink-0 rounded-full ${e.dot}`} style={e.dotColor ? { backgroundColor: e.dotColor } : undefined} />
                     </button>
                   </li>
                 ))}

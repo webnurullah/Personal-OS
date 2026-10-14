@@ -514,6 +514,38 @@ export type Database = {
           },
         ];
       };
+      google_connections: {
+        Row: {
+          user_id: string;
+          google_email: string;
+          refresh_token_enc: string;
+          scope: string;
+          status: string;
+          connected_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id?: string;
+          google_email?: string;
+          refresh_token_enc: string;
+          scope?: string;
+          status?: string;
+          connected_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          google_email?: string;
+          refresh_token_enc?: string;
+          scope?: string;
+          status?: string;
+          connected_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+
+        ];
+      };
       habit_logs: {
         Row: {
           habit_id: string;
