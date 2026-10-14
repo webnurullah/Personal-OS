@@ -49,7 +49,7 @@ export async function api<T>(path: string, options: Options = {}): Promise<T> {
         clearCache();
         // A full page load (not router.push) so no cached data from the old session survives.
         // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-        window.location.assign(`/login?next=${encodeURIComponent(window.location.pathname)}`);
+        window.location.assign(`/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
         throw new ApiError(401, "Please sign in again.");
       }
       res = await send(path, options, refreshed.data.session.access_token);

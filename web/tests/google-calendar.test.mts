@@ -168,23 +168,24 @@ function googleStub(handlers: { calendars?: unknown; events?: Record<string, unk
 const stored = () => ({ refresh_token_enc: encryptToken("refresh-1", config.key), status: "ok" });
 const day = (id: string, summary: string, date: string) => ({ id, summary, start: { date }, end: { date: new Date(Date.parse(date) + 86400000).toISOString().slice(0, 10) } });
 
-test("every selected calendar is read, hidden ones are not, and the events come in order", async () => {
+test("every ticked calendar and your main one are read; unticked (no selected flag from Google) and hidden ones are not, and the events come in order", async () => {
   const { db } = fakeDb(stored());
   const { fetchFn, calls } = googleStub({
-    calendars: { items: [{ id: "main", summary: "Me", backgroundColor: "#4285f4", selected: true }, { id: "work", summary: "Work", summaryOverride: "Office", backgroundColor: "#0b8043" }, { id: "hidden", summary: "Hidden", hidden: true }, { id: "off", summary: "Off", selected: false }] },
-    events: { main: { items: [day("1", "Dentist", "2026-10-20")] }, work: { items: [day("2", "Review", "2026-10-14")] } },
+    calendars: { items: [{ id: "main", summary: "Me", backgroundColor: "#4285f4", selected: true }, { id: "work", summary: "Work", summaryOverride: "Office", backgroundColor: "#0b8043", selected: true }, { id: "hidden", summary: "Hidden", hidden: true, selected: true }, { id: "unticked", summary: "Holidays" }, { id: "mine", summary: "Primary", primary: true, backgroundColor: "#4285f4" }] },
+    events: { main: { items: [day("1", "Dentist", "2026-10-20")] }, work: { items: [day("2", "Review", "2026-10-14")] }, mine: { items: [] } },
   });
   const result = await googleEvents(db, "u-order", "Asia/Dhaka", "2026-10-01", "2026-10-31", { config, fetchFn, now: 1_000_000 });
   assert.equal(result.status, "ok");
   assert.deepEqual(result.events.map((e) => [e.date, e.title, e.calendar, e.color]), [["2026-10-14", "Review", "Office", "#0b8043"], ["2026-10-20", "Dentist", "Me", "#4285f4"]]);
-  assert.equal(calls.filter((c) => c.includes("/events")).length, 2, "only the two shown calendars");
+  assert.equal(calls.filter((c) => c.includes("/events")).length, 3, "the two ticked ones and the main one");
+  assert.ok(!calls.filter((c) => c.includes("/events")).some((c) => c.includes("unticked") || c.includes("hidden")));
   const eventsCall = new URL(calls.find((c) => c.includes("/calendars/main/events"))!);
   assert.equal(eventsCall.searchParams.get("singleEvents"), "true", "repeating events are expanded by Google");
 });
 
 test("a second look soon after uses what was read (no new call to Google)", async () => {
   const { db } = fakeDb(stored());
-  const { fetchFn, calls } = googleStub({ calendars: { items: [{ id: "main", summary: "Me" }] }, events: { main: { items: [day("1", "A", "2026-10-20")] } } });
+  const { fetchFn, calls } = googleStub({ calendars: { items: [{ id: "main", summary: "Me", selected: true }] }, events: { main: { items: [day("1", "A", "2026-10-20")] } } });
   const deps = { config, fetchFn, now: 5_000_000 };
   await googleEvents(db, "u-cache", "Asia/Dhaka", "2026-10-01", "2026-10-31", deps);
   const first = calls.length;
@@ -198,12 +199,30 @@ test("a second look soon after uses what was read (no new call to Google)", asyn
 test("one calendar failing does not hide the others", async () => {
   const { db } = fakeDb(stored());
   const { fetchFn } = googleStub({
-    calendars: { items: [{ id: "main", summary: "Me" }, { id: "shared", summary: "Shared" }] },
+    calendars: { items: [{ id: "main", summary: "Me", selected: true }, { id: "shared", summary: "Shared", selected: true }] },
     events: { main: { items: [day("1", "Kept", "2026-10-20")] }, shared: json({ error: { message: "Not Found", status: "NOT_FOUND" } }, 404) },
   });
   const result = await googleEvents(db, "u-partial", "Asia/Dhaka", "2026-10-01", "2026-10-31", { config, fetchFn, now: 9_000_000 });
   assert.equal(result.status, "ok");
   assert.deepEqual(result.events.map((e) => e.title), ["Kept"]);
+});
+
+test("an incomplete answer is not kept: the next look asks Google again", async () => {
+  const { db } = fakeDb(stored());
+  const { fetchFn, calls } = googleStub({
+    calendars: { items: [{ id: "main", summary: "Me", selected: true }, { id: "shared", summary: "Shared", selected: true }] },
+    events: { main: { items: [day("1", "Kept", "2026-10-20")] }, shared: json({ error: { message: "Rate Limit Exceeded", status: "RESOURCE_EXHAUSTED" } }, 403) },
+  });
+  const deps = { config, fetchFn, now: 30_000_000 };
+  await googleEvents(db, "u-incomplete", "Asia/Dhaka", "2026-10-01", "2026-10-31", deps);
+  const first = calls.filter((c) => c.includes("/events")).length;
+  await googleEvents(db, "u-incomplete", "Asia/Dhaka", "2026-10-01", "2026-10-31", { ...deps, now: 30_000_000 + 1000 });
+  assert.equal(calls.filter((c) => c.includes("/events")).length, first * 2);
+});
+
+test("an event that started long before the days asked for still shows while it runs", () => {
+  const days = norm({ id: "long", summary: "Internship", start: { date: "2026-06-01" }, end: { date: "2027-01-01" } }, "2026-10-01", "2026-10-03");
+  assert.deepEqual(days.map((e) => e.date), ["2026-10-01", "2026-10-02", "2026-10-03"]);
 });
 
 test("when Google no longer accepts the link it is remembered, and the calendar still loads", async () => {
@@ -223,7 +242,7 @@ test("Google being down, slow or answering badly gives 'error' (never an excepti
   const { db } = fakeDb(stored());
   const down = (async () => { throw new Error("network"); }) as unknown as typeof fetch;
   assert.deepEqual(await googleEvents(db, "u-down", "Asia/Dhaka", "2026-10-01", "2026-10-31", { config, fetchFn: down, now: 15_000_000 }), { status: "error", events: [] });
-  const bad = googleStub({ calendars: { items: [{ id: "main", summary: "Me" }] }, events: { main: json({ error: { message: "Backend Error", status: "INTERNAL" } }, 500) } });
+  const bad = googleStub({ calendars: { items: [{ id: "main", summary: "Me", selected: true }] }, events: { main: json({ error: { message: "Backend Error", status: "INTERNAL" } }, 500) } });
   assert.equal((await googleEvents(db, "u-bad", "Asia/Dhaka", "2026-10-01", "2026-10-31", { config, fetchFn: bad.fetchFn, now: 18_000_000 })).status, "error");
 });
 
@@ -234,11 +253,11 @@ test("not connected, or not set up on the server: nothing is asked of Google", a
   assert.equal(none.calls.length, 0);
 });
 
-test("a saved token that cannot be opened (the key was changed) asks to connect again", async () => {
+test("a saved token that cannot be opened (the key was changed) asks to connect again, without changing what is saved", async () => {
   const wrongKey = fakeDb({ refresh_token_enc: encryptToken("x", "some-other-long-key-123"), status: "ok" });
   const { fetchFn, calls } = googleStub({});
   const result = await googleEvents(wrongKey.db, "u-key", "Asia/Dhaka", "2026-10-01", "2026-10-31", { config, fetchFn, now: 21_000_000 });
   assert.equal(result.status, "reconnect");
   assert.equal(calls.length, 0);
-  assert.deepEqual(wrongKey.updates, [{ status: "reconnect" }]);
+  assert.deepEqual(wrongKey.updates, [], "nothing is written, so the old key works again if put back");
 });

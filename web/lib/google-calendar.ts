@@ -1,5 +1,5 @@
 // Google Calendar events turned into days on this app's calendar. Pure functions (no network), so they can be tested.
-import { addDays, daysBetween } from "./dates.ts";
+import { addDays } from "./dates.ts";
 
 /** One Google event on one day (an event that lasts several days gives one of these per day). */
 export type GoogleEvent = {
@@ -35,7 +35,6 @@ export type RawGoogleEvent = {
 };
 
 const FALLBACK_COLOR = "#64748b";
-const MAX_DAYS_PER_EVENT = 62;
 
 /** A colour that is safe to put in a style: "#rrggbb" only. */
 export function safeColor(value: unknown) {
@@ -107,9 +106,8 @@ export function normalizeGoogleEvent(raw: RawGoogleEvent, calendar: GoogleCalend
   }
 
   const days: GoogleEvent[] = [];
-  const stop = daysBetween(first, last) > MAX_DAYS_PER_EVENT ? addDays(first, MAX_DAYS_PER_EVENT) : last;
   const link = safeGoogleLink(raw.htmlLink);
-  for (let day = first < from ? from : first; day <= stop && day <= to; day = addDays(day, 1)) {
+  for (let day = first < from ? from : first; day <= last && day <= to; day = addDays(day, 1)) {
     const firstDay = day === first;
     days.push({
       id: `${raw.id ?? "event"}@${calendar.id}@${day}`,

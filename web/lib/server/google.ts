@@ -158,10 +158,11 @@ async function accessTokenFor(config: GoogleConfig, userId: string, refreshToken
 }
 
 async function calendarsOf(access: string, fetchFn: Fetch): Promise<GoogleCalendarInfo[]> {
-  const body = await call(fetchFn, `${API}/users/me/calendarList?minAccessRole=reader&maxResults=${MAX_CALENDARS}&fields=items(id,summary,summaryOverride,backgroundColor,selected,hidden,deleted)`, { headers: { authorization: `Bearer ${access}` } });
-  const items = (body.items ?? []) as { id?: string; summary?: string; summaryOverride?: string; backgroundColor?: string; selected?: boolean; hidden?: boolean; deleted?: boolean }[];
+  const body = await call(fetchFn, `${API}/users/me/calendarList?minAccessRole=reader&maxResults=${MAX_CALENDARS}&fields=items(id,summary,summaryOverride,backgroundColor,selected,primary,hidden,deleted)`, { headers: { authorization: `Bearer ${access}` } });
+  const items = (body.items ?? []) as { id?: string; summary?: string; summaryOverride?: string; backgroundColor?: string; selected?: boolean; primary?: boolean; hidden?: boolean; deleted?: boolean }[];
   return items
-    .filter((c) => c.id && !c.hidden && !c.deleted && c.selected !== false)
+    // Google sends "selected" only when it is true (ticked in the left list of Google Calendar); your main calendar is always shown.
+    .filter((c) => c.id && !c.hidden && !c.deleted && (c.selected === true || c.primary === true))
     .slice(0, MAX_CALENDARS)
     .map((c) => ({ id: c.id!, name: (c.summaryOverride || c.summary || c.id!).slice(0, 100), color: safeColor(c.backgroundColor) }));
 }
@@ -202,10 +203,8 @@ export async function googleEvents(db: Db, userId: string, zone: string, from: s
     const hit = eventsCache.get(cacheKey);
     if (hit && now - hit.at < EVENTS_TTL_MS) return { status: "ok", events: hit.events };
     const refreshToken = decryptToken(data.refresh_token_enc, config.key);
-    if (!refreshToken) {
-      await markReconnect(db, userId);
-      return { status: "reconnect", events: [] };
-    }
+    // The key was changed or lost: connecting again is the way out, but nothing is written, so putting the old key back also works.
+    if (!refreshToken) return { status: "reconnect", events: [] };
     const access = await accessTokenFor(config, userId, refreshToken, fetchFn, now);
     const calendars = await calendarsOf(access, fetchFn);
     // One calendar failing (for example a shared one that went away) does not hide the others.
@@ -216,7 +215,8 @@ export async function googleEvents(db: Db, userId: string, zone: string, from: s
       throw first.reason;
     }
     const events = sortGoogleEvents(results.flatMap((r) => (r.status === "fulfilled" ? r.value : [])));
-    eventsCache.set(cacheKey, { at: now, events });
+    if (failed === 0) eventsCache.set(cacheKey, { at: now, events }); // an incomplete answer is not kept, so the next look asks again
+    else if (results.some((r) => r.status === "rejected" && r.reason instanceof GoogleError && r.reason.status === 401)) accessTokens.delete(userId);
     return { status: "ok", events };
   } catch (e) {
     if (e instanceof GoogleError && (e.code === "invalid_grant" || (e.status === 400 && /invalid_grant/i.test(e.message)))) {

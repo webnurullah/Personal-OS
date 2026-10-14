@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import useSWR from "swr";
 import { CalendarDays, CircleAlert, CircleCheck, Link2, Unlink } from "lucide-react";
 import { api, errorMessage, refresh } from "@/lib/api";
@@ -14,6 +14,14 @@ export function IntegrationsTab() {
   const { toast, confirm } = useFeedback();
   const { data, error, mutate } = useSWR<GoogleState>("/google/status");
   const [busy, setBusy] = useState(false);
+  // Back from Google's page (the browser may bring this page back as it was): the button works again.
+  useEffect(() => {
+    const back = (e: PageTransitionEvent) => {
+      if (e.persisted) setBusy(false);
+    };
+    window.addEventListener("pageshow", back);
+    return () => window.removeEventListener("pageshow", back);
+  }, []);
 
   const connect = async () => {
     setBusy(true);

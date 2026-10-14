@@ -8,6 +8,12 @@ The setup is done **once** (about 10–15 minutes). You need: the Google account
 
 ---
 
+## Part 0 — Database (once)
+
+Supabase → **SQL Editor** → **New query** → paste the whole file `supabase/migrations/20261021000000_google_connections.sql` → **Run**. It creates the small private table that keeps the (encrypted) link. It is safe to run again. (Skip this if Claude already applied it for you.)
+
+---
+
 ## Part 1 — Google Cloud (free)
 
 1. Open <https://console.cloud.google.com/> and sign in with your Google account. Accept the terms if asked. (No payment is needed.)
