@@ -1,4 +1,4 @@
-// Browser check for Job Apply → Company list: the sub-menu, the page, and adding a company from a job's box.
+// Browser check for Job Apply → Company list: the page and its tab (not in the sidebar), and adding a company from a job's box.
 // The built app must be running on http://localhost:3123.   Run:  node company-e2e.mjs   (a stand-in API answers; SHOTS=<folder> saves pictures)
 import { launch, newPhone, apiMock, measure, BASE, TODAY, session } from "/home/user/Personal-OS/dev-tools/browser-checks/audit-lib.mjs";
 
@@ -124,17 +124,13 @@ for (const width of [390, 320, 1280]) {
   check(`${width}px: Add Company on the page saves a new one`, calls[0]?.method === "POST" && calls[0].body.name === "Brand New Ltd", JSON.stringify(calls[0]));
 
   if (wide) {
-    // The sub-menu: "Company list" under "Job Apply" in the sidebar, highlighted on its page.
+    // The sidebar no longer lists "Company list" (the page and its tab are still there); on its page Job Apply is the marked item.
     const side = page.getByRole("complementary", { name: "Main menu" });
-    const sub = side.getByRole("link", { name: "Company list" });
-    check("the menu has Company list under Job Apply", (await sub.count()) === 1 && (await sub.getAttribute("aria-current")) === "page");
-    check("and Job Apply itself is not marked as the page", (await side.getByRole("link", { name: "Job Apply" }).getAttribute("aria-current")) === null);
-    const yJob = (await side.getByRole("link", { name: "Job Apply" }).boundingBox()).y;
-    const ySub = (await sub.boundingBox()).y;
-    const ySettings = (await side.getByRole("link", { name: "Settings" }).boundingBox()).y;
-    check("it sits right under Job Apply and above Settings", ySub > yJob && ySub < ySettings, JSON.stringify({ yJob, ySub, ySettings }));
+    check("the menu does not list Company list", (await side.getByRole("link", { name: "Company list" }).count()) === 0);
+    check("on the Company list page Job Apply is the marked item", (await side.getByRole("link", { name: "Job Apply" }).getAttribute("aria-current")) === "page");
+    check("and Job Apply has no sub-menu", (await side.locator("ul ul").count()) === 0);
     await page.goto(`${BASE}/jobs`);
-    check("on the Applications tab Job Apply is the marked page", (await side.getByRole("link", { name: "Job Apply" }).getAttribute("aria-current")) === "page" && (await sub.getAttribute("aria-current")) === null);
+    check("on the Applications tab Job Apply is the marked item", (await side.getByRole("link", { name: "Job Apply" }).getAttribute("aria-current")) === "page");
   }
   await ctx.close();
 }

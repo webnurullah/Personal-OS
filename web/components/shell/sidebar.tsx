@@ -29,12 +29,16 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
   const pathname = usePathname();
   const current = activeItem(pathname);
 
-  const link = (item: NavItem, sub = false): ReactNode => (
+  const link = (item: NavItem, sub = false): ReactNode => {
+    const listed = item.children?.filter((child) => !child.hidden) ?? [];
+    // On a page that is not listed in the menu, its parent item shows as the open one.
+    const open = current === item || Boolean(item.children?.some((child) => child.hidden && child === current));
+    return (
     <li key={item.href}>
       <Link
         href={item.href}
         className={sub ? "nav-link !py-2 !text-[0.875rem]" : "nav-link"}
-        aria-current={current === item ? "page" : undefined}
+        aria-current={open ? "page" : undefined}
         onClick={onClose}
         onMouseEnter={() => prefetchPage(item.href)}
         onFocus={() => prefetchPage(item.href)}
@@ -43,11 +47,12 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
         <item.icon className={sub ? "size-4 shrink-0" : "size-5 shrink-0"} />
         <span>{item.label}</span>
       </Link>
-      {item.children && (
-        <ul className="ml-6 mt-1 space-y-1 border-l border-slate-200 pl-2">{item.children.map((child) => link(child, true))}</ul>
+      {listed.length > 0 && (
+        <ul className="ml-6 mt-1 space-y-1 border-l border-slate-200 pl-2">{listed.map((child) => link(child, true))}</ul>
       )}
     </li>
-  );
+    );
+  };
 
   return (
     <>

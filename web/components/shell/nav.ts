@@ -1,6 +1,6 @@
 import { Archive, Building2, BriefcaseBusiness, CalendarDays, ChartColumn, FileText, FolderKanban, GraduationCap, Heart, House, Settings, SquareCheck, Target, Wallet, type LucideIcon } from "lucide-react";
 
-export type NavItem = { href: string; label: string; icon: LucideIcon; /** Pages that belong under it (shown a step in, under the item). */ children?: NavItem[] };
+export type NavItem = { href: string; label: string; icon: LucideIcon; /** Pages that belong under it (shown a step in, under the item). */ children?: NavItem[]; /** Not listed in the menu (the page still exists, with its title, search entry and tab). */ hidden?: boolean };
 
 export const NAV: NavItem[] = [
   { href: "/", label: "Dashboard", icon: House },
@@ -13,7 +13,7 @@ export const NAV: NavItem[] = [
   { href: "/finance", label: "Finance", icon: Wallet },
   { href: "/health", label: "Health", icon: Heart },
   { href: "/notes", label: "Notes", icon: FileText },
-  { href: "/jobs", label: "Job Apply", icon: BriefcaseBusiness, children: [{ href: "/jobs/companies", label: "Company list", icon: Building2 }] },
+  { href: "/jobs", label: "Job Apply", icon: BriefcaseBusiness, children: [{ href: "/jobs/companies", label: "Company list", icon: Building2, hidden: true }] },
 ];
 
 // Below the main list, after a line: Settings, then the Archive (where everything you delete waits until you delete it for good).
