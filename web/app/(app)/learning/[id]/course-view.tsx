@@ -272,16 +272,6 @@ export function CourseView({ id }: { id: string }) {
         </div>
       </div>
 
-      {/* Overview row */}
-      <div className="mt-5 grid grid-cols-1 gap-5">
-        <section className="flex flex-col justify-center rounded-[1.25rem] bg-pink-50 p-6 text-center ring-1 ring-pink-100">
-          <p className="font-hand text-3xl leading-tight text-slate-800">“Small steps every week make big progress.”</p>
-          <svg viewBox="0 0 80 8" className="mx-auto mt-3 w-20 text-slate-700" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
-            <path d="M2 5c20-3 50-4 76-2" />
-          </svg>
-        </section>
-      </div>
-
       {/* Topics table */}
       <section className="card mt-5 overflow-hidden" aria-labelledby="topics-title">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-5 py-3">
@@ -464,6 +454,16 @@ export function CourseView({ id }: { id: string }) {
         course={course}
         onSaved={(saved) => mutate((current) => current && { ...current, course: { ...current.course, ...saved } }, { revalidate: false })}
       />
+
+      {/* The closing line, at the very bottom of the page */}
+      <div className="mt-5 grid grid-cols-1 gap-5">
+        <section className="flex flex-col justify-center rounded-[1.25rem] bg-pink-50 p-6 text-center ring-1 ring-pink-100">
+          <p className="font-hand text-3xl leading-tight text-slate-800">“Small steps every week make big progress.”</p>
+          <svg viewBox="0 0 80 8" className="mx-auto mt-3 w-20 text-slate-700" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+            <path d="M2 5c20-3 50-4 76-2" />
+          </svg>
+        </section>
+      </div>
 
       <Modal open={editingCourse} onClose={() => setEditingCourse(false)} title="Edit course">
         <CourseForm today={today} course={course} onClose={() => setEditingCourse(false)} />
