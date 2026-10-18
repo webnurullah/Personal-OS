@@ -116,12 +116,22 @@ export function LearningView() {
         current="courses"
         filter={
           data.courses.length > 0 && (
+            <>
+            {categories.length > 0 && (
+              <Segmented
+                label="Category"
+                value={category}
+                onChange={setCategoryPick}
+                options={[{ value: "all", label: "All" }, ...categories.map((c) => ({ value: c.key, label: c.label })), ...(uncategorised ? [{ value: "none", label: "Other" }] : [])]}
+              />
+            )}
             <Segmented
               label="Status"
               value={statusPick}
               onChange={(next) => setStatusPick(next as CourseStatus)}
               options={COURSE_STATUSES.map((x) => ({ value: x.value, label: `${x.label} (${data.courses.filter((c) => statusOf(c) === x.value).length})` }))}
             />
+            </>
           )
         }
         actions={
@@ -136,14 +146,6 @@ export function LearningView() {
 
       <section className="mt-5" aria-labelledby="courses-title">
         <h2 id="courses-title" className="sr-only">My courses</h2>
-        {categories.length > 0 && (
-          <Segmented
-            label="Category"
-            value={category}
-            onChange={setCategoryPick}
-            options={[{ value: "all", label: "All" }, ...categories.map((c) => ({ value: c.key, label: c.label })), ...(uncategorised ? [{ value: "none", label: "Other" }] : [])]}
-          />
-        )}
         {visibleCourses.length ? (
           <ul className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
             {visibleCourses.map((course) => {

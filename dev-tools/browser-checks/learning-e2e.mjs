@@ -155,6 +155,13 @@ const browser = await launch();
   const row = await toolbar();
   check("the header row has the sections, the status buttons and Add on one line, in that order (no Ideas or Paste a list)", Math.max(...row.y) - Math.min(...row.y) <= 6 && row.x[0] < row.x[1] && row.x[1] < row.x[2] && (await page.getByRole("button", { name: "Ideas" }).count()) === 0 && (await page.getByRole("button", { name: "Paste a list" }).count()) === 0, JSON.stringify(row));
   check("the Focus and Log Study Session buttons are gone from the top right", (await page.getByRole("button", { name: "Focus", exact: true }).count()) === 0 && (await page.getByRole("button", { name: "Log Study Session" }).count()) === 0 && (await page.getByRole("timer").count()) === 0);
+  {
+    const nav = await page.getByRole("navigation", { name: "Learning sections" }).boundingBox();
+    const cat = await page.getByRole("tablist", { name: "Category" }).boundingBox();
+    const st = await page.getByRole("tablist", { name: "Status" }).boundingBox();
+    check("the category buttons are in the header row, between the sections and the status buttons", Math.abs(cat.y - nav.y) < 12 && cat.x > nav.x + nav.width - 2 && cat.x + cat.width <= st.x + 2, JSON.stringify({ nav, cat, st }));
+    check("and are not inside the course boxes area any more", (await section.getByRole("tablist", { name: "Category" }).count()) === 0);
+  }
   check("the status buttons are not repeated next to the categories", (await page.getByRole("tablist", { name: "Status" }).count()) === 1);
   check("the course boxes have no 'New' button of their own any more", (await section.getByRole("button", { name: "New" }).count()) === 0);
   const titles = async () => (await section.locator("a").evaluateAll((els) => els.map((e) => e.querySelector("span.truncate")?.textContent ?? ""))).sort();
