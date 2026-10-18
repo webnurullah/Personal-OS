@@ -222,3 +222,15 @@ test("plan dates: both or none, end not before start, at most two years", () => 
   assert.throws(() => checkPlanDates({ plan_start: "2026-09-15", plan_end: "2026-09-14" }), bad(400));
   assert.throws(() => checkPlanDates({ plan_start: "2026-01-01", plan_end: "2029-01-01" }), bad(400));
 });
+
+test("a course is finished when all topics are done and its certificates are completed", async () => {
+  const { courseFinished } = await import("../lib/course.ts");
+  const done = { status: "done" };
+  assert.equal(courseFinished([], []), false);
+  assert.equal(courseFinished([done, done], []), true);
+  assert.equal(courseFinished([done, { status: "in-progress" }], []), false);
+  assert.equal(courseFinished([done], [{ kind: "certificate", status: "learning" }]), false);
+  assert.equal(courseFinished([done], [{ kind: "certificate", status: "todo" }]), false);
+  assert.equal(courseFinished([done], [{ kind: "certificate", status: "completed" }, { kind: "certificate", status: "dropped" }]), true);
+  assert.equal(courseFinished([done], [{ kind: "playlist", status: "todo" }]), true); // only certificates count
+});

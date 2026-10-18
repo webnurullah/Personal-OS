@@ -1,6 +1,7 @@
 import { archiveItem } from "@/lib/server/archive";
 import { handle, ok } from "@/lib/server/api";
 import { applyChange, certificateDatesAfter } from "@/lib/library";
+import { completeCourseIfFinished } from "@/lib/server/course-status";
 import { HttpError, must } from "@/lib/server/http";
 import { resolveSubject } from "@/lib/server/resources-db";
 import { ResourceFields } from "@/lib/server/schemas";
@@ -20,7 +21,9 @@ export const PATCH = handle<{ id: string }>(async ({ db, params, body, today }) 
   if (row.course_id !== undefined && row.course_id !== current.course_id && row.unit_id === undefined) row.unit_id = null;
   Object.assign(row, await resolveSubject(db, row));
 
-  return must(await db.from("learning_resources").update(row).eq("id", id).select().single());
+  const saved = must(await db.from("learning_resources").update(row).eq("id", id).select().single());
+  if (saved.status === "completed" || saved.status === "dropped") await completeCourseIfFinished(db, saved.course_id);
+  return saved;
 });
 
 // Moves to the Archive (the certificate and the notes come back if you restore it).

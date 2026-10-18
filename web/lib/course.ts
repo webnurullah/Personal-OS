@@ -121,3 +121,13 @@ export function planRange(t: { planned_week: number | null; plan_start?: string 
   if (t.planned_week) return { from: addDays(courseStart, (t.planned_week - 1) * 7), to: addDays(courseStart, (t.planned_week - 1) * 7 + 6) };
   return null;
 }
+
+/**
+ * A course is finished when it has topics, every topic is done, and every certificate linked to it (that is not dropped) is
+ * completed. A course with no topics is never finished by itself (nothing was learned yet).
+ */
+export function courseFinished(topics: { status: string }[], certificates: { kind: string; status: string }[]) {
+  if (topics.length === 0) return false;
+  if (topics.some((t) => t.status !== "done")) return false;
+  return certificates.every((r) => r.kind !== "certificate" || r.status === "completed" || r.status === "dropped");
+}
