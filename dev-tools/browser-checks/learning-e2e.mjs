@@ -87,6 +87,15 @@ const browser = await launch();
   });
   const statusTabs = page.getByRole("tablist", { name: "Course status" });
   check("the course page shows Active / Paused / Done, Active chosen", JSON.stringify(await statusTabs.getByRole("tab").allInnerTexts()) === JSON.stringify(["Active", "Paused", "Done"]) && (await statusTabs.getByRole("tab", { name: "Active" }).getAttribute("aria-selected")) === "true");
+  {
+    // Top right: the status, Edit course and Delete sit in the breadcrumb row, to the right of it; the category is not shown on the page.
+    const crumb = await page.getByRole("navigation", { name: "Breadcrumb" }).boundingBox();
+    const st = await statusTabs.boundingBox();
+    const edit = await page.getByRole("button", { name: "Edit course" }).boundingBox();
+    const del = await page.getByRole("button", { name: "Delete", exact: true }).boundingBox();
+    check("wide: the status buttons, Edit course and Delete are at the top right, in the row of the breadcrumb", st.x > crumb.x + crumb.width && Math.abs(st.y - crumb.y) < 40 && edit.x > st.x && del.x > edit.x && del.x + del.width > 1000, JSON.stringify({ crumb, st, edit, del }));
+    check("and the category badge is not on the course page", (await page.locator("h1").locator("xpath=..").getByText("Digital Marketing", { exact: true }).count()) <= 1);
+  }
   await statusTabs.getByRole("tab", { name: "Paused" }).click();
   await page.waitForTimeout(500);
   check("pausing a course saves the status at once", patches.length === 1 && patches[0].status === "paused", JSON.stringify(patches));

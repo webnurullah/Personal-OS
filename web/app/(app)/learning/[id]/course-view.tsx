@@ -239,14 +239,30 @@ export function CourseView({ id }: { id: string }) {
 
   return (
     <>
-      <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500">
-        <Link href="/learning" className="flex shrink-0 items-center gap-1 whitespace-nowrap hover:text-blue-600">
-          <ChevronLeft className="size-4" />
-          Learning
-        </Link>
-        <span>/</span>
-        <span className="min-w-0 truncate text-slate-700">{course.title}</span>
-      </nav>
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-2 text-sm text-slate-500">
+          <Link href="/learning" className="flex shrink-0 items-center gap-1 whitespace-nowrap hover:text-blue-600">
+            <ChevronLeft className="size-4" />
+            Learning
+          </Link>
+          <span>/</span>
+          <span className="min-w-0 truncate text-slate-700">{course.title}</span>
+        </nav>
+        {/* Top right: the course's status, Edit and Delete. */}
+        <div className="flex max-w-full flex-wrap items-center justify-end gap-2">
+          <div className="max-w-full overflow-x-auto">
+            <Segmented label="Course status" value={course.status ?? "active"} onChange={setStatus} options={COURSE_STATUSES.map((x) => ({ value: x.value, label: x.label }))} />
+          </div>
+          <span className="flex gap-1">
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => setEditingCourse(true)}>
+              <Pencil className="size-4" /> Edit course
+            </button>
+            <button type="button" className="btn btn-ghost btn-sm text-rose-600" onClick={removeCourse}>
+              <Trash2 className="size-4" /> Delete
+            </button>
+          </span>
+        </div>
+      </div>
 
       {/* Title + key numbers */}
       <div className="mt-4 grid grid-cols-1 gap-5 2xl:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] 2xl:items-center">
@@ -258,18 +274,6 @@ export function CourseView({ id }: { id: string }) {
             <h1 className="text-2xl font-bold leading-tight tracking-tight text-[#12305a] sm:text-[1.65rem]">{course.title}</h1>
             {course.subtitle && <p className="mt-1 text-lg text-slate-700">{course.subtitle}</p>}
             {course.quote && <p className="font-hand text-2xl text-slate-600">“{course.quote}”</p>}
-            {course.category && <span className="badge mt-2 max-w-full bg-indigo-50 text-indigo-700"><span className="truncate">{course.category}</span></span>}
-            <div className="mt-3 max-w-full overflow-x-auto">
-              <Segmented label="Course status" value={course.status ?? "active"} onChange={setStatus} options={COURSE_STATUSES.map((x) => ({ value: x.value, label: x.label }))} />
-            </div>
-            <div className="mt-2 flex gap-1">
-              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setEditingCourse(true)}>
-                <Pencil className="size-4" /> Edit course
-              </button>
-              <button type="button" className="btn btn-ghost btn-sm text-rose-600" onClick={removeCourse}>
-                <Trash2 className="size-4" /> Delete
-              </button>
-            </div>
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
