@@ -8,23 +8,20 @@ import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import { GraduationCap, Plus, Sparkles, Trash2 } from "lucide-react";
 import { api, errorMessage, refresh } from "@/lib/api";
-import { addDays, formatDate, mondayOf, weekdayIndex } from "@/lib/dates";
+import { addDays, formatDate, mondayOf } from "@/lib/dates";
 import { COURSE_TEMPLATES, templateWeeks } from "@/lib/course-templates";
 import { hm, num, plural } from "@/lib/format";
 import { OUTLINE_LIMITS, parseOutline } from "@/lib/outline";
 import { COURSE_STATUSES, remainingText } from "@/lib/course";
 import { useProfile } from "@/lib/profile";
-import { REVISION_DAYS } from "@/lib/revision";
 import { forecastText } from "@/lib/study";
-import type { CourseStatus, CourseSummary, LearningWeek, RevisionDue, StudyBlock, StudyNextItem } from "@/lib/types";
+import type { CourseStatus, CourseSummary, LearningWeek, StudyBlock } from "@/lib/types";
 import { Progress } from "@/components/ui/charts";
 import { Field, Segmented } from "@/components/ui/controls";
 import { useFeedback } from "@/components/ui/feedback";
 import { Modal, ModalActions } from "@/components/ui/modal";
 import { LoadError, PageHeader, PageSkeleton } from "@/components/ui/states";
 import { LearningToolbar } from "./learning-tabs";
-import { LearningProgressCard } from "./learning-progress";
-import { StudyNext } from "./study-next";
 
 const categoryKey = (category: string | undefined) => (category ?? "").trim().toLowerCase();
 /** The categories in use, once each (spelled as first written), in order of name. */
@@ -54,21 +51,11 @@ export function LearningView() {
   const [categoryPick, setCategoryPick] = useState("all"); // "all", a category's key (lower case), or "none" for courses without one
   const [statusPick, setStatusPick] = useState<CourseStatus>("active");
   const { toast, confirm } = useFeedback();
-  const [logging, setLogging] = useState(false);
-  const [logChoice, setLogChoice] = useState(""); // what the session form starts on: "t:<topic id>", "r:<library item id>" or nothing
-  const [logNow, setLogNow] = useState(false); // from "Study next" (always about today): this week, even when another week is on screen
   const [newCourse, setNewCourse] = useState<NewCourseStart | null>(null); // the New course dialog, and where its cursor starts
-  const openLog = (choice = "", now = false) => {
-    setLogChoice(choice);
-    setLogNow(now);
-    setLogging(true);
-  };
 
   if (error && !data) return <LoadError error={error} retry={() => mutate()} />;
   if (!data) return <PageSkeleton />;
 
-  const thisWeek = mondayOf(data.today);
-  const isThisWeek = data.week_start === thisWeek;
   const done = data.blocks.filter((b) => b.done).reduce((sum, b) => sum + Number(b.hours), 0);
   const planned = data.blocks.reduce((sum, b) => sum + Number(b.hours), 0);
 
@@ -92,11 +79,6 @@ export function LearningView() {
     run(() => api(`/learning/blocks/${block.id}`, { method: "DELETE" }), "Block moved to the Archive");
   };
 
-  const markRevised = (item: RevisionDue) =>
-    run(
-      () => api(item.kind === "topic" ? `/topics/${item.id}` : `/resources/${item.id}`, { method: "PATCH", body: { revision_step: item.step + 1 } }),
-      item.step + 1 >= REVISION_DAYS.length ? "All three looks done. Well done!" : `Revised. The next look is in ${REVISION_DAYS[item.step + 1] - REVISION_DAYS[item.step]} days.`,
-    );
   // Courses by category (written by you in the course form) and by status, like the project list.
   const statusOf = (c: CourseSummary): CourseStatus => c.status ?? "active"; // (a copy saved before categories existed has neither)
   // The category buttons are the categories of the courses in the status on screen: a category whose only course is Done (or deleted) is not offered.
@@ -105,9 +87,6 @@ export function LearningView() {
   const uncategorised = inStatus.some((c) => !(c.category ?? "").trim());
   const category = categoryPick === "all" || (categoryPick === "none" && categories.length && uncategorised) || categories.some((c) => c.key === categoryPick) ? categoryPick : "all";
   const visibleCourses = inStatus.filter((c) => category === "all" || (category === "none" ? !(c.category ?? "").trim() : categoryKey(c.category) === category));
-  const finishTopic = (item: StudyNextItem) =>
-    run(() => api(`/topics/${item.topic_id}`, { method: "PATCH", body: { status: "done" } }), `${item.code} marked finished`);
-
   return (
     <>
       <PageHeader title="Learning" description="Plan your study week and watch the hours add up.">
@@ -196,10 +175,6 @@ export function LearningView() {
         )}
       </section>
 
-      <StudyNext data={data} onLog={(topicId) => openLog(`t:${topicId}`, true)} onFinish={finishTopic} onRevised={markRevised} />
-
-      <LearningProgressCard />
-
       {data.blocks.length > 0 && (
         <details className="card mt-5 p-5">
           <summary className="cursor-pointer text-sm font-semibold text-slate-800">
@@ -233,145 +208,10 @@ export function LearningView() {
         </div>
       </section>
 
-      <Modal
-        open={logging}
-        onClose={() => setLogging(false)}
-        title="Log a study session"
-        description={isThisWeek || logNow ? "It is added as a block for this week." : `It is added to the week of ${formatDate(data.week_start, "short")}.`}
-        size="md"
-      >
-        <SessionForm data={data} weekStart={logNow ? thisWeek : data.week_start} choice={logChoice} onClose={() => setLogging(false)} />
-      </Modal>
       <Modal open={newCourse !== null} onClose={() => setNewCourse(null)} title="New course" description="Then add its units and topics on the course page.">
         <CourseForm today={data.today} start={newCourse ?? "blank"} onClose={() => setNewCourse(null)} />
       </Modal>
     </>
-  );
-}
-
-function SessionForm({ data, weekStart, choice: firstChoice, defaultHours, onClose }: { data: LearningWeek; weekStart: string; choice: string; defaultHours?: number; onClose: () => void }) {
-  const { toast } = useFeedback();
-  const { today } = data;
-  // (A copy of this page saved before topics and the library were listed has neither; the fresh answer replaces it a moment later.)
-  const openTopics = data.open_topics ?? [];
-  const library = data.library ?? [];
-  const [busy, setBusy] = useState(false);
-  const isThisWeek = mondayOf(today) === weekStart;
-  const [day, setDay] = useState(isThisWeek ? weekdayIndex(today) : 0);
-  // "Already done" is on for today and days gone by, off for a day still to come — until you choose yourself.
-  const isPast = addDays(weekStart, day) <= today;
-  const [doneChoice, setDoneChoice] = useState<boolean | null>(null);
-  const done = doneChoice ?? isPast;
-
-  // What it was about: a topic of a course (its hours then count there), a library item, or nothing in particular.
-  const [choice, setChoice] = useState(firstChoice);
-  const topic = choice.startsWith("t:") ? openTopics.find((t) => t.id === choice.slice(2)) : undefined;
-  const item = choice.startsWith("r:") ? library.find((r) => r.id === choice.slice(2)) : undefined;
-  const [activity, setActivity] = useState(topic?.label ?? item?.title ?? "");
-  const [auto, setAuto] = useState(topic?.label ?? item?.title ?? ""); // the words filled in from the pick
-  const [finish, setFinish] = useState(false);
-  const pick = (value: string) => {
-    setChoice(value);
-    setFinish(false);
-    // Words you wrote yourself stay. Words that are still the old pick's (even with something added) follow the new pick.
-    if (activity.trim() && !(auto && activity.startsWith(auto))) return;
-    const t = value.startsWith("t:") ? openTopics.find((o) => o.id === value.slice(2)) : undefined;
-    const r = value.startsWith("r:") ? library.find((o) => o.id === value.slice(2)) : undefined;
-    const label = t?.label ?? r?.title ?? "";
-    setAuto(label);
-    setActivity(label);
-  };
-
-  const submit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const hours = Number(new FormData(e.currentTarget).get("hours"));
-    setBusy(true);
-    try {
-      await api("/learning/blocks", {
-        method: "POST",
-        body: { week_start: weekStart, weekday: day, hours, activity: activity.trim(), done, topic_id: topic?.id ?? null, resource_id: item?.id ?? null },
-      });
-      if (topic && finish) {
-        try {
-          await api(`/topics/${topic.id}`, { method: "PATCH", body: { status: "done" } });
-        } catch (error) {
-          toast(`The session was added, but the topic could not be marked finished: ${errorMessage(error)}`, "error");
-        }
-      }
-      await refresh("/learning", "/courses");
-      toast(done ? `${hm(hours)} added to ${isThisWeek ? "this week" : "the week of " + formatDate(weekStart, "short")}` : "Block planned");
-      onClose();
-    } catch (error) {
-      toast(errorMessage(error), "error");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <form onSubmit={submit} className="space-y-4">
-      {(openTopics.length > 0 || library.length > 0) && (
-        <Field label="What are you studying?" htmlFor="session-pick" hint={topic ? `${hm(topic.hours_left)} left on this topic. A finished session adds its hours to it.` : undefined}>
-          <select id="session-pick" className="select select-lg" value={topic || item ? choice : ""} onChange={(e) => pick(e.target.value)}>
-            <option value="">Something else</option>
-            {data.courses.map((course) => {
-              const open = openTopics.filter((t) => t.course_id === course.id);
-              return open.length ? (
-                <optgroup key={course.id} label={course.title}>
-                  {open.map((t) => (
-                    <option key={t.id} value={`t:${t.id}`}>{t.label}</option>
-                  ))}
-                </optgroup>
-              ) : null;
-            })}
-            {library.length > 0 && (
-              <optgroup label="Library: learning now">
-                {library.map((r) => (
-                  <option key={r.id} value={`r:${r.id}`}>{r.title}</option>
-                ))}
-              </optgroup>
-            )}
-          </select>
-        </Field>
-      )}
-      <div className="grid grid-cols-2 gap-4">
-        <Field label="Day" htmlFor="session-day">
-          <select id="session-day" name="weekday" className="select select-lg" value={day} onChange={(e) => setDay(Number(e.target.value))}>
-            {DAYS.map((day, i) => (
-              <option key={day} value={i}>{day}</option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Hours" htmlFor="session-hours">
-          <input id="session-hours" name="hours" type="number" min={0.25} max={24} step={0.25} defaultValue={defaultHours ?? 1} className="input" required />
-        </Field>
-      </div>
-      <Field label="What did you study?" htmlFor="session-what">
-        <input
-          id="session-what"
-          name="activity"
-          className="input"
-          required
-          maxLength={200}
-          placeholder="e.g. SQL joins practice"
-          autoComplete="off"
-          autoFocus={!topic && !item}
-          value={activity}
-          onChange={(e) => setActivity(e.target.value)}
-        />
-      </Field>
-      <label className="flex items-center gap-3 text-sm text-slate-700">
-        <input type="checkbox" name="done" className="checkbox checkbox-green" checked={done} onChange={(e) => setDoneChoice(e.target.checked)} />
-        Already done (counts towards {isThisWeek ? "this week" : "that week"}{topic ? " and the topic" : ""})
-      </label>
-      {topic && (
-        <label className="flex items-center gap-3 text-sm text-slate-700">
-          <input type="checkbox" className="checkbox checkbox-green" checked={finish} onChange={(e) => setFinish(e.target.checked)} />
-          I finished this topic
-        </label>
-      )}
-      <ModalActions onCancel={onClose} submitLabel="Add block" busy={busy} />
-    </form>
   );
 }
 

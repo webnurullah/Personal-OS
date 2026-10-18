@@ -162,6 +162,7 @@ const browser = await launch();
     check("the category buttons are in the header row, between the sections and the status buttons", Math.abs(cat.y - nav.y) < 12 && cat.x > nav.x + nav.width - 2 && cat.x + cat.width <= st.x + 2, JSON.stringify({ nav, cat, st }));
     check("and are not inside the course boxes area any more", (await section.getByRole("tablist", { name: "Category" }).count()) === 0);
   }
+  check("the Study next card and the Learning progress and time card are gone from the Learning page", (await page.getByRole("heading", { name: "Study next" }).count()) === 0 && (await page.getByText("Where the time went").count()) === 0 && (await page.getByText("Learning progress and time").count()) === 0);
   check("the status buttons are not repeated next to the categories", (await page.getByRole("tablist", { name: "Status" }).count()) === 1);
   check("the course boxes have no 'New' button of their own any more", (await section.getByRole("button", { name: "New" }).count()) === 0);
   const titles = async () => (await section.locator("a").evaluateAll((els) => els.map((e) => e.querySelector("span.truncate")?.textContent ?? ""))).sort();

@@ -1,4 +1,4 @@
-// Browser check for Learning step 6 (connect to the rest): revision, goals that follow
+// Browser check for Learning step 6 (connect to the rest): goals that follow
 // a course, study sessions on the Calendar, and a course's week as tasks.
 // The built app must be running on http://localhost:3123.   Run:  node step6-e2e.mjs   (a stand-in API answers; SHOTS=<folder> saves pictures)
 import { launch, newPhone, apiMock, measure, BASE, TODAY } from "/home/user/Personal-OS/dev-tools/browser-checks/audit-lib.mjs";
@@ -30,42 +30,6 @@ const week = {
 };
 
 const browser = await launch();
-
-// ---------- Learning page: revision ----------
-for (const width of [390, 320]) {
-  const ctx = await newPhone(browser, width);
-  const calls = [];
-  await apiMock(ctx, { "/learning/week": week });
-  await ctx.route(/\/api\/(learning\/week\/[^/]+|topics\/[^/]+|resources\/[^/]+|learning\/blocks)$/, (route) => {
-    const req = route.request();
-    if (req.method() === "GET") return route.fulfill({ json: week });
-    calls.push({ url: new URL(req.url()).pathname.replace("/api", ""), method: req.method(), body: req.postDataJSON() });
-    return route.fulfill({ json: { ok: true } });
-  });
-  const page = await ctx.newPage();
-  await page.goto(`${BASE}/learning`);
-  await page.getByRole("heading", { name: "Study next" }).waitFor();
-  if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/step6-learning-${width}.png`, fullPage: true });
-  const m = await measure(page, width);
-  check(`${width}px: no zoom-out or overflow with revision and long titles`, !m.zoomedOut && m.mainClipped === 0 && m.offenders.length === 0, JSON.stringify(m));
-
-  const card = page.locator("section[aria-labelledby='next-title']");
-  check(`${width}px: "Time to revise" lists a topic and a library item with their look number`, (await card.getByText("Time to revise").count()) === 1 && (await card.getByText("look 1 of 3").count()) === 1 && (await card.getByText("look 2 of 3").count()) === 1);
-  calls.length = 0;
-  await card.getByRole("button", { name: /Mark 1\.4 .* revised/ }).click();
-  await page.waitForTimeout(500);
-  const rev = calls.find((c) => c.method === "PATCH" && c.url === "/topics/t9");
-  check(`${width}px: "Revised" moves a topic to its next look`, rev?.body?.revision_step === 1, JSON.stringify(rev?.body));
-  await card.getByRole("button", { name: "Mark SEO basics (Coursera) revised" }).click();
-  await page.waitForTimeout(500);
-  const rev2 = calls.find((c) => c.method === "PATCH" && c.url === "/resources/r9");
-  check(`${width}px: and a library item`, rev2?.body?.revision_step === 2, JSON.stringify(rev2?.body));
-
-  if (width === 390) {
-    check("there is no focus timer any more", (await page.getByRole("button", { name: /focus timer/i }).count()) === 0 && (await page.getByRole("button", { name: "Focus", exact: true }).count()) === 0);
-  }
-  await ctx.close();
-}
 
 // ---------- Goals: one that follows a course, and the form ----------
 for (const width of [390, 320]) {

@@ -856,25 +856,9 @@ unit("project", "/projects/p1", (p) => p.locator("main h1").first().waitFor({ ti
 unit("project-archived", "/projects/p2", (p) => p.locator("main h1").first().waitFor({ timeout: 12000 }), () => ({ "/projects/p2": projectDetail(2, { archived_at: iso(D(-3)), archived_on: D(-3) }) }), []);
 
 unit("learning", "/learning", heading, () => ({ "/learning/week": (_m, url) => ({ ...learningWeek, week_start: url.searchParams.get("start") ?? learningWeek.week_start }), "/courses": coursesResponse, "/learning/progress": progressResponse, "/resources": resources }), [
-  scene("Progress and time", async (page, snap) => {
-    const card = page.locator("section[aria-labelledby='progress-title']");
-    await snap("weekly");
-    await press(card.locator("button[aria-pressed]").nth(2));
-    await snap("an older week picked");
-    await press(card.getByRole("tab", { name: "Monthly" }));
-    await snap("monthly");
-    await press(card.getByRole("tab", { name: "Quarterly" }));
-    await snap("quarterly");
-    await press(card.locator("button[aria-pressed]").nth(1));
-    await snap("an older quarter picked");
-  }),
   scene("This week's study sessions", async (page, snap) => {
     await press(page.locator("details", { hasText: "Study sessions this week" }).locator("summary"));
     await snap("sessions list open");
-  }),
-  scene("Log time from Study next", async (page, snap) => {
-    await openDialog(page, page.getByRole("button", { name: "Log time" }).first());
-    await snap("form on a topic");
   }),
   scene("New course dialog", async (page, snap) => {
     await openDialog(page, page.getByRole("button", { name: "Add a course" }));
