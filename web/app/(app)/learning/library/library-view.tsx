@@ -12,7 +12,7 @@ import { useProfile } from "@/lib/profile";
 import type { CourseSummary, LearningResource, ResourceKind } from "@/lib/types";
 import { Segmented } from "@/components/ui/controls";
 import { Modal } from "@/components/ui/modal";
-import { EmptyState, LoadError, PageHeader, PageSkeleton } from "@/components/ui/states";
+import { EmptyState, LoadError, PageSkeleton } from "@/components/ui/states";
 import { LearningToolbar } from "../learning-tabs";
 import { PasteList, StarterIdeas } from "./add-many";
 import { CompleteDialog } from "./complete-dialog";
@@ -82,7 +82,7 @@ export function LibraryView() {
 
   return (
     <>
-      <PageHeader title="Learning" />
+      <h1 className="sr-only">Learning</h1>
       <LearningToolbar
         current="library"
         filter={
