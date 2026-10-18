@@ -76,6 +76,7 @@ const browser = await launch();
   await page.goto(`${BASE}/learning/c1`);
   await page.getByText("Topic 1.1").first().waitFor();
   check("wide: the table has no hour columns (Estimated, Actual Time Spent, Remaining) and no hour boxes", (await page.locator("table").count()) >= 1 && (await page.getByLabel("Actual hours for topic 1.1").count()) === 0 && (await page.locator("table thead").getByText(/Estimated|Actual Time|Remaining/).count()) === 0 && (await page.locator("table thead").getByText("Status").count()) === 1);
+  check("wide: the percentage ring and the Module Progress card are gone from the course page", (await page.getByText("Module Progress", { exact: true }).count()) === 0 && (await page.getByLabel("Course progress").count()) === 0 && (await page.getByText("Overall Progress", { exact: true }).count()) === 1);
   // The course page: its category, and a status that can be changed with one tap.
   const patches = [];
   await ctx.route(/\/api\/courses\/c1$/, (route) => {

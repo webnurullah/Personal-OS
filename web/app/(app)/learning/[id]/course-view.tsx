@@ -17,7 +17,7 @@ import { useProfile } from "@/lib/profile";
 import { useMedia } from "@/lib/use-media";
 import { useSaveLater } from "@/lib/use-save-later";
 import { CourseNotes } from "./course-notes";
-import { Donut, Progress } from "@/components/ui/charts";
+import { Progress } from "@/components/ui/charts";
 import { ColorPicker, Field, Segmented } from "@/components/ui/controls";
 import { useFeedback } from "@/components/ui/feedback";
 import { Modal, ModalActions } from "@/components/ui/modal";
@@ -301,48 +301,7 @@ export function CourseView({ id }: { id: string }) {
       </div>
 
       {/* Overview row */}
-      <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-2 2xl:grid-cols-[1fr_1.15fr_1.3fr_0.85fr]">
-        <section className="card flex items-center justify-center gap-6 p-5" aria-label="Course progress">
-          <div className="relative size-32 shrink-0 sm:size-36 2xl:size-32 min-[112.5rem]:size-36">
-            <Donut
-              segments={[
-                { value: stats.ring.done, color: "#059669" },
-                { value: stats.ring.inProgress, color: "#3b82f6" },
-                { value: stats.ring.notStarted, color: "#cbd5e1" },
-              ]}
-              thickness={14}
-              className="absolute inset-0"
-            />
-            <p className="absolute inset-0 grid place-content-center text-3xl font-bold text-[#12305a]">{stats.progress}%</p>
-          </div>
-          <ul className="space-y-2.5 whitespace-nowrap text-sm text-slate-700">
-            <li className="flex items-center gap-2"><span className="size-3 rounded-full bg-emerald-600" />Completed</li>
-            <li className="flex items-center gap-2"><span className="size-3 rounded-full bg-blue-500" />In Progress</li>
-            <li className="flex items-center gap-2"><span className="size-3 rounded-full bg-slate-300" />Not Started</li>
-          </ul>
-        </section>
-
-        <section className="card p-5" aria-labelledby="module-title">
-          <h2 id="module-title" className="text-lg font-bold text-[#12305a]">Module Progress</h2>
-          {stats.units.length ? (
-            <ul className="mt-4 space-y-3.5 text-sm">
-              {stats.units.map(({ unit, est, percent }) => (
-                <li key={unit.id}>
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="min-w-0 truncate font-medium text-slate-700">
-                      {unitName(unit)} <span className="text-slate-400">({num(est)}h)</span>
-                    </span>
-                    <span className="shrink-0 font-semibold text-slate-700">{percent}%</span>
-                  </div>
-                  <Progress value={percent} fill={colorOf(unit.color).bar} className="mt-1.5 h-2" />
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="mt-4 text-sm text-slate-500">Add units to see progress per module.</p>
-          )}
-        </section>
-
+      <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-2 2xl:grid-cols-[1.3fr_0.85fr]">
         <section className="card p-5" aria-labelledby="week-title">
           <div className="flex items-center gap-3">
             <span className="icon-tile size-10 bg-[#12305a] text-white">
