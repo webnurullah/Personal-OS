@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
-import { GraduationCap, Plus, Sparkles, Trash2 } from "lucide-react";
+import { GraduationCap, Plus, Trash2 } from "lucide-react";
 import { api, errorMessage, refresh } from "@/lib/api";
 import { addDays, formatDate, mondayOf } from "@/lib/dates";
 import { COURSE_TEMPLATES, templateWeeks } from "@/lib/course-templates";
@@ -199,14 +199,6 @@ export function LearningView() {
           </ul>
         </details>
       )}
-
-      <section className="mt-5 flex items-center gap-4 rounded-2xl bg-linear-to-br from-indigo-600 to-blue-600 p-5 text-white shadow-lg shadow-indigo-600/20">
-        <Sparkles className="size-6 shrink-0 text-amber-300" />
-        <div className="min-w-0">
-          <p className="font-hand text-2xl leading-tight sm:text-3xl">“Small steps every week make big progress.”</p>
-          <p className="mt-1 text-sm text-indigo-100">Two short sessions beat one long one. Your memory likes repeats.</p>
-        </div>
-      </section>
 
       <Modal open={newCourse !== null} onClose={() => setNewCourse(null)} title="New course" description="Then add its units and topics on the course page.">
         <CourseForm today={data.today} start={newCourse ?? "blank"} onClose={() => setNewCourse(null)} />
