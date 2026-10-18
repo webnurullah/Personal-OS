@@ -36,19 +36,9 @@ const browser = await launch();
   await page.getByText("Topic 1.1").first().waitFor();
   const m = await measure(page, 390);
   check("phone: page does not zoom out or overflow", !m.zoomedOut && m.mainClipped === 0, JSON.stringify(m));
-  check("phone: only one set of hour boxes is on the page", (await page.getByLabel("Actual hours for topic 1.1").count()) === 1);
+  check("phone: no hour boxes or planned/spent hours on the topic cards", (await page.getByLabel("Actual hours for topic 1.1").count()) === 0 && (await page.getByText(/^[\d.]+h planned$/).count()) === 0 && (await page.getByRole("button", { name: /Add .* to topic/ }).count()) === 0);
   check("after the end the plan card says Last Week's Plan", (await page.getByText("Last Week's Plan").count()) === 1);
   check("date passed wording on the tile", (await page.getByText("(date passed)").count()) === 1);
-
-  // the box shows 1.25 and keeps quarter hours
-  const box = page.getByLabel("Actual hours for topic 1.1");
-  check("quarter hour value is kept in the box", (await box.inputValue()) === "1.25");
-  await box.fill("1500");
-  await box.blur();
-  check("a value over the limit is shown as the limit when leaving the box", (await box.inputValue()) === "1000", await box.inputValue());
-  await page.waitForTimeout(1200);
-  const patch = calls.find((c) => c.method === "PATCH" && c.url.endsWith("/t1"));
-  check("the saved value is the limited one", patch?.body?.actual_hours === 1000, JSON.stringify(patch));
 
   // add topic: next number is 1.4 (1.1 and 1.3 exist), duplicate is warned
   await page.getByRole("button", { name: /Add topic to SEO/ }).click();
@@ -85,7 +75,7 @@ const browser = await launch();
   const page = await ctx.newPage();
   await page.goto(`${BASE}/learning/c1`);
   await page.getByText("Topic 1.1").first().waitFor();
-  check("wide: table is shown, one set of hour boxes", (await page.locator("table").count()) >= 1 && (await page.getByLabel("Actual hours for topic 1.1").count()) === 1);
+  check("wide: the table has no hour columns (Estimated, Actual Time Spent, Remaining) and no hour boxes", (await page.locator("table").count()) >= 1 && (await page.getByLabel("Actual hours for topic 1.1").count()) === 0 && (await page.locator("table thead").getByText(/Estimated|Actual Time|Remaining/).count()) === 0 && (await page.locator("table thead").getByText("Status").count()) === 1);
   // The course page: its category, and a status that can be changed with one tap.
   const patches = [];
   await ctx.route(/\/api\/courses\/c1$/, (route) => {
@@ -149,12 +139,11 @@ const browser = await launch();
     const x = async (loc) => Math.round((await loc.boundingBox()).x);
     const nav = page.getByRole("navigation", { name: "Learning sections" });
     const status = page.getByRole("tablist", { name: "Status" });
-    const ideas = page.getByRole("button", { name: "Ideas" });
     const add = page.getByRole("button", { name: "Add a course" });
-    return { y: [await y(nav), await y(status), await y(ideas), await y(add)], x: [await x(nav), await x(status), await x(ideas), await x(add)] };
+    return { y: [await y(nav), await y(status), await y(add)], x: [await x(nav), await x(status), await x(add)] };
   };
   const row = await toolbar();
-  check("the header row has the sections, the status buttons, Ideas, Paste a list and Add on one line, in that order", Math.max(...row.y) - Math.min(...row.y) <= 6 && row.x[0] < row.x[1] && row.x[1] < row.x[2] && row.x[2] < row.x[3], JSON.stringify(row));
+  check("the header row has the sections, the status buttons and Add on one line, in that order (no Ideas or Paste a list)", Math.max(...row.y) - Math.min(...row.y) <= 6 && row.x[0] < row.x[1] && row.x[1] < row.x[2] && (await page.getByRole("button", { name: "Ideas" }).count()) === 0 && (await page.getByRole("button", { name: "Paste a list" }).count()) === 0, JSON.stringify(row));
   check("the Focus and Log Study Session buttons are gone from the top right", (await page.getByRole("button", { name: "Focus", exact: true }).count()) === 0 && (await page.getByRole("button", { name: "Log Study Session" }).count()) === 0 && (await page.getByRole("timer").count()) === 0);
   check("the status buttons are not repeated next to the categories", (await page.getByRole("tablist", { name: "Status" }).count()) === 1);
   check("the course boxes have no 'New' button of their own any more", (await section.getByRole("button", { name: "New" }).count()) === 0);
@@ -183,14 +172,6 @@ const browser = await launch();
   check("the form suggests the categories already in use", JSON.stringify(options) === JSON.stringify(["BCS", "Data", "Digital Marketing"]), JSON.stringify(options));
   check("a new course has no status field (it starts active)", (await dialog.locator("#course-status").count()) === 0);
   check("Add opens a blank course with the cursor in the name", await dialog.locator("#course-title").evaluate((el) => el === document.activeElement));
-  await page.keyboard.press("Escape");
-  await page.getByRole("button", { name: "Ideas" }).click();
-  await page.waitForTimeout(100);
-  check("Ideas opens the New course dialog on the ready-made courses (the cursor is in 'Start from')", await dialog.locator("#course-template").evaluate((el) => el === document.activeElement));
-  await page.keyboard.press("Escape");
-  await page.getByRole("button", { name: "Paste a list" }).click();
-  await page.waitForTimeout(100);
-  check("Paste a list opens it on the outline box, already open", (await dialog.locator("details").getAttribute("open")) !== null && (await dialog.locator("#course-outline").evaluate((el) => el === document.activeElement)));
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Add a course" }).click();
   await dialog.locator("#course-template").selectOption("digital-marketing");

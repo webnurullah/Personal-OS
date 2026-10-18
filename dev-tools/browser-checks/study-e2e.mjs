@@ -139,97 +139,17 @@ for (const width of [390, 320]) {
   await ctx.close();
 }
 
-// ---------- The course page on a phone: +30m / +1h ----------
+// ---------- The course page on a phone: no hours or +30m / +1h any more ----------
 {
   const ctx = await newPhone(browser, 390);
-  const calls = [];
-  let added = 0; // the stand-in server keeps the hours it was given, as the database does
-  const withHours = () => ({ ...detail, units: [{ ...detail.units[0], topics: detail.units[0].topics.map((t) => (t.id === "a" ? { ...t, actual_hours: Number(t.actual_hours) + added } : t)) }] });
-  await apiMock(ctx, { "/courses/c1": () => withHours() });
-  await ctx.route(/\/api\/learning\/blocks$/, (route) => {
-    const req = route.request();
-    calls.push({ method: req.method(), body: req.postDataJSON() });
-    added += req.postDataJSON().hours;
-    return route.fulfill({ json: { ok: true } });
-  });
+  await apiMock(ctx, { "/courses/c1": detail });
   const page = await ctx.newPage();
   await page.goto(`${BASE}/learning/c1`);
   await page.getByText("Topic 1.1").first().waitFor();
   const m = await measure(page, 390);
-  check("course page: no zoom-out or overflow with the chips", !m.zoomedOut && m.mainClipped === 0 && m.offenders.length === 0, JSON.stringify(m));
-  check("course page: chips on an open topic", (await page.getByRole("button", { name: "Add 30m to topic 1.1" }).count()) === 1 && (await page.getByRole("button", { name: "Add 1h to topic 1.1" }).count()) === 1);
-  check("course page: none on a finished topic", (await page.getByRole("button", { name: /Add .* to topic 1.2/ }).count()) === 0);
-  await page.getByRole("button", { name: "Add 1h to topic 1.1" }).click();
-  await page.waitForTimeout(600);
-  const post = calls.find((c) => c.method === "POST");
-  check("+1h saves a finished session for today that names the topic", post?.body?.topic_id === "a" && post.body.hours === 1 && post.body.done === true && post.body.week_start === "2026-10-05" && post.body.weekday === 1 && post.body.activity === "1.1 Topic 1.1", JSON.stringify(post?.body));
-  check("the Spent box shows the new total at once", (await page.getByLabel("Actual hours for topic 1.1").inputValue()) === "2.25", await page.getByLabel("Actual hours for topic 1.1").inputValue());
-  await ctx.close();
-}
-
-// ---------- +1h that fails: the numbers go back to what was saved ----------
-{
-  const ctx = await newPhone(browser, 390);
-  await apiMock(ctx, { "/courses/c1": detail });
-  await ctx.route(/\/api\/learning\/blocks$/, (route) => route.fulfill({ status: 500, json: { error: { message: "The database is down" } } }));
-  const page = await ctx.newPage();
-  await page.goto(`${BASE}/learning/c1`);
-  await page.getByText("Topic 1.1").first().waitFor();
-  await page.getByRole("button", { name: "Add 1h to topic 1.1" }).click();
-  await page.waitForTimeout(800);
-  check("a failed +1h shows the saved hours again", (await page.getByLabel("Actual hours for topic 1.1").inputValue()) === "1.25", await page.getByLabel("Actual hours for topic 1.1").inputValue());
-  await ctx.close();
-}
-
-// ---------- Two taps that both fail, and a typed total that the database raises ----------
-{
-  const ctx = await newPhone(browser, 390);
-  let kept = 1.25; // the stand-in database keeps what it was given, but never less than the sessions (3h)
-  const served = () => ({ ...detail, units: [{ ...detail.units[0], topics: detail.units[0].topics.map((t) => (t.id === "a" ? { ...t, actual_hours: kept } : t)) }] });
-  await apiMock(ctx, { "/courses/c1": () => served() });
-  await ctx.route(/\/api\/learning\/blocks$/, async (route) => {
-    await new Promise((r) => setTimeout(r, 150));
-    return route.fulfill({ status: 500, json: { error: { message: "The database is down" } } });
-  });
-  // Spent cannot be lower than the sessions: typing 1 is kept as 3.
-  await ctx.route(/\/api\/topics\/a$/, (route) => {
-    if (route.request().method() === "GET") return route.fallback();
-    kept = 3;
-    return route.fulfill({ json: { ...detail.units[0].topics[0], actual_hours: 3 } });
-  });
-  const page = await ctx.newPage();
-  await page.goto(`${BASE}/learning/c1`);
-  await page.getByText("Topic 1.1").first().waitFor();
-  const box = page.getByLabel("Actual hours for topic 1.1");
-  await page.getByRole("button", { name: "Add 30m to topic 1.1" }).click();
-  await page.getByRole("button", { name: "Add 30m to topic 1.1" }).click();
-  await page.waitForTimeout(1500);
-  check("two taps that both fail leave the saved hours, not a phantom hour", (await box.inputValue()) === "1.25", await box.inputValue());
-  await box.fill("1");
-  await box.blur();
-  await page.waitForTimeout(1500);
-  check("a typed total that the database raises is shown as saved", (await box.inputValue()) === "3", await box.inputValue());
-  await ctx.close();
-}
-
-// ---------- Typing a total below the logged sessions: nothing jumps, focus stays ----------
-{
-  const ctx = await newPhone(browser, 390);
-  await apiMock(ctx, { "/courses/c1": detail });
-  await ctx.route(/\/api\/topics\/a$/, (route) => route.fulfill({ json: { ...detail.units[0].topics[0], actual_hours: 6 } }));
-  const page = await ctx.newPage();
-  await page.goto(`${BASE}/learning/c1`);
-  await page.getByText("Topic 1.1").first().waitFor();
-  const box = page.getByLabel("Actual hours for topic 1.1");
-  await box.click();
-  await box.fill("1");
-  await page.waitForTimeout(1500); // saved: the database keeps 6
-  check("the box keeps what is being typed while it is in use", (await box.inputValue()) === "1", await box.inputValue());
-  await page.keyboard.type("2");
-  check("and keeps the focus, so the next digit lands in it", (await box.inputValue()) === "12" && (await page.evaluate(() => document.activeElement?.getAttribute("aria-label"))) === "Actual hours for topic 1.1");
-  await box.blur();
-  await page.waitForTimeout(300);
-  check("leaving it shows the saved value (the 12 was typed against the same saved 6)", (await box.inputValue()) === "6" || (await box.inputValue()) === "12", await box.inputValue());
+  check("course page: no zoom-out or overflow", !m.zoomedOut && m.mainClipped === 0 && m.offenders.length === 0, JSON.stringify(m));
+  check("course page: no +30m / +1h buttons, no Spent box and no planned hours on a topic", (await page.getByRole("button", { name: /Add .* to topic/ }).count()) === 0 && (await page.getByLabel("Actual hours for topic 1.1").count()) === 0 && (await page.getByText(/^[\d.]+h planned$/).count()) === 0);
+  check("course page: the status of a topic is still there", (await page.getByLabel("Status of topic 1.1").count()) === 1);
   await ctx.close();
 }
 
@@ -249,60 +169,6 @@ for (const width of [390, 320]) {
   await page.getByRole("dialog").getByRole("button", { name: "Add block" }).click();
   await page.waitForTimeout(600);
   check("Log time on Study next goes into today's week", calls[0]?.week_start === "2026-10-05" && calls[0].weekday === 1 && calls[0].done === true, JSON.stringify(calls[0]));
-  await ctx.close();
-}
-
-// ---------- A half-typed number is not saved as 0; a typed total goes first, and a failed tap restores the status ----------
-{
-  const ctx = await newPhone(browser, 390);
-  const calls = [];
-  await apiMock(ctx, { "/courses/c1": detail });
-  await ctx.route(/\/api\/topics\/[^/]+$/, (route) => {
-    const req = route.request();
-    if (req.method() === "GET") return route.fallback();
-    calls.push({ kind: "topic", method: req.method(), body: req.postDataJSON() });
-    return route.fulfill({ json: { ...detail.units[0].topics[0], ...req.postDataJSON() } });
-  });
-  await ctx.route(/\/api\/learning\/blocks$/, (route) => {
-    calls.push({ kind: "block", method: route.request().method(), body: route.request().postDataJSON() });
-    return route.fulfill({ json: { ok: true } });
-  });
-  const page = await ctx.newPage();
-  await page.goto(`${BASE}/learning/c1`);
-  await page.getByText("Topic 1.1").first().waitFor();
-  const box = page.getByLabel("Actual hours for topic 1.1");
-  await box.click();
-  await box.press("Control+a");
-  await box.pressSequentially("1e");
-  await page.waitForTimeout(1000);
-  await box.blur();
-  await page.waitForTimeout(500);
-  check("a half-typed number ('1e') is not saved as 0", !calls.some((c) => c.kind === "topic" && c.body.actual_hours === 0), JSON.stringify(calls));
-  check("and leaving the box shows the saved hours again", (await box.inputValue()) === "1.25", await box.inputValue());
-
-  calls.length = 0;
-  await box.click();
-  await box.press("Control+a");
-  await box.pressSequentially("3");
-  await page.getByRole("button", { name: "Add 30m to topic 1.1" }).click(); // within the 0.7 s wait
-  await page.waitForTimeout(1200);
-  const order = calls.map((c) => `${c.kind}:${c.body.actual_hours ?? c.body.hours}`).join(" ");
-  check("a typed total that is still waiting is saved before the +30m session", order === "topic:3 block:0.5", order);
-  await ctx.close();
-}
-
-{
-  const ctx = await newPhone(browser, 390);
-  const fresh = { ...detail, units: [{ ...detail.units[0], topics: [{ ...detail.units[0].topics[0], status: "not-started", actual_hours: 0 }] }] };
-  await apiMock(ctx, { "/courses/c1": fresh });
-  await ctx.route(/\/api\/learning\/blocks$/, (route) => route.abort());
-  const page = await ctx.newPage();
-  await page.goto(`${BASE}/learning/c1`);
-  await page.getByText("Topic 1.1").first().waitFor();
-  await page.getByRole("button", { name: "Add 30m to topic 1.1" }).click();
-  await page.waitForTimeout(1200);
-  const status = await page.getByLabel("Status of topic 1.1").first().inputValue();
-  check("a +30m that fails (no connection) puts the status back to Not Started", status === "not-started", status);
   await ctx.close();
 }
 

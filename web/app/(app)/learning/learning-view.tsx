@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
-import { GraduationCap, ListChecks, Plus, Sparkles, Trash2 } from "lucide-react";
+import { GraduationCap, Plus, Sparkles, Trash2 } from "lucide-react";
 import { api, errorMessage, refresh } from "@/lib/api";
 import { addDays, formatDate, mondayOf, weekdayIndex } from "@/lib/dates";
 import { COURSE_TEMPLATES, templateWeeks } from "@/lib/course-templates";
@@ -126,14 +126,6 @@ export function LearningView() {
         }
         actions={
           <>
-            <button type="button" className="btn btn-secondary" onClick={() => setNewCourse("ideas")} title="Start from a ready-made course (Digital Marketing, SQL …)">
-              <Sparkles className="size-4" />
-              Ideas
-            </button>
-            <button type="button" className="btn btn-secondary" onClick={() => setNewCourse("list")} title="Paste the units and topics of a course">
-              <ListChecks className="size-4" />
-              Paste a list
-            </button>
             <button type="button" className="btn btn-primary" onClick={() => setNewCourse("blank")} aria-label="Add a course">
               <Plus className="size-4" />
               Add

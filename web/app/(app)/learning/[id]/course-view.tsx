@@ -9,10 +9,9 @@ import { CalendarCheck, CalendarDays, ChevronLeft, ClipboardPaste, Clock, Gradua
 import { api, ApiError, errorMessage, refresh } from "@/lib/api";
 import { cacheMutate } from "@/lib/cache";
 import { colorOf } from "@/lib/colors";
-import { COURSE_STATUSES, courseStats, doneHours, nextNumber, timeLeft } from "@/lib/course";
-import { addDays, formatDate, mondayOf, weekdayIndex } from "@/lib/dates";
-import { hm, num, pct, plural } from "@/lib/format";
-import { sessionLabel } from "@/lib/study";
+import { COURSE_STATUSES, courseStats, nextNumber, timeLeft } from "@/lib/course";
+import { addDays, formatDate } from "@/lib/dates";
+import { num, pct, plural } from "@/lib/format";
 import type { CourseDetail, CourseStatus, Topic, TopicStatus, Unit } from "@/lib/types";
 import { useProfile } from "@/lib/profile";
 import { useMedia } from "@/lib/use-media";
@@ -184,40 +183,6 @@ export function CourseView({ id }: { id: string }) {
     saveLater("plan", () => {
       api(`/courses/${course.id}`, { method: "PATCH", body: { weekly_plan: plan } }).catch(failed);
     });
-  };
-
-  /**
-   * "+30m" / "+1h" on a topic adds a finished study session for today that names the topic: one record, so the Learning
-   * page, the week's hours and the topic's Spent hours all agree (the database adds the hours to the topic).
-   */
-  const logTime = async (topic: Topic, hours: number) => {
-    // A number typed in the Spent box and still waiting to be saved goes first, so the session is added on top of it.
-    await saveLater.flush(`topic-${topic.id}`);
-    mutate(
-      (current) =>
-        current && {
-          ...current,
-          units: current.units.map((u) =>
-            u.id !== topic.unit_id
-              ? u
-              : { ...u, topics: u.topics.map((t) => (t.id === topic.id ? { ...t, actual_hours: Number(t.actual_hours) + hours, status: t.status === "not-started" ? "in-progress" : t.status } : t)) },
-          ),
-        },
-      { revalidate: false },
-    );
-    try {
-      await api("/learning/blocks", { method: "POST", body: { week_start: mondayOf(today), weekday: weekdayIndex(today), hours, activity: sessionLabel(topic), topic_id: topic.id, done: true } });
-      toast(`${hm(hours)} added to ${topic.code}`);
-      await refresh("/learning", "/courses");
-    } catch (e) {
-      // Take this tap's hours off again (other taps that are still on their way keep theirs).
-      await failed(e, () =>
-        mutate(
-          (current) => current && { ...current, units: current.units.map((u) => (u.id !== topic.unit_id ? u : { ...u, topics: u.topics.map((t) => (t.id === topic.id ? (() => { const left = Math.max(0, Number(t.actual_hours) - hours); return { ...t, actual_hours: left, status: topic.status === "not-started" && t.status === "in-progress" && left === 0 ? "not-started" : t.status }; })() : t)) })) },
-          { revalidate: false },
-        ),
-      );
-    }
   };
 
   /** A task for each topic still to study in this week's plan (due at the end of the week); pressing it twice adds nothing twice. */
@@ -474,29 +439,7 @@ export function CourseView({ id }: { id: string }) {
                             <option key={st.value} value={st.value}>{st.label}</option>
                           ))}
                         </select>
-                        <span>{num(Number(topic.est_hours))}h planned</span>
                         {topic.planned_week ? <span className={topic.planned_week === stats.thisWeek ? "font-semibold text-blue-700" : ""}>W{topic.planned_week}</span> : null}
-                        <label className="flex items-center gap-1.5">
-                          <span>Spent</span>
-                          <HoursBox
-                            key={`${topic.id}-${syncKey}`}
-                            value={Number(topic.actual_hours)}
-                            max={1000}
-                            className="cell-input w-16"
-                            label={`Actual hours for topic ${topic.code}`}
-                            onValue={(hours) => changeTopic(topic, { actual_hours: hours }, true)}
-                          />
-                          <span>h</span>
-                        </label>
-                        {topic.status !== "done" && (
-                          <span className="flex gap-1.5">
-                            {[0.5, 1].map((h) => (
-                              <button key={h} type="button" className="btn btn-secondary btn-sm h-8 px-2.5 text-xs" onClick={() => logTime(topic, h)} aria-label={`Add ${hm(h)} to topic ${topic.code}`}>
-                                +{hm(h)}
-                              </button>
-                            ))}
-                          </span>
-                        )}
                       </div>
                     </li>
                   ))}
@@ -510,24 +453,21 @@ export function CourseView({ id }: { id: string }) {
             ))}
             <p className="flex flex-wrap justify-between gap-x-4 gap-y-1 bg-[#e8f1fc] px-4 py-3 text-sm font-bold text-slate-900">
               <span>Total</span>
-              <span>{num(stats.total)}h planned · {num(stats.spent)}h spent · {num(stats.left)}h left</span>
+              <span>{plural(units.reduce((n, u) => n + u.topics.filter((t) => t.status === "done").length, 0), "topic")} done of {units.reduce((n, u) => n + u.topics.length, 0)}</span>
             </p>
           </div>
         ) : null}
         {units.length && wide ? (
           <div className="relative overflow-x-auto">
-            <table className="w-full min-w-[1220px] border-collapse text-sm">
+            <table className="w-full min-w-[1000px] border-collapse text-sm">
               <thead className="bg-[#e8f1fc] text-xs font-semibold text-slate-700">
                 <tr>
                   <th className="w-28 px-4 py-3 text-center">Unit</th>
                   <th className="w-12 px-2 py-3"></th>
                   <th className="px-3 py-3 text-left">Topic / Learning Outcome</th>
                   <th className="px-3 py-3 text-left">What I Will Learn</th>
-                  <th className="w-20 px-2 py-3 text-center">Estimated<br />Time (Hours)</th>
                   <th className="w-16 px-2 py-3 text-center">Week<br />Plan</th>
                   <th className="w-36 px-2 py-3 text-center">Status</th>
-                  <th className="w-24 px-2 py-3 text-center">Actual Time<br />Spent (Hours)</th>
-                  <th className="w-24 px-2 py-3 text-center">Remaining<br />Time (Hours)</th>
                   <th className="px-3 py-3 text-left">Notes / Resources</th>
                   <th className="w-12 px-2 py-3"><span className="sr-only">Edit</span></th>
                 </tr>
@@ -550,7 +490,6 @@ export function CourseView({ id }: { id: string }) {
                         <td className="px-2 py-2 text-center text-slate-500">{topic.code}</td>
                         <td className="px-3 py-2 text-slate-800">{topic.title}</td>
                         <td className="px-3 py-2 text-slate-600">{topic.outcome}</td>
-                        <td className="px-2 py-2 text-center">{num(Number(topic.est_hours))}</td>
                         <td className={`px-2 py-2 text-center ${topic.planned_week === stats.thisWeek ? "font-semibold text-blue-700" : "text-slate-600"}`}>
                           {topic.planned_week ? `W${topic.planned_week}` : "–"}
                         </td>
@@ -567,17 +506,6 @@ export function CourseView({ id }: { id: string }) {
                             ))}
                           </select>
                         </td>
-                        <td className="px-2 py-2 text-center">
-                          <HoursBox
-                            key={`${topic.id}-${syncKey}`}
-                            value={Number(topic.actual_hours)}
-                            max={1000}
-                            className="cell-input"
-                            label={`Actual hours for topic ${topic.code}`}
-                            onValue={(hours) => changeTopic(topic, { actual_hours: hours }, true)}
-                          />
-                        </td>
-                        <td className="px-2 py-2 text-center font-medium text-slate-700">{num(Number(topic.est_hours) - doneHours(topic))}</td>
                         <td className="max-w-56 truncate px-3 py-2 text-slate-600" title={topic.notes}>{topic.notes}</td>
                         <td className="px-2 py-2 text-center">
                           <button
@@ -593,7 +521,7 @@ export function CourseView({ id }: { id: string }) {
                     ))}
                     <tr className="border-t border-slate-100">
                       {unit.topics.length === 0 && unitCell}
-                      <td colSpan={10} className="px-2 py-1.5">
+                      <td colSpan={7} className="px-2 py-1.5">
                         <button type="button" className="btn btn-ghost btn-sm text-slate-500" onClick={() => setTopicModal({ unitId: unit.id })}>
                           <Plus className="size-4" /> Add topic to {unitName(unit)}
                         </button>
@@ -606,11 +534,8 @@ export function CourseView({ id }: { id: string }) {
                 <tr>
                   <th className="px-4 py-3 text-center text-base">Total</th>
                   <td colSpan={3}></td>
-                  <td className="px-2 py-3 text-center">{num(stats.total)}</td>
                   <td className="px-2 py-3 text-center">–</td>
                   <td className="px-2 py-3 text-center">–</td>
-                  <td className="px-2 py-3 text-center">{num(stats.spent)}</td>
-                  <td className="px-2 py-3 text-center">{num(stats.left)}</td>
                   <td colSpan={2}></td>
                 </tr>
               </tfoot>
