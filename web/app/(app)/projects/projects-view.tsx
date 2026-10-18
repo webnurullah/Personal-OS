@@ -41,7 +41,7 @@ export function ProjectsView() {
 
   return (
     <>
-      <PageHeader title="Projects" description="Everything you are working on: websites, social media, personal branding and more.">
+      <PageHeader title="Projects">
         <button type="button" className="btn btn-primary" onClick={() => setAdding(true)}>
           <Plus className="size-4" />
           New Project

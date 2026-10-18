@@ -90,7 +90,7 @@ export function LearningView() {
   const visibleCourses = inStatus.filter((c) => category === "all" || (category === "none" ? !(c.category ?? "").trim() : categoryKey(c.category) === category));
   return (
     <>
-      <PageHeader title="Learning" description="Plan your study week and watch the hours add up.">
+      <PageHeader title="Learning">
       </PageHeader>
       <LearningToolbar
         current="courses"
@@ -145,14 +145,14 @@ export function LearningView() {
                     </span>
                     <span className="mt-3 flex flex-wrap items-center gap-1.5">
                       <span className={`badge ${tone}`}>{courseTimeBadge(course.days_left)}</span>
+                      <span className="min-w-0 max-w-full truncate text-sm text-slate-600">
+                        {course.forecast && course.state !== "done" ? forecastText(course.forecast) : `Due ${formatDate(course.target_date, "date")}`}
+                      </span>
                       {course.state === "behind" && (
                         <span className="badge max-w-full bg-amber-50 text-amber-700">
                           <span className="truncate">Behind: {hm(course.behind_hours)} to catch up{course.weeks_behind > 0 ? ` (${plural(course.weeks_behind, "week")} late)` : ""}</span>
                         </span>
                       )}
-                    </span>
-                    <span className="mt-3 block truncate text-sm text-slate-600">
-                      {course.forecast && course.state !== "done" ? forecastText(course.forecast) : `Due ${formatDate(course.target_date, "date")}`}
                     </span>
                     <span className="mt-4 block">
                       <span className="flex items-center gap-3">

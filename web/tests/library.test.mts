@@ -139,6 +139,8 @@ test("the numbers at the top of the library", () => {
   assert.deepEqual([stats.todo, stats.learning, stats.completed, stats.dropped, stats.certificates], [1, 1, 2, 1, 1]);
   assert.equal(stats.hours, 13); // 6 + 2 finished, half of the 10 started
   assert.equal(stats.spent, 1700.5); // dropped items are not counted
+  // Time counted by an item's timer replaces its estimate.
+  assert.equal(libraryStats([item({ id: "t", status: "learning", est_hours: 10, time_seconds: 7200 }), item({ id: "u", status: "completed", est_hours: 3 })]).hours, 5);
   assert.equal(stats.tooManyStarted, false);
   assert.equal(libraryStats(Array.from({ length: 4 }, (_, i) => item({ id: String(i), status: "learning" }))).tooManyStarted, true);
   assert.deepEqual(libraryStats([]), { todo: 0, learning: 0, completed: 0, dropped: 0, certificates: 0, hours: 0, spent: 0, tooManyStarted: false });

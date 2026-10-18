@@ -10,13 +10,13 @@ import { api, errorMessage, refresh } from "@/lib/api";
 import { formatDate, daysBetween } from "@/lib/dates";
 import { num } from "@/lib/format";
 import { isHttpUrl } from "@/lib/projects";
-import { applyChange, certificateExpiry, expiryLabel, hasCertificate, kindLabel, progressOf, resumeLine, statusLabel, stepWord, type ResourceChange } from "@/lib/library";
+import { applyChange, type TimedResource, certificateExpiry, expiryLabel, hasCertificate, kindLabel, progressOf, resumeLine, statusLabel, stepWord, type ResourceChange } from "@/lib/library";
 import type { LearningResource, Project, ResourceKind } from "@/lib/types";
 import { ResourceClock, startResourceTimer, useResourceTimer } from "@/components/projects/resource-timer";
 import { Progress } from "@/components/ui/charts";
 import { useFeedback } from "@/components/ui/feedback";
 
-export type Resources = { today: string; items: LearningResource[] };
+export type Resources = { today: string; items: TimedResource[] };
 
 /** Everything in the library (one saved list, shared by the library page, the course page and the dashboard). */
 export const useResources = () => useSWR<Resources>("/resources");

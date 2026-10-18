@@ -63,7 +63,7 @@ for (const width of [390, 320, 1280]) {
   check(`${width}px: no Total Learning Time / Time Completed / Time Remaining tiles`, (await page.getByText("Total Learning Time").count()) === 0 && (await page.getByText("Time Completed").count()) === 0 && (await page.getByText("Time Remaining").count()) === 0);
   const week = await page.locator("section[aria-labelledby='week-title']").boundingBox();
   const box = await timer.locator("xpath=ancestor::section").boundingBox();
-  const target = await page.getByText("Target Date", { exact: true }).locator("xpath=ancestor::div[contains(@class,'rounded-2xl')]").boundingBox();
+  const target = await page.getByText("Target Date", { exact: true }).locator("xpath=ancestor::div[contains(@class,'card')][1]").boundingBox();
   check(`${width}px: This Week's Plan, Time spent and Target Date are three boxes in one block`, !!week && !!box && !!target && (wide ? Math.abs(week.y - box.y) < 8 && week.x < box.x && box.x < target.x : week.y < box.y && box.y < target.y), JSON.stringify({ week, box, target }));
   check(`${width}px: the Estimated hours field is gone from the topic form`, await (async () => { await page.getByLabel("Edit topic 1.1").click(); const gone = (await page.locator("#topic-est").count()) === 0 && (await page.locator("#topic-from").count()) === 1 && (await page.locator("#topic-week").count()) === 0; await page.keyboard.press("Escape"); return gone; })());
   let m = await measure(page, width);

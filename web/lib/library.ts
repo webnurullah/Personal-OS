@@ -185,18 +185,25 @@ export function expiryLabel(r: Pick<LearningResource, "expires_on">, today: stri
 // ---------- The whole library ----------
 
 /** The numbers at the top of the page. `hours` counts completed items fully and started ones by how much is watched. */
-export function libraryStats(list: LearningResource[]) {
+/** A library item as the list sends it: with the seconds counted by its timer (finished sessions and the running one). */
+export type TimedResource = LearningResource & { time_seconds?: number };
+
+export function libraryStats(list: TimedResource[]) {
   const by = (status: ResourceStatus) => list.filter((r) => r.status === status);
   const completed = by("completed");
   const learning = by("learning");
-  const hours = completed.reduce((sum, r) => sum + Number(r.est_hours), 0) + learning.reduce((sum, r) => sum + (Number(r.est_hours) * progressOf(r)) / 100, 0);
+  // An item with time counted by its timer counts that time; the others count their estimate (completed: all of it, learning: its share done).
+  const counted = (r: TimedResource) => (r.time_seconds ?? 0) / 3600;
+  const hours = list.filter((r) => counted(r) > 0).reduce((sum, r) => sum + counted(r), 0)
+    + completed.filter((r) => counted(r) === 0).reduce((sum, r) => sum + Number(r.est_hours), 0)
+    + learning.filter((r) => counted(r) === 0).reduce((sum, r) => sum + (Number(r.est_hours) * progressOf(r)) / 100, 0);
   return {
     todo: by("todo").length,
     learning: learning.length,
     completed: completed.length,
     dropped: by("dropped").length,
     certificates: completed.filter(hasCertificate).length,
-    hours: Math.round(hours * 100) / 100,
+    hours: Math.round(hours * 10000) / 10000,
     spent: Math.round(list.filter((r) => r.status !== "dropped").reduce((sum, r) => sum + Number(r.cost), 0) * 100) / 100,
     /** True when more than WIP_LIMIT are in progress at once. */
     tooManyStarted: learning.length > WIP_LIMIT,

@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import useSWR from "swr";
 import { Award, Check, Copy, ExternalLink, GraduationCap, ListChecks, Plus, Search, Sparkles } from "lucide-react";
 import { formatDate } from "@/lib/dates";
-import { hm } from "@/lib/format";
+import { spent } from "@/lib/project-time";
 import { certificateExpiry, compareUpNext, expiryLabel, hasCertificate, kindLabel, KINDS, LEVELS, libraryStats, needsPractice, resumeLine, skillLadder, WIP_LIMIT } from "@/lib/library";
 import { skillKey } from "@/lib/jobs";
 import { isHttpUrl } from "@/lib/projects";
@@ -82,7 +82,7 @@ export function LibraryView() {
 
   return (
     <>
-      <PageHeader title="Learning" description="Collect the courses and playlists you want to finish, and keep your certificates in one place." />
+      <PageHeader title="Learning" />
       <LearningToolbar
         current="library"
         filter={
@@ -135,7 +135,7 @@ export function LibraryView() {
             <Stat label="Learning now" value={stats.learning} tone={stats.tooManyStarted ? "text-amber-600" : "text-blue-600"} />
             <Stat label="Completed" value={stats.completed} tone="text-emerald-600" />
             <Stat label="Certificates" value={stats.certificates} tone="text-amber-600" />
-            <Stat label="Hours learned" value={hm(stats.hours)} tone="text-violet-600" />
+            <Stat label="Hours learned" value={spent(Math.round(stats.hours * 3600))} tone="text-violet-600" />
             <Stat label="Spent" value={stats.spent ? money(stats.spent) : "Free"} tone="text-slate-700" />
           </div>
 

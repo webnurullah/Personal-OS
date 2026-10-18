@@ -5,13 +5,13 @@ import type { LucideIcon } from "lucide-react";
 import { CircleAlert, RefreshCw } from "lucide-react";
 import { errorMessage } from "@/lib/api";
 
-/** Page title, one-line description and an optional button on the right. */
-export function PageHeader({ title, description, children }: { title: string; description: string; children?: ReactNode }) {
+/** Page title, an optional one-line description and an optional button on the right. */
+export function PageHeader({ title, description, children }: { title: string; description?: string; children?: ReactNode }) {
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-slate-900">{title}</h1>
-        <p className="mt-1 text-slate-500">{description}</p>
+        {description && <p className="mt-1 text-slate-500">{description}</p>}
       </div>
       {children && <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">{children}</div>}
     </div>

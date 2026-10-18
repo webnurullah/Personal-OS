@@ -261,7 +261,7 @@ export function CourseView({ id }: { id: string }) {
             )}
           </section>
           <ProjectTimer kind="course" projectId={course.id} />
-          <div className="rounded-2xl bg-violet-50 p-3 text-center ring-1 ring-violet-100 sm:p-4">
+          <div className="card p-5 text-center">
             <p className="flex items-center justify-center gap-2 text-[13px] font-semibold leading-tight text-slate-700">
               <CalendarCheck className="size-5 shrink-0 text-violet-600" />
               Target Date
