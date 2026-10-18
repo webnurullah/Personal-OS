@@ -30,8 +30,6 @@ export function ProjectsView() {
   if (!data) return <PageSkeleton />;
 
   const projects = data.items;
-  const active = projects.filter((p) => p.status === "active");
-  const dueSoon = active.filter((p) => p.timeframe.days !== null && p.timeframe.days >= 0 && p.timeframe.days <= 7).length;
   const visible = projects.filter((p) => p.status === status && (kind === "all" || p.kind === kind)).sort(compareProjects);
 
   const archiveIt = async (project: Project) => {
@@ -61,13 +59,6 @@ export function ProjectsView() {
         </div>
       ) : (
         <>
-          <div className="mt-6 grid grid-cols-2 gap-3 xl:grid-cols-4">
-            <Stat label="Active" value={active.length} tone="text-slate-800" />
-            <Stat label="Ongoing" value={active.filter((p) => !p.due_date).length} tone="text-sky-600" />
-            <Stat label="Due in 7 days" value={dueSoon} tone={dueSoon ? "text-amber-600" : "text-slate-400"} />
-            <Stat label="Overdue" value={active.filter((p) => p.timeframe.tone === "late").length} tone={active.some((p) => p.timeframe.tone === "late") ? "text-rose-600" : "text-slate-400"} />
-          </div>
-
           <div className="mt-6 flex flex-wrap items-center gap-3">
             <Segmented label="Type" value={kind} onChange={setKind} options={[{ value: "all" as const, label: "All" }, ...PROJECT_KINDS.map((k) => ({ value: k.value, label: k.label }))]} />
             <Segmented label="Status" value={status} onChange={setStatus} options={PROJECT_STATUSES.map((s) => ({ value: s.value, label: `${s.label} (${projects.filter((p) => p.status === s.value).length})` }))} />
@@ -131,14 +122,5 @@ export function ProjectsView() {
         {adding && <ProjectForm project={null} onClose={() => setAdding(false)} onSaved={(saved) => router.push(`/projects/${saved.id}`)} />}
       </Modal>
     </>
-  );
-}
-
-function Stat({ label, value, tone }: { label: string; value: number; tone: string }) {
-  return (
-    <div className="card px-4 py-3">
-      <p className="text-xs font-medium text-slate-500">{label}</p>
-      <p className={`mt-0.5 text-2xl font-bold ${tone}`}>{value}</p>
-    </div>
   );
 }
