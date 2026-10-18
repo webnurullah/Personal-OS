@@ -82,7 +82,7 @@ export function ArchiveView() {
 
   return (
     <>
-      <PageHeader title="Archive" description="Everything you delete waits here. Restore it to bring it back, or delete it from here to remove it for good." />
+      <PageHeader title="Archive" description="Nothing is lost. Restore what you need, or delete what you do not for good." />
 
       {items.length === 0 ? (
         <div className="card mt-6">

@@ -99,7 +99,7 @@ export function TasksView() {
 
   return (
     <>
-      <PageHeader title="Tasks" description="Plan it, do it, tick it off.">
+      <PageHeader title="Tasks" description="Turn what is on your mind into done. One clear next step at a time.">
         <button type="button" className="btn btn-primary" onClick={() => setEditing("new")}>
           <Plus className="size-4" />
           New Task

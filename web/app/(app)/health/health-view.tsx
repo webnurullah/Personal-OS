@@ -115,7 +115,7 @@ export function HealthView() {
 
   return (
     <>
-      <PageHeader title="Health" description="Small healthy choices, every day.">
+      <PageHeader title="Health" description="Small healthy choices, every day, build a body and mind that last.">
         <button type="button" className="btn btn-primary" onClick={() => setLogging(true)}>
           <HeartPulse className="size-4" />
           Log Today

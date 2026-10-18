@@ -53,7 +53,7 @@ export function CompaniesView() {
 
   return (
     <>
-      <PageHeader title="Company list" description="The companies you follow: where to find them on the web, Facebook and LinkedIn.">
+      <PageHeader title="Company list" description="Know the companies you want to work for, and keep their doors within reach.">
         <button type="button" className="btn btn-primary" onClick={() => setEditing("new")}>
           <Plus className="size-4" />
           Add Company

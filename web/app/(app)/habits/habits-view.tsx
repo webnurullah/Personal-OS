@@ -42,7 +42,7 @@ export function HabitsView() {
 
   return (
     <>
-      <PageHeader title="Habits" description="Small daily wins add up to a big life.">
+      <PageHeader title="Habits" description="Small daily wins add up to a big life. Show up today.">
         <button type="button" className="btn btn-primary" onClick={() => setEditing("new")}>
           <Plus className="size-4" />
           New Habit

@@ -36,7 +36,7 @@ export function GoalsView() {
 
   return (
     <>
-      <PageHeader title="Goals" description="Dream big, start small, keep going.">
+      <PageHeader title="Goals" description="Dream big, start small, keep going. Every milestone moves you closer.">
         <button type="button" className="btn btn-primary" onClick={() => setEditing("new")}>
           <Plus className="size-4" />
           New Goal

@@ -81,7 +81,7 @@ export function FinanceView() {
 
   return (
     <>
-      <PageHeader title="Finance" description="Know where every taka goes.">
+      <PageHeader title="Finance" description="Know where every taka goes, and make your money work for your goals.">
         <select className="select select-lg w-auto" value={data.month} onChange={(e) => setMonth(e.target.value)} aria-label="Month">
           {months.map((m) => (
             <option key={m} value={m}>

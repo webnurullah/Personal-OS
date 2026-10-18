@@ -176,7 +176,7 @@ export function JobsView() {
 
   return (
     <>
-      <PageHeader title="Job Apply" description="Save job links, track the last date to apply, and see which skills to learn.">
+      <PageHeader title="Job Apply" description="Your next opportunity starts with one application. Save the links, watch the deadlines, learn the skills.">
         {jobs.length > 0 && (
           <button type="button" className="btn btn-secondary" onClick={() => downloadCsv(jobs, mySkills, today)}>
             <Download className="size-4" />

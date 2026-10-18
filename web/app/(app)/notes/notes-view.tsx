@@ -149,7 +149,7 @@ export function NotesView() {
 
   return (
     <>
-      <PageHeader title="Notes" description="Catch ideas before they fly away.">
+      <PageHeader title="Notes" description="Catch ideas before they fly away, and turn them into something real.">
         <button type="button" className="btn btn-primary" onClick={() => setEditing("new")}>
           <Plus className="size-4" />
           New Note

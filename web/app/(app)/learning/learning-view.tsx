@@ -21,7 +21,7 @@ import { Progress } from "@/components/ui/charts";
 import { Field, Segmented } from "@/components/ui/controls";
 import { useFeedback } from "@/components/ui/feedback";
 import { Modal, ModalActions } from "@/components/ui/modal";
-import { LoadError, PageSkeleton } from "@/components/ui/states";
+import { LoadError, PageHeader, PageSkeleton } from "@/components/ui/states";
 import { LearningToolbar } from "./learning-tabs";
 
 const categoryKey = (category: string | undefined) => (category ?? "").trim().toLowerCase();
@@ -90,7 +90,7 @@ export function LearningView() {
   const visibleCourses = inStatus.filter((c) => category === "all" || (category === "none" ? !(c.category ?? "").trim() : categoryKey(c.category) === category));
   return (
     <>
-      <h1 className="sr-only">Learning</h1>
+      <PageHeader title="Learning" description="Learn a little every day. Finish courses, earn certificates, and watch your skills grow." />
       <LearningToolbar
         current="courses"
         filter={

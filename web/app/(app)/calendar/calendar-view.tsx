@@ -94,7 +94,7 @@ export function CalendarView() {
 
   return (
     <>
-      <PageHeader title="Calendar" description="Your days, at a glance.">
+      <PageHeader title="Calendar" description="Own your days. See what matters and make time for it.">
         <button type="button" className="btn btn-primary" onClick={() => setEditing("new")}>
           <Plus className="size-4" />
           New Event
