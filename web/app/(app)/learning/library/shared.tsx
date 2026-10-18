@@ -4,7 +4,7 @@ import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
-import { Award, BookOpen, Check, Circle, Copy, ExternalLink, Hammer, Link2, ListVideo, Pencil, Play, Plus, RotateCcw, Star, Video, type LucideIcon } from "lucide-react";
+import { Award, BookOpen, Check, Circle, Copy, ExternalLink, Hammer, Link2, ListVideo, Pause, Pencil, Play, Plus, RotateCcw, Star, Video, type LucideIcon } from "lucide-react";
 import { toArchive } from "@/lib/archive";
 import { api, errorMessage, refresh } from "@/lib/api";
 import { formatDate, daysBetween } from "@/lib/dates";
@@ -12,6 +12,7 @@ import { num } from "@/lib/format";
 import { isHttpUrl } from "@/lib/projects";
 import { applyChange, certificateExpiry, expiryLabel, hasCertificate, kindLabel, progressOf, resumeLine, statusLabel, stepWord, type ResourceChange } from "@/lib/library";
 import type { LearningResource, Project, ResourceKind } from "@/lib/types";
+import { ResourceClock, startResourceTimer, useResourceTimer } from "@/components/projects/resource-timer";
 import { Progress } from "@/components/ui/charts";
 import { useFeedback } from "@/components/ui/feedback";
 
@@ -99,7 +100,8 @@ export function useResourceActions() {
     await mutate((current) => current && { ...current, items: current.items.map((x) => (x.id === item.id ? { ...x, ...settled } : x)) }, { revalidate: false });
     try {
       await api(`/resources/${item.id}`, { method: "PATCH", body: changes });
-      await refresh("/resources");
+      // A finished item stops its timer, which changes the time of its course, and can finish the course.
+      await refresh("/resources", ...(changes.status ? ["/learning", "/courses", "/project-time"] : []));
       return true;
     } catch (e) {
       toast(errorMessage(e), "error");
@@ -137,10 +139,14 @@ function Chip({ children, tone = "bg-slate-100 text-slate-600" }: { children: Re
 /** One item in a list: what it is, how far you are, and the next step as a button. */
 export function ResourceRow({ item, today, courseName, onEdit, onComplete }: { item: LearningResource; today: string; courseName?: string; onEdit: () => void; onComplete: () => void }) {
   const { change } = useResourceActions();
+  const { toast } = useFeedback();
   const copy = useCopy();
   const practiceProjects = usePracticeProjects();
   const makePractice = useMakePractice();
   const [busy, setBusy] = useState(false);
+  // A certificate course has a timer once it is started (Start now → Resume / Pause): its time counts on its course too.
+  const certificate = item.kind === "certificate";
+  const timer = useResourceTimer(item.id, certificate && item.status === "learning");
   const practice = item.practice_project_id ? practiceProjects.get(item.practice_project_id) : undefined;
   const style = KIND_STYLE[item.kind] ?? KIND_STYLE.other;
   const Icon = style.icon;
@@ -154,6 +160,19 @@ export function ResourceRow({ item, today, courseName, onEdit, onComplete }: { i
   const run = async (changes: ResourceChange) => {
     setBusy(true);
     await change(item, changes);
+    setBusy(false);
+  };
+
+  // Start now: the item becomes "Learning" and its timer starts.
+  const startNow = async () => {
+    setBusy(true);
+    if (await change(item, { status: "learning" })) {
+      try {
+        await startResourceTimer(item.id);
+      } catch (e) {
+        toast(errorMessage(e), "error");
+      }
+    }
     setBusy(false);
   };
 
@@ -182,7 +201,7 @@ export function ResourceRow({ item, today, courseName, onEdit, onComplete }: { i
           {meta && <p className="mt-0.5 text-xs text-slate-500">{meta}</p>}
 
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            <StatusBadge status={item.status} />
+            {item.status !== "todo" && item.status !== "learning" && <StatusBadge status={item.status} />}
             {courseName && <Chip tone="bg-indigo-50 text-indigo-700">{courseName}</Chip>}
             {item.priority === "high" && item.status !== "completed" && <Chip tone="bg-rose-50 text-rose-700">High priority</Chip>}
             {dueDays !== null && (item.status === "todo" || item.status === "learning") && (
@@ -219,7 +238,36 @@ export function ResourceRow({ item, today, courseName, onEdit, onComplete }: { i
           {item.status === "dropped" && item.dropped_reason && <p className="mt-2 text-sm text-slate-500">Dropped: {item.dropped_reason}</p>}
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            {(item.status === "todo" || item.status === "learning") && (
+            {certificate && item.status === "todo" && (
+              <div className="grid w-full max-w-sm grid-cols-2 gap-1.5 max-sm:-ml-[3.25rem] max-sm:w-[calc(100%+3.25rem)] max-sm:max-w-none" role="group" aria-label={`Progress of ${item.title}`}>
+                <button type="button" className="btn btn-primary btn-sm h-9 w-full min-w-0 justify-center gap-1 !px-0.5" aria-pressed="true">
+                  <Circle className="size-3.5" /> To do
+                </button>
+                <button type="button" className="btn btn-secondary btn-sm h-9 w-full min-w-0 justify-center gap-1 !px-0.5" disabled={busy} onClick={startNow}>
+                  <Play className="size-3.5" /> Start now
+                </button>
+              </div>
+            )}
+            {certificate && item.status === "learning" && (
+              <div className="w-full max-w-sm space-y-2 max-sm:-ml-[3.25rem] max-sm:w-[calc(100%+3.25rem)] max-sm:max-w-none">
+                <ResourceClock timer={timer} />
+                <div className="grid grid-cols-2 gap-1.5" role="group" aria-label={`Progress of ${item.title}`}>
+                  {timer.here ? (
+                    <button type="button" className="btn btn-secondary btn-sm h-9 w-full min-w-0 justify-center gap-1 !px-0.5" disabled={timer.busy} onClick={() => timer.press("pause")}>
+                      <Pause className="size-3.5" /> Pause
+                    </button>
+                  ) : (
+                    <button type="button" className="btn btn-primary btn-sm h-9 w-full min-w-0 justify-center gap-1 !px-0.5" disabled={timer.busy || !timer.loaded} onClick={() => timer.press("start")}>
+                      <Play className="size-3.5" /> Resume
+                    </button>
+                  )}
+                  <button type="button" className="btn btn-secondary btn-sm h-9 w-full min-w-0 justify-center gap-1 !px-0.5" disabled={busy} onClick={onComplete}>
+                    <Check className="size-3.5" /> Complete
+                  </button>
+                </div>
+              </div>
+            )}
+            {!certificate && (item.status === "todo" || item.status === "learning") && (
               // Where this item stands, in one line: the button of the current step is blue; the others are a tap away.
               <div className="grid w-full max-w-sm grid-cols-[repeat(3,minmax(0,1fr))] gap-1.5 max-sm:-ml-[3.25rem] max-sm:w-[calc(100%+3.25rem)] max-sm:max-w-none" role="group" aria-label={`Progress of ${item.title}`}>
                 <button type="button" className={`btn btn-sm h-9 w-full min-w-0 justify-center gap-1 !px-0.5 max-[360px]:!text-[13px] max-[360px]:[&_svg]:hidden ${item.status === "todo" ? "btn-primary" : "btn-secondary"}`} disabled={busy} aria-pressed={item.status === "todo"} onClick={() => item.status !== "todo" && run({ status: "todo" })}>

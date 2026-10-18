@@ -4,8 +4,11 @@ import { addDays } from "./dates.ts";
 /** A session is never longer than this (a timer left running overnight is cut here). The database enforces it too. */
 export const MAX_SESSION_SECONDS = 12 * 3600;
 
-/** What a timer is kept on: a project (table project_time) or a course (table course_time). Both are shown together on the Habits page. */
-export type TimeKind = "project" | "course";
+/**
+ * What a timer is kept on: a project (table project_time), a course (table course_time) or a library item that is not linked to a course
+ * ("resource", also in course_time). A library item linked to a course counts as that course. Projects and courses show together on the Habits page.
+ */
+export type TimeKind = "project" | "course" | "resource";
 
 /** One row of the project_time table (a course_time row is read the same way, with the course id in project_id). */
 export type TimeRow = { project_id: string; started_at: string; ended_at: string | null };

@@ -74,7 +74,10 @@ await page.waitForTimeout(300);
 check("+1 video sends only the new count", calls.some((c) => c.method === "PATCH" && c.path === "/resources/r1" && c.body.items_done === 8 && Object.keys(c.body).length === 1), JSON.stringify(calls.at(-1)));
 
 // ----- complete: Make it count -----
-await page.getByRole("button", { name: "Complete" }).nth(1).click(); // the second open row = Google Ads (rows: r1 learning, r2 todo...)
+// A certificate course is started first (Start now), then it can be completed.
+const ads = page.locator("li.card", { hasText: "Google Ads Search certification" });
+await ads.getByRole("button", { name: "Start now" }).click();
+await ads.getByRole("button", { name: "Complete" }).click();
 await page.getByText("Make it count").first().waitFor();
 const skillsValue = await page.locator("#done-skills").inputValue();
 check("skills of the item are offered", skillsValue === "Google Ads, React", skillsValue);

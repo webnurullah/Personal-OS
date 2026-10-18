@@ -172,7 +172,8 @@ export type Database = {
         Row: {
           id: string;
           user_id: string;
-          course_id: string;
+          course_id: string | null;
+          resource_id: string | null;
           started_at: string;
           ended_at: string | null;
           created_at: string;
@@ -180,7 +181,8 @@ export type Database = {
         Insert: {
           id?: string;
           user_id?: string;
-          course_id: string;
+          course_id?: string | null;
+          resource_id?: string | null;
           started_at?: string;
           ended_at?: string | null;
           created_at?: string;
@@ -188,7 +190,8 @@ export type Database = {
         Update: {
           id?: string;
           user_id?: string;
-          course_id?: string;
+          course_id?: string | null;
+          resource_id?: string | null;
           started_at?: string;
           ended_at?: string | null;
           created_at?: string;

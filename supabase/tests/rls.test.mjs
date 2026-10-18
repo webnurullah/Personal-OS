@@ -515,6 +515,24 @@ check('deleting the practice project keeps the item', (await one('select practic
   await expectError("nobody can add time to someone else's course", () => qb(`insert into course_time (course_id) values ($1)`, [cc]), 'row-level security');
   await expectError('a signed-out visitor cannot read it', () => qanon('select * from course_time'), 'permission denied');
   check('deleting a course deletes its time', (await qa('delete from courses where id = $1 returning id', [cc])).length === 1 && (await qa('select id from course_time where course_id = $1', [cc])).length === 0);
+  // Library item timers (20261025000000_resource_time.sql)
+  const rc = (await one(`insert into courses (title, start_date, target_date) values ('Cert course', '2026-10-05', '2026-12-28') returning id`)).id;
+  const r1 = (await one(`insert into learning_resources (title, course_id) values ('Cert A', $1) returning id`, [rc])).id;
+  const r2 = (await one(`insert into learning_resources (title) values ('Cert B') returning id`)).id;
+  await qa(`update course_time set ended_at = now() where ended_at is null`);
+  await qa(`insert into course_time (course_id, resource_id, ended_at) values ($1, $2, started_at)`, [rc, r1]).catch(() => {});
+  const linked = await one(`insert into course_time (course_id, resource_id) values ($1, $2) returning id`, [rc, r1]);
+  check('a linked item keeps time on its course', (await qa(`select id from course_time where course_id = $1 and resource_id = $2`, [rc, r1])).length >= 1);
+  await expectError('still one timer at a time with items', () => qa(`insert into course_time (resource_id) values ($1)`, [r2]), 'duplicate key');
+  await qa(`update course_time set ended_at = started_at + interval '10 minutes' where id = $1`, [linked.id]);
+  const loose = await one(`insert into course_time (resource_id) values ($1) returning id, course_id`, [r2]);
+  check('an item with no course keeps its time on the item', loose.course_id === null);
+  await qa(`update course_time set ended_at = started_at + interval '5 minutes' where id = $1`, [loose.id]);
+  await expectError('a row needs a course or an item', () => qa(`insert into course_time (started_at) values (now())`), 'needs a course or a library item');
+  await expectError("nobody can time someone else's item", () => qb(`insert into course_time (resource_id) values ($1)`, [r1]), 'not yours');
+  check('deleting an item keeps its time on the course', (await qa('delete from learning_resources where id = $1 returning id', [r1])).length === 1 && (await qa('select id from course_time where id = $1 and resource_id is null', [linked.id])).length === 1);
+  check('deleting an unlinked item deletes its time', (await qa('delete from learning_resources where id = $1 returning id', [r2])).length === 1 && (await qa('select id from course_time where id = $1', [loose.id])).length === 0);
+  await qa('delete from courses where id = $1', [rc]);
 }
 
 // Learning -> a topic planned for a range of dates (20261024000000_topic_plan_dates.sql)

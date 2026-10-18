@@ -2,6 +2,7 @@ import { archiveItem } from "@/lib/server/archive";
 import { handle, ok } from "@/lib/server/api";
 import { applyChange, certificateDatesAfter } from "@/lib/library";
 import { completeCourseIfFinished } from "@/lib/server/course-status";
+import { pauseTimer } from "@/lib/server/project-time";
 import { HttpError, must } from "@/lib/server/http";
 import { resolveSubject } from "@/lib/server/resources-db";
 import { ResourceFields } from "@/lib/server/schemas";
@@ -22,6 +23,8 @@ export const PATCH = handle<{ id: string }>(async ({ db, params, body, today }) 
   Object.assign(row, await resolveSubject(db, row));
 
   const saved = must(await db.from("learning_resources").update(row).eq("id", id).select().single());
+  // Finished, dropped or put back to To do: its timer stops.
+  if (saved.status !== "learning") await pauseTimer(db, "resource", id);
   if (saved.status === "completed" || saved.status === "dropped") await completeCourseIfFinished(db, saved.course_id);
   return saved;
 });
