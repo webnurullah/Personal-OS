@@ -921,7 +921,7 @@ unit("course", "/learning/c0", heading, () => ({ "/courses/c0": courseDetail, "/
   }),
   confirmScene("Delete course question", (p) => p.getByRole("button", { name: "Delete", exact: true }).first()),
   scene("Library: add dialog", async (page, snap) => {
-    await openDialog(page, page.locator("section[aria-labelledby='library-title']").getByRole("button", { name: "Add", exact: true }));
+    await openDialog(page, page.locator("section[aria-labelledby='library-title']").getByRole("button", { name: "Add Certificate", exact: true }));
     await snap("empty form");
   }),
 ]);

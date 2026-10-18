@@ -106,7 +106,7 @@ check("phone: certificates tab fits", !m.zoomedOut && m.mainClipped === 0, JSON.
 await page.getByRole("tab", { name: /To do/ }).click();
 
 // ----- add one with a link -----
-await page.getByRole("button", { name: "Add", exact: true }).click();
+await page.getByRole("button", { name: "Add Certificate", exact: true }).click();
 await page.locator("#res-url").fill("https://www.coursera.org/learn/seo-basics");
 await page.getByRole("button", { name: "Read link" }).click();
 await page.waitForFunction(() => document.querySelector("#res-title")?.value === "SEO Basics");
@@ -120,7 +120,7 @@ const created = calls.find((c) => c.method === "POST" && c.path === "/resources"
 check("saved with title, platform, kind and count", created && created.body.title === "SEO Basics" && created.body.platform === "Coursera" && created.body.items_total === 12 && created.body.kind === "certificate", JSON.stringify(created?.body));
 
 // ----- a site that refuses: manual form still works -----
-await page.getByRole("button", { name: "Add", exact: true }).click();
+await page.getByRole("button", { name: "Add Certificate", exact: true }).click();
 await page.locator("#res-url").fill("https://blocked.example.org/course");
 await page.getByRole("button", { name: "Read link" }).click();
 await page.getByText("refused to share the page").waitFor();
@@ -175,7 +175,7 @@ await ctx.close();
   await pw.goto(`${BASE}/learning/library`);
   await pw.getByText("SEO full course").first().waitFor();
   const at = async (loc) => { const b = await loc.boundingBox(); return { x: Math.round(b.x), y: Math.round(b.y) }; };
-  const parts = [await at(pw.getByRole("navigation", { name: "Learning sections" })), await at(pw.getByRole("tablist", { name: "Show" })), await at(pw.getByRole("button", { name: "Ideas" })), await at(pw.getByRole("button", { name: "Paste a list" })), await at(pw.getByRole("button", { name: "Add", exact: true }))];
+  const parts = [await at(pw.getByRole("navigation", { name: "Learning sections" })), await at(pw.getByRole("tablist", { name: "Show" })), await at(pw.getByRole("button", { name: "Ideas" })), await at(pw.getByRole("button", { name: "Paste a list" })), await at(pw.getByRole("button", { name: "Add Certificate", exact: true }))];
   check("wide: the sections, To do / Completed / Certificates, Ideas, Paste a list and Add are on one line, in that order", Math.max(...parts.map((p) => p.y)) - Math.min(...parts.map((p) => p.y)) <= 6 && parts.every((p, i) => i === 0 || p.x > parts[i - 1].x), JSON.stringify(parts));
   check("wide: the 'Show' buttons are not repeated under the totals", (await pw.getByRole("tablist", { name: "Show" }).count()) === 1);
   check("wide: the search and filters are still there", (await pw.getByLabel("Search the library").count()) === 1 && (await pw.getByLabel("Subject").count()) === 1);

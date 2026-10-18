@@ -117,7 +117,7 @@ export function LearningView() {
           <>
             <button type="button" className="btn btn-primary" onClick={() => setNewCourse("blank")} aria-label="Add a course">
               <Plus className="size-4" />
-              Add
+              Add Course
             </button>
           </>
         }

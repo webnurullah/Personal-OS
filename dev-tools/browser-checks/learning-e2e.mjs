@@ -114,7 +114,7 @@ const browser = await launch();
 
 // ---------- Learning page on a wide screen: My courses is full width, two courses in a row ----------
 {
-  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const ctx = await browser.newContext({ viewport: { width: 1500, height: 900 } });
   const { session } = await import("/home/user/Personal-OS/dev-tools/browser-checks/audit-lib.mjs");
   await ctx.addCookies([{ name: "sb-127-auth-token", value: "base64-" + Buffer.from(JSON.stringify(session)).toString("base64url"), url: BASE }]);
   const c = (id, title, over = {}) => ({ id, title, subtitle: "", category: "", status: "active", start_date: "2026-09-14", target_date: "2026-12-31", color: "blue", est_hours: 4, done_hours: 1, spent_hours: 1, percent: 25, topic_count: 2, unit_count: 2, days_left: 80, state: "on-track", behind_hours: 0, weeks_behind: 0, forecast: null, ...over });

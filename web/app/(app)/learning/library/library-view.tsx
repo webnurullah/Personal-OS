@@ -111,7 +111,7 @@ export function LibraryView() {
             </button>
             <button type="button" className="btn btn-primary" onClick={() => setEditing("new")}>
               <Plus className="size-4" />
-              Add
+              Add Certificate
             </button>
           </>
         }
