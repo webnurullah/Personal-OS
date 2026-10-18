@@ -203,6 +203,9 @@ export type Topic = {
   outcome: string;
   est_hours: number;
   planned_week: number | null;
+  /** The dates this topic is planned for (picked on the topic form); both empty when only a week (or nothing) is planned. */
+  plan_start?: string | null;
+  plan_end?: string | null;
   status: TopicStatus;
   actual_hours: number;
   notes: string;

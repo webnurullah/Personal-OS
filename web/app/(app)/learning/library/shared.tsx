@@ -221,14 +221,14 @@ export function ResourceRow({ item, today, courseName, onEdit, onComplete }: { i
           <div className="mt-3 flex flex-wrap items-center gap-2">
             {(item.status === "todo" || item.status === "learning") && (
               // Where this item stands, in one line: the button of the current step is blue; the others are a tap away.
-              <div className="grid w-full max-w-sm grid-cols-3 gap-2" role="group" aria-label={`Progress of ${item.title}`}>
-                <button type="button" className={`btn btn-sm h-9 w-full justify-center ${item.status === "todo" ? "btn-primary" : "btn-secondary"}`} disabled={busy} aria-pressed={item.status === "todo"} onClick={() => item.status !== "todo" && run({ status: "todo" })}>
+              <div className="grid w-full max-w-sm grid-cols-[repeat(3,minmax(0,1fr))] gap-1.5 max-sm:-ml-[3.25rem] max-sm:w-[calc(100%+3.25rem)] max-sm:max-w-none" role="group" aria-label={`Progress of ${item.title}`}>
+                <button type="button" className={`btn btn-sm h-9 w-full min-w-0 justify-center gap-1 !px-0.5 max-[360px]:!text-[13px] max-[360px]:[&_svg]:hidden ${item.status === "todo" ? "btn-primary" : "btn-secondary"}`} disabled={busy} aria-pressed={item.status === "todo"} onClick={() => item.status !== "todo" && run({ status: "todo" })}>
                   <Circle className="size-3.5" /> To do
                 </button>
-                <button type="button" className={`btn btn-sm h-9 w-full justify-center ${item.status === "learning" ? "btn-primary" : "btn-secondary"}`} disabled={busy} aria-pressed={item.status === "learning"} onClick={() => item.status !== "learning" && run({ status: "learning" })}>
+                <button type="button" className={`btn btn-sm h-9 w-full min-w-0 justify-center gap-1 !px-0.5 max-[360px]:!text-[13px] max-[360px]:[&_svg]:hidden ${item.status === "learning" ? "btn-primary" : "btn-secondary"}`} disabled={busy} aria-pressed={item.status === "learning"} onClick={() => item.status !== "learning" && run({ status: "learning" })}>
                   <Play className="size-3.5" /> Learning
                 </button>
-                <button type="button" className="btn btn-secondary btn-sm h-9 w-full justify-center" disabled={busy} onClick={onComplete}>
+                <button type="button" className="btn btn-secondary btn-sm h-9 w-full min-w-0 justify-center gap-1 !px-0.5 max-[360px]:!text-[13px] max-[360px]:[&_svg]:hidden" disabled={busy} onClick={onComplete}>
                   <Check className="size-3.5" /> Complete
                 </button>
               </div>

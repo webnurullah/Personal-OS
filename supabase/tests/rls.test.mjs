@@ -517,6 +517,33 @@ check('deleting the practice project keeps the item', (await one('select practic
   check('deleting a course deletes its time', (await qa('delete from courses where id = $1 returning id', [cc])).length === 1 && (await qa('select id from course_time where course_id = $1', [cc])).length === 0);
 }
 
+// Learning -> a topic planned for a range of dates (20261024000000_topic_plan_dates.sql)
+{
+  const pc = (await one(`insert into courses (title, start_date, target_date) values ('Planned by dates', '2026-10-05', '2026-12-28') returning id`)).id;
+  const pu = (await one(`insert into course_units (course_id, code, title) values ($1, '1', 'U') returning id`, [pc])).id;
+  const topicRow = (id) => one('select planned_week w, plan_start::text s, plan_end::text e from course_topics where id = $1', [id]);
+  const t1 = (await one(`insert into course_topics (course_id, unit_id, code, title, plan_start, plan_end) values ($1, $2, '1.1', 'A', '2026-10-20', '2026-10-26') returning id`, [pc, pu])).id;
+  check('picking dates sets the planned week to the week the range starts in (Oct 20 is in week 3)', JSON.stringify(await topicRow(t1)) === JSON.stringify({ w: 3, s: '2026-10-20', e: '2026-10-26' }), JSON.stringify(await topicRow(t1)));
+  await qa(`update course_topics set plan_start = '2026-10-05', plan_end = '2026-10-18' where id = $1`, [t1]);
+  check('changing the dates moves the planned week (Oct 5 is week 1)', (await topicRow(t1)).w === 1);
+  await qa(`update course_topics set planned_week = 6 where id = $1`, [t1]);
+  check('a week set on its own clears the dates', JSON.stringify(await topicRow(t1)) === JSON.stringify({ w: 6, s: null, e: null }), JSON.stringify(await topicRow(t1)));
+  await qa(`update course_topics set title = 'Renamed' where id = $1`, [t1]);
+  check('editing something else changes nothing', (await topicRow(t1)).w === 6);
+  await expectError('both dates or none', () => qa(`update course_topics set plan_start = '2026-10-05' where id = $1`, [t1]), 'check constraint');
+  await expectError('the end cannot be before the start', () => qa(`update course_topics set plan_start = '2026-10-10', plan_end = '2026-10-09' where id = $1`, [t1]), 'check constraint');
+  await expectError('a range cannot be longer than two years', () => qa(`update course_topics set plan_start = '2026-10-10', plan_end = '2029-10-09' where id = $1`, [t1]), 'check constraint');
+  await qa(`update course_topics set plan_start = null, plan_end = null, planned_week = null where id = $1`, [t1]);
+  check('the plan can be cleared', JSON.stringify(await topicRow(t1)) === JSON.stringify({ w: null, s: null, e: null }));
+  const early = (await one(`insert into course_topics (course_id, unit_id, code, title, plan_start, plan_end) values ($1, $2, '1.2', 'Before the start', '2026-09-01', '2026-09-03') returning id`, [pc, pu])).id;
+  check('dates before the course starts count as week 1', (await topicRow(early)).w === 1);
+  // An old Archive copy (made before the dates existed) of a topic comes back with no dates.
+  const arcTopic = await arch('topic', early);
+  await db.exec(`update archive_items set data = jsonb_set(data, '{row}', (data -> 'row') - 'plan_start' - 'plan_end') where id = '${arcTopic}'`);
+  await restore(arcTopic);
+  check('an old Archive copy of a topic comes back without dates and keeps its week', JSON.stringify(await topicRow(early)) === JSON.stringify({ w: 1, s: null, e: null }), JSON.stringify(await topicRow(early)));
+}
+
 // Deleting a course takes everything made for it: its tasks, its study sessions and its library items (20261020000000_course_delete_everything.sql)
 {
   const migration = readFileSync(join(dir, '20261020000000_course_delete_everything.sql'), 'utf8');

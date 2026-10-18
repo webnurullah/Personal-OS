@@ -1,10 +1,10 @@
 // Learning: course numbers, wording, date limits and the request schemas. Run with: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
-import { courseStats, courseWeeks, currentWeek, doneHours, MAX_COURSE_WEEKS, nextNumber, nextPosition, remainingText, timeLeft } from "../lib/course.ts";
+import { courseStats, courseWeeks, currentWeek, doneHours, inWeek, MAX_COURSE_WEEKS, nextNumber, planRange, nextPosition, remainingText, timeLeft } from "../lib/course.ts";
 import { hm, num, plural } from "../lib/format.ts";
 import { HttpError } from "../lib/server/http.ts";
-import { checkDates, checkPlannedWeek, CourseFields, TopicFields, UnitFields } from "../lib/server/schemas.ts";
+import { checkDates, checkPlanDates, checkPlannedWeek, CourseFields, TopicFields, UnitFields } from "../lib/server/schemas.ts";
 
 const topic = (code: string, est: number, week: number | null, status = "not-started", actual = 0) => ({ code, est_hours: est, planned_week: week, status, actual_hours: actual });
 const course = { start_date: "2026-09-14", target_date: "2026-12-31", weekly_plan: [5, 5, 4] };
@@ -198,4 +198,27 @@ test("tasks made from a course are tied to it (so they go with it) and a second 
   assert.deepEqual(tables.tasks.map((t) => [t.title, t.course_id, t.due_date]), [["Study: 1.1 SEO basics", "C1", "2026-10-11"]]);
   assert.equal((await tasksForWeek(db, "C1", "2026-10-06", 1)).created, 0);
   assert.equal(tables.tasks.length, 1);
+});
+
+test("a topic planned with dates shows in every week the dates touch; a plain week still works", () => {
+  const dated = { planned_week: 1, plan_start: "2026-09-18", plan_end: "2026-09-29" };
+  assert.equal(inWeek(dated, 1, "2026-09-14"), true); // 14-20 holds the 18th
+  assert.equal(inWeek(dated, 2, "2026-09-21"), true);
+  assert.equal(inWeek(dated, 3, "2026-09-28"), true); // ends on the 29th
+  assert.equal(inWeek(dated, 4, "2026-10-05"), false);
+  assert.equal(inWeek({ planned_week: 2 }, 2, "2026-09-21"), true);
+  assert.equal(inWeek({ planned_week: null }, 2, "2026-09-21"), false);
+  assert.deepEqual(planRange(dated, "2026-09-14"), { from: "2026-09-18", to: "2026-09-29" });
+  assert.deepEqual(planRange({ planned_week: 2 }, "2026-09-14"), { from: "2026-09-21", to: "2026-09-27" });
+  assert.equal(planRange({ planned_week: null }, "2026-09-14"), null);
+});
+
+test("plan dates: both or none, end not before start, at most two years", () => {
+  assert.doesNotThrow(() => checkPlanDates({}));
+  assert.doesNotThrow(() => checkPlanDates({ plan_start: null, plan_end: null }));
+  assert.doesNotThrow(() => checkPlanDates({ plan_start: "2026-09-14", plan_end: "2026-09-14" }));
+  assert.throws(() => checkPlanDates({ plan_start: "2026-09-14", plan_end: null }), bad(400));
+  assert.throws(() => checkPlanDates({ plan_end: "2026-09-14" }), bad(400));
+  assert.throws(() => checkPlanDates({ plan_start: "2026-09-15", plan_end: "2026-09-14" }), bad(400));
+  assert.throws(() => checkPlanDates({ plan_start: "2026-01-01", plan_end: "2029-01-01" }), bad(400));
 });

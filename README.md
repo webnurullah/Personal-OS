@@ -52,6 +52,7 @@ Frontend and backend are **one Vercel project**. Every push to GitHub `main` put
    23. `20261021000000_google_connections.sql` (Calendar: one read-only link per person to their Google Calendar; only an encrypted refresh token is kept. Also needs the three Vercel values and the Google Cloud setup in `docs/google-calendar-setup.md`)
    24. `20261022000000_project_time.sql` (Projects: a timer on each project page. One row per Start → Pause, so time carries on across sessions; one timer at a time; a session never lasts more than 12 hours. Shown per project and per day on the Habits page)
    25. `20261023000000_course_time.sql` (Learning: the same timer on every course page (not on certificate courses): one row per Start → Pause in `course_time`; one timer at a time across projects and courses; the time shows on the course box and on the Habits page)
+   26. `20261024000000_topic_plan_dates.sql` (Learning: a topic is planned with a From–To date range instead of a week number: `plan_start`/`plan_end`; the week stays in step with the start date)
 
    Already set up? Only run the files you have not run yet. Each new file is listed here when it is added.
 3. **Authentication → URL Configuration**

@@ -201,6 +201,9 @@ export const TopicFields = z.object({
   /** Left out when a topic is added without it (the database then uses 1 hour: progress counts every topic the same). */
   est_hours: z.number().positive().max(500).optional(),
   planned_week: z.number().int().min(1).max(156).nullable().optional(),
+  /** The dates picked for the topic: both or neither (checkPlanDates). */
+  plan_start: s.date.nullable().optional(),
+  plan_end: s.date.nullable().optional(),
   /** How many of the three look-backs (after 1, 7 and 21 days) of a finished topic are done. */
   revision_step: z.number().int().min(0).max(3).optional(),
   status: z.enum(["not-started", "in-progress", "done"]).optional(),
@@ -237,6 +240,15 @@ export function checkDates<T extends { start_date?: string; target_date?: string
     if (daysBetween(start, target) + 1 > MAX_COURSE_WEEKS * 7) throw new HttpError(400, "A course can last at most 3 years. Check the target date.");
   }
   return c;
+}
+
+/** A topic planned for dates needs both, the end not before the start, and at most two years (the database checks the same). */
+export function checkPlanDates(input: { plan_start?: string | null; plan_end?: string | null }) {
+  const { plan_start: from, plan_end: to } = input;
+  if (from === undefined && to === undefined) return;
+  if (!from !== !to) throw new HttpError(400, "Pick both dates, From and To, or leave both empty.");
+  if (from && to && to < from) throw new HttpError(400, "The end date cannot be before the start date.");
+  if (from && to && daysBetween(from, to) > 730) throw new HttpError(400, "A plan can be at most two years long.");
 }
 
 /** A topic can only be planned in a week the course has. */

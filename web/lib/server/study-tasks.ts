@@ -3,6 +3,7 @@ import { hoursLeft } from "../study.ts";
 import { addDays } from "./dates.ts";
 import { must } from "./http.ts";
 import { planningWeek } from "../plan.ts";
+import { inWeek } from "../course.ts";
 import type { Db } from "./supabase.ts";
 
 /**
@@ -13,7 +14,8 @@ import type { Db } from "./supabase.ts";
 export async function tasksForWeek(db: Db, courseId: string, today: string, week?: number) {
   const course = must(await db.from("courses").select("id, title, start_date, target_date").eq("id", courseId).single());
   const which = week ?? planningWeek(course, today);
-  const topics = must(await db.from("course_topics").select("id, code, title, status, est_hours, actual_hours").eq("course_id", courseId).eq("planned_week", which).order("position").order("code"))
+  const topics = must(await db.from("course_topics").select("id, code, title, status, est_hours, actual_hours, planned_week, plan_start, plan_end").eq("course_id", courseId).order("position").order("code"))
+    .filter((t) => inWeek(t, which, addDays(course.start_date, (which - 1) * 7)))
     .filter((t) => t.status !== "done" && hoursLeft({ status: t.status, est_hours: Number(t.est_hours), actual_hours: Number(t.actual_hours) }) > 0);
   const weekEnd = addDays(course.start_date, which * 7 - 1);
   const due = weekEnd < today ? today : weekEnd;

@@ -48,17 +48,24 @@ const browser = await launch();
   check("a used number is warned about", (await page.getByText("already used").count()) === 1);
   await page.keyboard.press("Escape");
 
-  // edit topic planned beyond the end: the week stays visible and an unchanged week is not sent
+  // edit topic: the old planned week shows as its dates; unchanged dates are not sent; picked dates are
   await page.getByLabel("Edit topic 1.3").click();
-  const weekSelect = page.locator("#topic-week");
-  check("a week after the course end stays selectable and selected", (await weekSelect.inputValue()) === "20", await weekSelect.inputValue());
-  check("it is labelled as after the end", (await weekSelect.locator("option:checked").textContent())?.includes("after the end") === true);
+  check("the topic form has From and To dates instead of a week list", (await page.locator("#topic-week").count()) === 0 && (await page.locator("#topic-from").inputValue()) !== "" && (await page.locator("#topic-to").inputValue()) !== "");
   calls.length = 0;
   await page.locator("#topic-title").fill("Renamed topic");
   await page.getByRole("button", { name: "Save topic" }).click();
   await page.waitForTimeout(500);
   const save = calls.find((c) => c.method === "PATCH" && c.url.endsWith("/t3"));
-  check("saving without touching the week does not send the week", save && !("planned_week" in save.body), JSON.stringify(save?.body));
+  check("saving without touching the dates does not send them", save && !("plan_start" in save.body) && !("planned_week" in save.body), JSON.stringify(save?.body));
+  await page.getByLabel("Edit topic 1.3").click();
+  await page.locator("#topic-from").fill("2026-05-04");
+  check("picking From fills To with the same day", (await page.locator("#topic-to").inputValue()) !== "");
+  await page.locator("#topic-to").fill("2026-05-10");
+  calls.length = 0;
+  await page.getByRole("button", { name: "Save topic" }).click();
+  await page.waitForTimeout(500);
+  const picked = calls.find((c) => c.method === "PATCH" && c.url.endsWith("/t3"));
+  check("picked dates are sent as plan_start and plan_end", picked?.body?.plan_start === "2026-05-04" && picked?.body?.plan_end === "2026-05-10", JSON.stringify(picked?.body));
 
   // add unit: next number is 3
   await page.getByRole("button", { name: /Add unit/ }).first().click();

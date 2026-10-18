@@ -9,7 +9,7 @@ import { CalendarCheck, CalendarDays, ChevronLeft, ClipboardPaste, GraduationCap
 import { api, ApiError, errorMessage, refresh } from "@/lib/api";
 import { cacheMutate } from "@/lib/cache";
 import { colorOf } from "@/lib/colors";
-import { COURSE_STATUSES, courseStats, nextNumber, timeLeft } from "@/lib/course";
+import { COURSE_STATUSES, courseStats, nextNumber, planRange, timeLeft } from "@/lib/course";
 import { addDays, formatDate } from "@/lib/dates";
 import { num, plural } from "@/lib/format";
 import type { CourseDetail, CourseStatus, Topic, TopicStatus, Unit } from "@/lib/types";
@@ -341,7 +341,7 @@ export function CourseView({ id }: { id: string }) {
                             <option key={st.value} value={st.value}>{st.label}</option>
                           ))}
                         </select>
-                        {topic.planned_week ? <span className={topic.planned_week === stats.thisWeek ? "font-semibold text-blue-700" : ""}>W{topic.planned_week}</span> : null}
+                        {planRange(topic, course.start_date) ? <span className={topic.planned_week === stats.thisWeek ? "font-semibold text-blue-700" : ""}>{rangeText(planRange(topic, course.start_date))}</span> : null}
                       </div>
                     </li>
                   ))}
@@ -392,7 +392,7 @@ export function CourseView({ id }: { id: string }) {
                         <td className="px-3 py-2 text-slate-800">{topic.title}</td>
                         <td className="px-3 py-2 text-slate-600">{topic.outcome}</td>
                         <td className={`px-2 py-2 text-center ${topic.planned_week === stats.thisWeek ? "font-semibold text-blue-700" : "text-slate-600"}`}>
-                          {topic.planned_week ? `W${topic.planned_week}` : "–"}
+                          {rangeText(planRange(topic, course.start_date)) || "–"}
                         </td>
                         <td className="px-2 py-2 text-center">
                           <select
@@ -509,8 +509,7 @@ export function CourseView({ id }: { id: string }) {
             units={units}
             unitId={topicModal.unitId}
             topic={topicModal.topic}
-            weeks={stats.weeks}
-            thisWeek={stats.thisWeek}
+            courseStart={course.start_date}
             onClose={() => setTopicModal(null)}
             onSaved={() => mutate()}
           />
@@ -599,13 +598,18 @@ function UnitForm({ courseId, unit, codes, onClose, onSaved }: { courseId: strin
   );
 }
 
-function TopicForm({ courseId, units, unitId, topic, weeks, thisWeek, onClose, onSaved }: {
+/** "12 Oct – 18 Oct" (one date when it is a single day). */
+function rangeText(range: { from: string; to: string } | null) {
+  if (!range) return "";
+  return range.from === range.to ? formatDate(range.from) : `${formatDate(range.from)} – ${formatDate(range.to)}`;
+}
+
+function TopicForm({ courseId, units, unitId, topic, courseStart, onClose, onSaved }: {
   courseId: string;
   units: Unit[];
   unitId: string;
   topic?: Topic;
-  weeks: number;
-  thisWeek: number;
+  courseStart: string;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -618,21 +622,25 @@ function TopicForm({ courseId, units, unitId, topic, weeks, thisWeek, onClose, o
   const [code, setCode] = useState(topic?.code ?? proposal(unit));
   const [codeEdited, setCodeEdited] = useState(false);
   const used = unit.topics.some((t) => t.id !== topic?.id && t.code === code.trim());
-  // A week beyond the end of the course (left over from a shorter target date) stays visible instead of vanishing.
-  const lastWeek = Math.max(weeks, topic?.planned_week ?? 0);
+  // The dates the topic is planned for: its own, else those of its old planned week; a new topic starts empty.
+  const own = topic ? planRange(topic, courseStart) : null;
+  const [from, setFrom] = useState(own?.from ?? "");
+  const [to, setTo] = useState(own?.to ?? "");
+  const badRange = Boolean(from && to && to < from);
 
   const submit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
-    const week = String(form.get("planned_week"));
-    const planned_week = week ? Number(week) : null;
+    if (Boolean(from) !== Boolean(to)) return toast("Pick both dates, From and To, or leave both empty.", "error");
+    if (badRange) return toast("The end date cannot be before the start date.", "error");
+    const changed = from !== (own?.from ?? "") || to !== (own?.to ?? "");
     const body = {
       code: String(form.get("code")),
       title: String(form.get("title")),
       short_title: String(form.get("short_title")),
       outcome: String(form.get("outcome")),
-      // An unchanged week is not sent again: a week left beyond the course end would otherwise block every other edit.
-      ...(topic && planned_week === topic.planned_week ? {} : { planned_week }),
+      // Unchanged dates are not sent again.
+      ...(topic && !changed ? {} : { plan_start: from || null, plan_end: to || null }),
       notes: String(form.get("notes")),
     };
     setBusy(true);
@@ -713,16 +721,18 @@ function TopicForm({ courseId, units, unitId, topic, weeks, thisWeek, onClose, o
           <input id="topic-outcome" name="outcome" className="input" maxLength={300} defaultValue={topic?.outcome} autoComplete="off" />
         </Field>
       </div>
-      <div className="grid grid-cols-1 gap-4">
-        <Field label="Planned week" htmlFor="topic-week">
-          <select id="topic-week" name="planned_week" className="select select-lg" defaultValue={topic ? (topic.planned_week ?? "") : thisWeek}>
-            <option value="">Not planned</option>
-            {Array.from({ length: lastWeek }, (_, i) => (
-              <option key={i} value={i + 1}>{i + 1 > weeks ? `Week ${i + 1} (after the end)` : `Week ${i + 1}`}</option>
-            ))}
-          </select>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Plan from" htmlFor="topic-from" hint={from || to ? undefined : "Leave both empty if not planned yet."}>
+          <input id="topic-from" type="date" className="input" value={from} onChange={(e) => { setFrom(e.target.value); if (e.target.value && !to) setTo(e.target.value); }} />
+        </Field>
+        <Field label="Plan to" htmlFor="topic-to">
+          <input id="topic-to" type="date" className="input" value={to} onChange={(e) => setTo(e.target.value)} />
         </Field>
       </div>
+      {(from || to) && (
+        <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setFrom(""); setTo(""); }}>Clear dates</button>
+      )}
+      {badRange && <p className="text-sm text-rose-600" role="alert">The end date cannot be before the start date.</p>}
       <Field label="Notes / resources" htmlFor="topic-notes">
         <input id="topic-notes" name="notes" className="input" maxLength={300} defaultValue={topic?.notes} autoComplete="off" />
       </Field>

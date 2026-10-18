@@ -215,6 +215,8 @@ export type Database = {
           outcome: string;
           est_hours: number;
           planned_week: number | null;
+          plan_start: string | null;
+          plan_end: string | null;
           status: string;
           actual_hours: number;
           notes: string;
@@ -236,6 +238,8 @@ export type Database = {
           outcome?: string;
           est_hours?: number;
           planned_week?: number | null;
+          plan_start?: string | null;
+          plan_end?: string | null;
           status?: string;
           actual_hours?: number;
           notes?: string;
@@ -257,6 +261,8 @@ export type Database = {
           outcome?: string;
           est_hours?: number;
           planned_week?: number | null;
+          plan_start?: string | null;
+          plan_end?: string | null;
           status?: string;
           actual_hours?: number;
           notes?: string;

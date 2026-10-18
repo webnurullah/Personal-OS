@@ -1,12 +1,13 @@
 import { archiveItem } from "@/lib/server/archive";
 import { handle, ok } from "@/lib/server/api";
 import { must } from "@/lib/server/http";
-import { checkPlannedWeek, TopicFields } from "@/lib/server/schemas";
+import { checkPlanDates, checkPlannedWeek, TopicFields } from "@/lib/server/schemas";
 import { nonEmpty, parse, s } from "@/lib/server/validate";
 
 export const PATCH = handle<{ id: string }>(async ({ db, params, body }) => {
   const id = parse(s.id, params.id);
   const changes = nonEmpty(parse(TopicFields.omit({ unit_id: true }).partial().strict(), await body()));
+  checkPlanDates(changes);
   if (changes.planned_week != null) {
     // Only a week the course has: otherwise the topic would silently drop out of every week.
     const { course_id } = must(await db.from("course_topics").select("course_id").eq("id", id).single());

@@ -65,7 +65,7 @@ for (const width of [390, 320, 1280]) {
   const box = await timer.locator("xpath=ancestor::section").boundingBox();
   const target = await page.getByText("Target Date", { exact: true }).locator("xpath=ancestor::div[contains(@class,'rounded-2xl')]").boundingBox();
   check(`${width}px: This Week's Plan, Time spent and Target Date are three boxes in one block`, !!week && !!box && !!target && (wide ? Math.abs(week.y - box.y) < 8 && week.x < box.x && box.x < target.x : week.y < box.y && box.y < target.y), JSON.stringify({ week, box, target }));
-  check(`${width}px: the Estimated hours field is gone from the topic form`, await (async () => { await page.getByLabel("Edit topic 1.1").click(); const gone = (await page.locator("#topic-est").count()) === 0 && (await page.locator("#topic-week").count()) === 1; await page.keyboard.press("Escape"); return gone; })());
+  check(`${width}px: the Estimated hours field is gone from the topic form`, await (async () => { await page.getByLabel("Edit topic 1.1").click(); const gone = (await page.locator("#topic-est").count()) === 0 && (await page.locator("#topic-from").count()) === 1 && (await page.locator("#topic-week").count()) === 0; await page.keyboard.press("Escape"); return gone; })());
   let m = await measure(page, width);
   check(`${width}px: the course page fits the screen`, !m.zoomedOut && m.mainClipped === 0 && m.offenders.length === 0, JSON.stringify(m));
   if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/course-time-${width}.png`, fullPage: true });

@@ -2,13 +2,14 @@
 // Runs in the browser so the page updates while you type.
 import type { CourseStatus } from "./types.ts";
 
-type TopicFacts = { status: string; est_hours: number; actual_hours: number; planned_week: number | null };
+type TopicFacts = { status: string; est_hours: number; actual_hours: number; planned_week: number | null; plan_start?: string | null; plan_end?: string | null };
 type UnitFacts<T extends TopicFacts> = { id: string; topics: T[] };
 type CourseFacts = { start_date: string; target_date: string; weekly_plan: number[] };
 
 const DAY_MS = 86400000;
 const toMs = (iso: string) => Date.UTC(Number(iso.slice(0, 4)), Number(iso.slice(5, 7)) - 1, Number(iso.slice(8, 10)));
 const daysBetween = (a: string, b: string) => Math.round((toMs(b) - toMs(a)) / DAY_MS);
+const addDays = (iso: string, days: number) => new Date(toMs(iso) + days * DAY_MS).toISOString().slice(0, 10);
 const sum = <T,>(list: T[], value: (item: T) => number) => list.reduce((total, item) => total + value(item), 0);
 const percent = (part: number, whole: number) => (whole ? Math.round((part / whole) * 100) : 0);
 
@@ -82,7 +83,7 @@ export function courseStats<T extends TopicFacts, U extends UnitFacts<T>>(course
     units: units.map((unit) => ({ unit, est: sum(unit.topics, (t) => Number(t.est_hours)), percent: percent(sum(unit.topics, doneHours), sum(unit.topics, (t) => Number(t.est_hours))) })),
     weeks,
     thisWeek,
-    weekTopics: topics.filter((t) => t.planned_week === thisWeek),
+    weekTopics: topics.filter((t) => inWeek(t, thisWeek, addDays(course.start_date, (thisWeek - 1) * 7))),
     plan,
     actualByWeek,
     plannedTotal,
@@ -103,4 +104,20 @@ export function remainingText(c: { unit_count: number; units_left?: number; topi
     return `${left} of ${total} ${word}${total === 1 ? "" : "s"} left`;
   };
   return [part(c.unit_count, c.units_left, "unit"), part(c.topic_count, c.topics_left, "topic")].filter(Boolean).join(" · ");
+}
+
+/**
+ * Is this topic planned for the week that starts on `weekStart` (week number `weekNo` of the course)? A topic planned for dates counts
+ * when its dates touch that week; a topic planned only for a week number counts in that week.
+ */
+export function inWeek(t: { planned_week: number | null; plan_start?: string | null; plan_end?: string | null }, weekNo: number, weekStart: string) {
+  if (t.plan_start && t.plan_end) return t.plan_start <= addDays(weekStart, 6) && t.plan_end >= weekStart;
+  return t.planned_week === weekNo;
+}
+
+/** The dates of a topic's plan for display: its own dates, else the dates of its planned week; null when it is not planned. */
+export function planRange(t: { planned_week: number | null; plan_start?: string | null; plan_end?: string | null }, courseStart: string) {
+  if (t.plan_start && t.plan_end) return { from: t.plan_start, to: t.plan_end };
+  if (t.planned_week) return { from: addDays(courseStart, (t.planned_week - 1) * 7), to: addDays(courseStart, (t.planned_week - 1) * 7 + 6) };
+  return null;
 }
