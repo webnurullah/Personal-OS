@@ -17,6 +17,7 @@ import { Field } from "@/components/ui/controls";
 import { useFeedback } from "@/components/ui/feedback";
 import { Modal } from "@/components/ui/modal";
 import { EmptyState, LoadError, PageSkeleton } from "@/components/ui/states";
+import { ProjectTimer } from "@/components/projects/project-timer";
 import { ProjectForm } from "../project-form";
 import { forgetProject, KindIcon, refreshProjects, TimeBadge, useProjectActions } from "../shared";
 
@@ -209,7 +210,7 @@ export function ProjectView({ id }: { id: string }) {
         </div>
       </header>
 
-      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <section className="card p-5">
           <p className="text-xs font-medium text-slate-500">Tasks</p>
           <p className="mt-0.5 text-2xl font-bold text-slate-900">
@@ -232,6 +233,7 @@ export function ProjectView({ id }: { id: string }) {
             {project.due_date ? ` · Due ${formatDate(project.due_date, "short")}` : " · No due date"}
           </p>
         </section>
+        <ProjectTimer projectId={project.id} archived={archived} />
       </div>
 
       <div className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">

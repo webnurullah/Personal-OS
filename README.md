@@ -50,6 +50,7 @@ Frontend and backend are **one Vercel project**. Every push to GitHub `main` put
    21. `20261018000000_course_notes.sql` and `20261019000000_course_notes_simple.sql` (Learning: private notes on a course, written in a text editor that stores HTML; the first migration also had a public-link idea that the second switched off before anyone used it (the unused `notes_share` column and an empty, uncallable `public_course_notes()` are left in place))
    22. `20261020000000_course_delete_everything.sql` (deleting a course takes everything made for it: its tasks (`tasks.course_id`), its study sessions (`study_blocks.course_id`, kept by a trigger from the topic or library item) and its certificates, courses and playlists in the Learning library; it all goes to the Archive in one entry and comes back together; goals that follow the course and projects are kept)
    23. `20261021000000_google_connections.sql` (Calendar: one read-only link per person to their Google Calendar; only an encrypted refresh token is kept. Also needs the three Vercel values and the Google Cloud setup in `docs/google-calendar-setup.md`)
+   24. `20261022000000_project_time.sql` (Projects: a timer on each project page. One row per Start → Pause, so time carries on across sessions; one timer at a time; a session never lasts more than 12 hours. Shown per project and per day on the Habits page)
 
    Already set up? Only run the files you have not run yet. Each new file is listed here when it is added.
 3. **Authentication → URL Configuration**

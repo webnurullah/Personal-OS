@@ -582,7 +582,13 @@ unit("tasks", "/tasks", heading, () => ({ "/tasks": { today: TODAY, items: tasks
   confirmScene("Delete task question", (p) => p.locator("button[aria-label^='Delete ']").first()),
 ]);
 
-unit("habits", "/habits", heading, () => ({ "/habits": habitsResponse }), [
+// Project time on the Habits page: long names, big and small times, a timer running.
+const projectTime = {
+  today: TODAY, days: habitDays, now: new Date().toISOString(), today_seconds: 40000, week_seconds: 99999, total_seconds: 9999999,
+  running: { project_id: "p1", name: H(1, 120), started_at: new Date(Date.now() - 3700000).toISOString() },
+  projects: range(6).map((i) => ({ id: `p${i}`, name: H(i, 120), color: COLORS[i], total_seconds: [9999999, 123456, 3600, 59, 0, 43200][i], week_seconds: [99999, 5400, 3600, 59, 0, 43200][i], by_day: habitDays.map((_, j) => (i + j) % 3 === 0 ? 0 : [43199, 59, 3600, 600, 7260, 1, 12000][j]) })),
+};
+unit("habits", "/habits", heading, () => ({ "/habits": habitsResponse, "/project-time?days=7": projectTime }), [
   filledDialog("New habit dialog", (p) => button(p, "New Habit")),
   scene("Edit habit dialog", async (page, snap) => {
     await openDialog(page, page.locator("button[aria-label^='Edit ']").first());
@@ -831,7 +837,7 @@ unit("projects", "/projects", heading, () => ({ "/projects": { today: TODAY, ite
   }),
 ]);
 
-unit("project", "/projects/p1", (p) => p.locator("main h1").first().waitFor({ timeout: 12000 }), () => ({ "/projects/p1": projectDetail(1) }), [
+unit("project", "/projects/p1", (p) => p.locator("main h1").first().waitFor({ timeout: 12000 }), () => ({ "/projects/p1": projectDetail(1), "/projects/p1/time": { now: new Date().toISOString(), closed_seconds: 3599999, today_closed_seconds: 43200, running: { project_id: "p4", name: H(4, 120), started_at: new Date(Date.now() - 600000).toISOString(), started_today: true } } }), [
   scene("done tasks opened", async (page, snap) => {
     await press(page.getByRole("button", { name: /^Done \(/ }));
     await snap("done tasks");

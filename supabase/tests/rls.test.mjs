@@ -479,6 +479,29 @@ check('deleting the practice project keeps the item', (await one('select practic
   await db.exec(`insert into auth.users (id, email, raw_user_meta_data) values ('${B}', 'b@x.com', '{}') on conflict do nothing`);
 }
 
+// Projects -> time spent (20261022000000_project_time.sql)
+{
+  const tp = (await one(`insert into projects (name) values ('Timed project') returning id`)).id;
+  const tp2 = (await one(`insert into projects (name) values ('Other timed project') returning id`)).id;
+  const first = await one(`insert into project_time (project_id) values ($1) returning id, ended_at`, [tp]);
+  check('a timer starts with no end (it is running)', first.ended_at === null);
+  await expectError('only one timer can run at a time', () => qa(`insert into project_time (project_id) values ($1)`, [tp2]), 'duplicate key');
+  await qa(`update project_time set ended_at = started_at + interval '90 minutes' where id = $1`, [first.id]);
+  const second = await one(`insert into project_time (project_id) values ($1) returning id`, [tp2]);
+  check('after stopping, another project can start', !!second.id);
+  await expectError('a session cannot end before it started', () => qa(`update project_time set ended_at = started_at - interval '1 minute' where id = $1`, [second.id]), 'check constraint');
+  await expectError('a session is never longer than 12 hours', () => qa(`update project_time set ended_at = started_at + interval '13 hours' where id = $1`, [second.id]), 'check constraint');
+  await qa(`update project_time set ended_at = started_at + interval '12 hours' where id = $1`, [second.id]);
+  check('exactly 12 hours is allowed', true);
+  check("nobody else sees my time", (await qb('select count(*)::int n from project_time'))[0].n === 0);
+  check("and cannot change or remove it", (await qb(`update project_time set ended_at = now() returning id`)).length === 0 && (await qb('delete from project_time returning id')).length === 0);
+  await expectError("nobody can add time to someone else's project", () => qb(`insert into project_time (project_id) values ($1)`, [tp]), 'row-level security');
+  await expectError('nor for someone else (user_id of A)', () => qb(`insert into project_time (user_id, project_id) values ($1, $2)`, [A, tp]), 'row-level security');
+  await expectError('a signed-out visitor cannot read it', () => qanon('select * from project_time'), 'permission denied');
+  check('deleting a project deletes its time', (await qa('delete from projects where id = $1 returning id', [tp])).length === 1 && (await qa('select id from project_time where project_id = $1', [tp])).length === 0);
+  await qa('delete from projects where id = $1', [tp2]);
+}
+
 // Deleting a course takes everything made for it: its tasks, its study sessions and its library items (20261020000000_course_delete_everything.sql)
 {
   const migration = readFileSync(join(dir, '20261020000000_course_delete_everything.sql'), 'utf8');

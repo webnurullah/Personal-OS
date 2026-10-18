@@ -1,0 +1,72 @@
+"use client";
+
+import { useState } from "react";
+import useSWR from "swr";
+import { Pause, Play } from "lucide-react";
+import { api, errorMessage, refresh } from "@/lib/api";
+import { clock, MAX_SESSION_SECONDS, spent, type ProjectTimeState } from "@/lib/project-time";
+import { useSecond } from "@/lib/use-second";
+import { useFeedback } from "@/components/ui/feedback";
+
+/**
+ * "Time spent" on a project page: a clock that counts up while you work on it. Press Start, and Pause when you stop; pressing Start
+ * again carries on from the time already spent. The timer lives on the server, so it keeps running if you close the page.
+ * Only one project can have a running timer: starting here stops the other one.
+ */
+export function ProjectTimer({ projectId, archived }: { projectId: string; archived: boolean }) {
+  const { toast } = useFeedback();
+  // How far this device's clock is from the server's, so a wrong clock on the phone does not show wrong seconds.
+  const [skew, setSkew] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const { data, error, mutate } = useSWR<ProjectTimeState>(`/projects/${projectId}/time`, { onSuccess: (d) => setSkew(new Date(d.now).getTime() - Date.now()) });
+
+  const here = data?.running?.project_id === projectId;
+  const second = useSecond(Boolean(data?.running));
+  const sinceStart = data?.running ? Math.min(MAX_SESSION_SECONDS, Math.max(0, Math.floor((second + skew - new Date(data.running.started_at).getTime()) / 1000))) : 0;
+  const elsewhere = Boolean(data?.running && !here);
+  const total = (data?.closed_seconds ?? 0) + (here ? sinceStart : 0);
+  const today = (data?.today_closed_seconds ?? 0) + (here && data?.running?.started_today ? sinceStart : 0);
+
+  const press = async (action: "start" | "pause") => {
+    setBusy(true);
+    try {
+      const next = await api<ProjectTimeState>(`/projects/${projectId}/time`, { method: "POST", body: { action } });
+      setSkew(new Date(next.now).getTime() - Date.now());
+      await mutate(next, { revalidate: false });
+      void refresh("/project-time");
+      toast(action === "start" ? "Timer started" : `Paused at ${clock(next.closed_seconds)}`);
+    } catch (e) {
+      toast(errorMessage(e), "error");
+      void mutate();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="card p-5" aria-labelledby="timer-title">
+      <p id="timer-title" className="text-xs font-medium text-slate-500">Time spent</p>
+      <p className="mt-0.5 flex items-center gap-2 text-2xl font-bold tabular-nums text-slate-900" role="timer" aria-label="Time spent on this project">
+        {data ? clock(total) : error ? "–:––:––" : "0:00:00"}
+        {here && <span className="size-2.5 shrink-0 animate-pulse rounded-full bg-emerald-500" title="Running" aria-hidden />}
+      </p>
+      <p className="mt-2 text-sm text-slate-500">
+        {error && !data ? "The time could not be loaded." : here ? `Running · today ${spent(today)}` : `Paused · today ${spent(today)}`}
+      </p>
+      {elsewhere && data?.running && <p className="mt-1 break-words text-xs text-amber-700">The timer is running on “{data.running.name}”. Starting here pauses that one.</p>}
+      <div className="mt-3">
+        {here ? (
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => press("pause")} disabled={busy}>
+            <Pause className="size-4" />
+            Pause
+          </button>
+        ) : (
+          <button type="button" className="btn btn-primary btn-sm" onClick={() => press("start")} disabled={busy || archived || !data} title={archived ? "Restore the project to keep time on it" : undefined}>
+            <Play className="size-4" />
+            {total > 0 ? "Continue" : "Start"}
+          </button>
+        )}
+      </div>
+    </section>
+  );
+}

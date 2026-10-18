@@ -9,6 +9,7 @@ import { formatDate } from "@/lib/dates";
 import { useNewAction } from "@/lib/new-action";
 import type { Habit, HabitsResponse } from "@/lib/types";
 import { HABITS_KEY, HabitTracker } from "@/components/habits/habit-tracker";
+import { ProjectTimeCard } from "@/components/habits/project-time-card";
 import { ColorPicker, Field, IconPicker } from "@/components/ui/controls";
 import { useFeedback } from "@/components/ui/feedback";
 import { HABIT_ICONS } from "@/components/ui/icon";
@@ -62,6 +63,8 @@ export function HabitsView() {
       </div>
 
       <HabitTracker className="mt-6" data={data} mutate={mutate} onEdit={setEditing} onDelete={remove} onNew={() => setEditing("new")} />
+
+      <ProjectTimeCard className="mt-5" />
 
       <div className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <section className="card p-5" aria-labelledby="heat-title">
