@@ -4,7 +4,10 @@ import { addDays } from "./dates.ts";
 /** A session is never longer than this (a timer left running overnight is cut here). The database enforces it too. */
 export const MAX_SESSION_SECONDS = 12 * 3600;
 
-/** One row of the project_time table. */
+/** What a timer is kept on: a project (table project_time) or a course (table course_time). Both are shown together on the Habits page. */
+export type TimeKind = "project" | "course";
+
+/** One row of the project_time table (a course_time row is read the same way, with the course id in project_id). */
 export type TimeRow = { project_id: string; started_at: string; ended_at: string | null };
 
 const secondsBetween = (from: string, to: number) => Math.max(0, Math.floor((to - new Date(from).getTime()) / 1000));
@@ -47,7 +50,7 @@ export function dayOf(iso: string, zone: string) {
   }
 }
 
-export type ProjectTimeLine = { id: string; name: string; color: string; total_seconds: number; week_seconds: number; by_day: number[] };
+export type ProjectTimeLine = { id: string; kind: TimeKind; name: string; color: string; total_seconds: number; week_seconds: number; by_day: number[] };
 export type ProjectTimeSummary = {
   today: string;
   /** The days shown, oldest first, ending today. */
@@ -56,7 +59,7 @@ export type ProjectTimeSummary = {
   today_seconds: number;
   week_seconds: number;
   total_seconds: number;
-  running: { project_id: string; name: string; started_at: string } | null;
+  running: { project_id: string; kind: TimeKind; name: string; started_at: string } | null;
   /** The server's clock when this was worked out (ISO), so a ticking clock can correct for a wrong phone clock. */
   now: string;
 };
@@ -65,7 +68,7 @@ export type ProjectTimeSummary = {
  * Time per project and per day. A session counts on the day it STARTED (in the time zone of the person).
  * `days` is how many days to list (ending today); every project that has time (or a running timer) is listed, most time this period first.
  */
-export function summariseTime(rows: TimeRow[], projects: { id: string; name: string; color: string }[], today: string, zone: string, days: number, now: number): ProjectTimeSummary {
+export function summariseTime(rows: TimeRow[], projects: { id: string; name: string; color: string; kind?: TimeKind }[], today: string, zone: string, days: number, now: number): ProjectTimeSummary {
   const list = Array.from({ length: days }, (_, i) => addDays(today, i - days + 1));
   const index = new Map(list.map((d, i) => [d, i]));
   const lines = new Map<string, ProjectTimeLine>();
@@ -76,7 +79,7 @@ export function summariseTime(rows: TimeRow[], projects: { id: string; name: str
     const project = byId.get(row.project_id);
     if (!project) continue;
     const seconds = sessionSeconds(row, now);
-    const line = lines.get(project.id) ?? { id: project.id, name: project.name, color: project.color, total_seconds: 0, week_seconds: 0, by_day: list.map(() => 0) };
+    const line = lines.get(project.id) ?? { id: project.id, kind: project.kind ?? "project", name: project.name, color: project.color, total_seconds: 0, week_seconds: 0, by_day: list.map(() => 0) };
     line.total_seconds += seconds;
     const slot = index.get(dayOf(row.started_at, zone));
     if (slot !== undefined) {
@@ -84,7 +87,7 @@ export function summariseTime(rows: TimeRow[], projects: { id: string; name: str
       line.week_seconds += seconds;
     }
     lines.set(project.id, line);
-    if (!row.ended_at) running = { project_id: project.id, name: project.name, started_at: row.started_at };
+    if (!row.ended_at) running = { project_id: project.id, kind: project.kind ?? "project", name: project.name, started_at: row.started_at };
   }
 
   const out = [...lines.values()].sort((a, b) => b.week_seconds - a.week_seconds || b.total_seconds - a.total_seconds || a.name.localeCompare(b.name));
@@ -109,16 +112,16 @@ export type ProjectTimeState = {
   /** Finished time that started today. */
   today_closed_seconds: number;
   /** The running timer (any project), if there is one. */
-  running: { project_id: string; name: string; started_at: string; started_today: boolean } | null;
+  running: { project_id: string; kind: TimeKind; name: string; started_at: string; started_today: boolean } | null;
 };
 
-export function projectState(rows: TimeRow[], projectId: string, runningName: string, today: string, zone: string, now: number): ProjectTimeState {
+export function projectState(rows: TimeRow[], projectId: string, runningName: string, today: string, zone: string, now: number, runningKind: TimeKind = "project"): ProjectTimeState {
   let closed = 0;
   let todayClosed = 0;
   let running: ProjectTimeState["running"] = null;
   for (const row of rows) {
     if (!row.ended_at) {
-      running = { project_id: row.project_id, name: runningName, started_at: row.started_at, started_today: dayOf(row.started_at, zone) === today };
+      running = { project_id: row.project_id, kind: runningKind, name: runningName, started_at: row.started_at, started_today: dayOf(row.started_at, zone) === today };
       continue;
     }
     if (row.project_id !== projectId) continue;

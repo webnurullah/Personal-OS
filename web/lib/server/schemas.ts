@@ -198,7 +198,8 @@ export const TopicFields = z.object({
   title: s.text(300),
   short_title: s.optionalText(80).optional(),
   outcome: s.optionalText(300).optional(),
-  est_hours: z.number().positive().max(500),
+  /** Left out when a topic is added without it (the database then uses 1 hour: progress counts every topic the same). */
+  est_hours: z.number().positive().max(500).optional(),
   planned_week: z.number().int().min(1).max(156).nullable().optional(),
   /** How many of the three look-backs (after 1, 7 and 21 days) of a finished topic are done. */
   revision_step: z.number().int().min(0).max(3).optional(),

@@ -502,6 +502,21 @@ check('deleting the practice project keeps the item', (await one('select practic
   await qa('delete from projects where id = $1', [tp2]);
 }
 
+// Courses -> time spent (20261023000000_course_time.sql)
+{
+  const cc = (await one(`insert into courses (title, start_date, target_date) values ('Timed course', '2026-10-05', '2026-12-28') returning id`)).id;
+  const first = await one(`insert into course_time (course_id) values ($1) returning id, ended_at`, [cc]);
+  check('a course timer starts with no end (it is running)', first.ended_at === null);
+  await expectError('only one course timer can run at a time', () => qa(`insert into course_time (course_id) values ($1)`, [cc]), 'duplicate key');
+  await qa(`update course_time set ended_at = started_at + interval '45 minutes' where id = $1`, [first.id]);
+  await expectError('a session cannot be longer than 12 hours', () => qa(`update course_time set ended_at = started_at + interval '13 hours' where id = $1`, [first.id]), 'check constraint');
+  check("nobody else sees my course time", (await qb('select count(*)::int n from course_time'))[0].n === 0);
+  check("and cannot change or remove it", (await qb(`update course_time set ended_at = now() returning id`)).length === 0 && (await qb('delete from course_time returning id')).length === 0);
+  await expectError("nobody can add time to someone else's course", () => qb(`insert into course_time (course_id) values ($1)`, [cc]), 'row-level security');
+  await expectError('a signed-out visitor cannot read it', () => qanon('select * from course_time'), 'permission denied');
+  check('deleting a course deletes its time', (await qa('delete from courses where id = $1 returning id', [cc])).length === 1 && (await qa('select id from course_time where course_id = $1', [cc])).length === 0);
+}
+
 // Deleting a course takes everything made for it: its tasks, its study sessions and its library items (20261020000000_course_delete_everything.sql)
 {
   const migration = readFileSync(join(dir, '20261020000000_course_delete_everything.sql'), 'utf8');

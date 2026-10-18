@@ -76,7 +76,7 @@ const browser = await launch();
   await page.goto(`${BASE}/learning/c1`);
   await page.getByText("Topic 1.1").first().waitFor();
   check("wide: the table has no hour columns (Estimated, Actual Time Spent, Remaining) and no hour boxes", (await page.locator("table").count()) >= 1 && (await page.getByLabel("Actual hours for topic 1.1").count()) === 0 && (await page.locator("table thead").getByText(/Estimated|Actual Time|Remaining/).count()) === 0 && (await page.locator("table thead").getByText("Status").count()) === 1);
-  check("wide: the percentage ring and the Module Progress card are gone from the course page", (await page.getByText("Module Progress", { exact: true }).count()) === 0 && (await page.getByLabel("Course progress").count()) === 0 && (await page.getByText("Overall Progress", { exact: true }).count()) === 1);
+  check("wide: the percentage ring, Module Progress, Weekly Learning Plan and Overall Progress are gone from the course page", (await page.getByText("Module Progress", { exact: true }).count()) === 0 && (await page.getByLabel("Course progress").count()) === 0 && (await page.getByText("Overall Progress", { exact: true }).count()) === 0 && (await page.getByText("Weekly Learning Plan").count()) === 0);
   // The course page: its category, and a status that can be changed with one tap.
   const patches = [];
   await ctx.route(/\/api\/courses\/c1$/, (route) => {
@@ -89,12 +89,13 @@ const browser = await launch();
   const statusTabs = page.getByRole("tablist", { name: "Course status" });
   check("the course page shows Active / Paused / Done, Active chosen", JSON.stringify(await statusTabs.getByRole("tab").allInnerTexts()) === JSON.stringify(["Active", "Paused", "Done"]) && (await statusTabs.getByRole("tab", { name: "Active" }).getAttribute("aria-selected")) === "true");
   {
-    // Top right: the status, Edit course and Delete sit in the breadcrumb row, to the right of it; the category is not shown on the page.
+    // Top right of the title row: the status, Edit course and Delete sit to the right of the course name, below the breadcrumb.
     const crumb = await page.getByRole("navigation", { name: "Breadcrumb" }).boundingBox();
+    const title = await page.locator("h1").boundingBox();
     const st = await statusTabs.boundingBox();
     const edit = await page.getByRole("button", { name: "Edit course" }).boundingBox();
     const del = await page.getByRole("button", { name: "Delete", exact: true }).boundingBox();
-    check("wide: the status buttons, Edit course and Delete are at the top right, in the row of the breadcrumb", st.x > crumb.x + crumb.width && Math.abs(st.y - crumb.y) < 40 && edit.x > st.x && del.x > edit.x && del.x + del.width > 1000, JSON.stringify({ crumb, st, edit, del }));
+    check("wide: the status buttons, Edit course and Delete are at the top right of the title row (right of the course name, below the breadcrumb)", st.y > crumb.y + crumb.height && st.x > title.x + title.width && Math.abs(st.y - title.y) < 60 && edit.x > st.x && del.x > edit.x && del.x + del.width > 1000, JSON.stringify({ crumb, title, st, edit, del }));
     check("and the category badge is not on the course page", (await page.locator("h1").locator("xpath=..").getByText("Digital Marketing", { exact: true }).count()) <= 1);
   }
   await statusTabs.getByRole("tab", { name: "Paused" }).click();
@@ -128,9 +129,9 @@ const browser = await launch();
   check("wide: only the active courses are listed, two in the first row", links.length === 4 && links[0].top === links[1].top && links[1].left > links[0].left && links[2].top > links[0].top && links[2].top === links[3].top, JSON.stringify(links));
   // How much is left to finish: units and topics.
   const boxOf = (title) => section.locator("li", { hasText: title }).first();
-  check("a course box says how many units and topics are left", (await boxOf("Google Ads").getByText("3 of 5 units left · 16 of 30 topics left", { exact: true }).count()) === 1);
-  check("and says when all units are done and one topic is left", (await boxOf("Meta Ads").getByText("All 4 units done · 1 of 12 topics left", { exact: true }).count()) === 1);
-  check("a course with no units or topics yet says nothing extra (it still says 'No topics yet')", (await boxOf("SQL").getByText("No topics yet").count()) === 1 && (await boxOf("SQL").getByText(/left|done · /).count()) === 0);
+  check("a course box says how many units and topics are left, in the line under its name (not in a line of its own)", (await boxOf("Google Ads").getByText(/^Digital Marketing · 3 of 5 units left · 16 of 30 topics left$/).count()) === 1);
+  check("and says when all units are done and one topic is left", (await boxOf("Meta Ads").getByText(/All 4 units done · 1 of 12 topics left$/).count()) === 1);
+  check("a course with no units or topics yet says nothing extra (it says 'No time counted yet')", (await boxOf("SQL").getByText("No time counted yet").count()) === 1 && (await boxOf("SQL").getByText("Data · No units yet").count()) === 1 && (await boxOf("SQL").getByText(/ left$/).count()) === 0);
   check("an older answer without the counts shows no 'left' line (English)", (await boxOf("English").getByText(/ left$/).count()) === 0);
   check("wide: both are about the same width (half the width)", Math.abs(links[0].width - links[1].width) <= 2, JSON.stringify(links));
   if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/learning-wide.png`, fullPage: true });
@@ -167,7 +168,7 @@ const browser = await launch();
   check("the course boxes have no 'New' button of their own any more", (await section.getByRole("button", { name: "New" }).count()) === 0);
   const titles = async () => (await section.locator("a").evaluateAll((els) => els.map((e) => e.querySelector("span.truncate")?.textContent ?? ""))).sort();
   await page.getByRole("tablist", { name: "Category" }).getByRole("tab", { name: "Digital Marketing" }).click();
-  check("a category shows its courses (Google Ads and Meta Ads), with the category on the box", JSON.stringify(await titles()) === JSON.stringify(["Google Ads", "Meta Ads"]) && (await section.getByText(/^Digital Marketing · \d+ units/).count()) >= 1, JSON.stringify(await titles()));
+  check("a category shows its courses (Google Ads and Meta Ads), with the category on the box", JSON.stringify(await titles()) === JSON.stringify(["Google Ads", "Meta Ads"]) && (await section.getByText(/^Digital Marketing · .*units?/).count()) >= 1, JSON.stringify(await titles()));
   await page.getByRole("tablist", { name: "Status" }).getByRole("tab", { name: /Paused/ }).click();
   check("paused courses of that category", JSON.stringify(await titles()) === JSON.stringify(["Paused course"]));
   check("on Paused, only the categories of paused courses are offered (Data has none paused)", JSON.stringify(await tabs("Category")) === JSON.stringify(["All", "Digital Marketing"]), JSON.stringify(await tabs("Category")));

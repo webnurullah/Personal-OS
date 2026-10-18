@@ -10,7 +10,7 @@ import { clock, MAX_SESSION_SECONDS, spent, type ProjectTimeSummary } from "@/li
 import { useSecond } from "@/lib/use-second";
 import { Skeleton } from "@/components/ui/states";
 
-/** Habits → "Project time": how long you worked on each project, each of the last 7 days (kept by the timer on the project page). */
+/** Habits → "Project time": how long you worked on each project and course, each of the last 7 days (kept by the timer on the project and course pages). */
 export function ProjectTimeCard({ className = "" }: { className?: string }) {
   const [skew, setSkew] = useState(0);
   const { data, error } = useSWR<ProjectTimeSummary>("/project-time?days=7", { onSuccess: (d) => setSkew(new Date(d.now).getTime() - Date.now()) });
@@ -19,7 +19,7 @@ export function ProjectTimeCard({ className = "" }: { className?: string }) {
   if (!data) {
     return (
       <section className={`card p-5 ${className}`} aria-labelledby="project-time-title">
-        <h2 id="project-time-title" className="card-title">Project time</h2>
+        <h2 id="project-time-title" className="card-title">Project &amp; course time</h2>
         {error ? <p className="mt-3 text-sm text-slate-500">The project time could not be loaded.</p> : <Skeleton className="mt-4 h-24" />}
       </section>
     );
@@ -38,8 +38,8 @@ export function ProjectTimeCard({ className = "" }: { className?: string }) {
             <Timer className="size-5" aria-hidden />
           </span>
           <div className="min-w-0">
-            <h2 id="project-time-title" className="card-title">Project time</h2>
-            <p className="text-xs text-slate-500">How long you worked on each project, last 7 days. Start the timer on a project page.</p>
+            <h2 id="project-time-title" className="card-title">Project &amp; course time</h2>
+            <p className="text-xs text-slate-500">How long you worked on each project and course, last 7 days. Start the timer on a project or course page.</p>
           </div>
         </div>
         <dl className="flex shrink-0 gap-4 text-right">
@@ -59,12 +59,12 @@ export function ProjectTimeCard({ className = "" }: { className?: string }) {
           <span className="size-2 shrink-0 animate-pulse rounded-full bg-emerald-500" aria-hidden />
           <span className="min-w-0 break-words">Timer running on <b className="font-semibold">{running.name}</b></span>
           <span className="font-semibold tabular-nums" role="timer" aria-label="This session">{clock(sinceStart)}</span>
-          <Link href={`/projects/${running.project_id}`} className="font-semibold underline">Open</Link>
+          <Link href={`${running.kind === "course" ? "/learning" : "/projects"}/${running.project_id}`} className="font-semibold underline">Open</Link>
         </p>
       )}
 
       {lines.length === 0 ? (
-        <p className="mt-4 rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">No time kept yet. Open a project and press Start.</p>
+        <p className="mt-4 rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">No time kept yet. Open a project or a course and press Start.</p>
       ) : (
         <ul className="mt-4 divide-y divide-slate-100">
           {lines.map((p) => {
@@ -72,9 +72,10 @@ export function ProjectTimeCard({ className = "" }: { className?: string }) {
             return (
               <li key={p.id} className="py-3">
                 <div className="flex items-baseline justify-between gap-3">
-                  <Link href={`/projects/${p.id}`} className="flex min-w-0 items-center gap-2 text-sm font-semibold text-slate-800 hover:text-blue-600">
+                  <Link href={`${p.kind === "course" ? "/learning" : "/projects"}/${p.id}`} className="flex min-w-0 items-center gap-2 text-sm font-semibold text-slate-800 hover:text-blue-600">
                     <span className={`size-2.5 shrink-0 rounded-full ${color.dot}`} aria-hidden />
                     <span className="min-w-0 truncate" title={p.name}>{p.name}</span>
+                    {p.kind === "course" && <span className="badge shrink-0 bg-slate-100 text-slate-600">Course</span>}
                   </Link>
                   <span className="shrink-0 whitespace-nowrap text-xs text-slate-500">
                     <b className="font-semibold tabular-nums text-slate-700">{spent(p.week_seconds)}</b> this week · {spent(p.total_seconds)} in all

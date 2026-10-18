@@ -78,7 +78,6 @@ for (const width of [390, 320]) {
   await page.waitForTimeout(700);
   check("planning sends the mode and the weekly hours", calls[0]?.body?.mode === "plan" && calls[0].body.weekly_hours === 4, JSON.stringify(calls[0]?.body));
   check("it says what was planned and warns about hours that do not fit", (await page.getByText("Planned 3 topics for weeks 4–6.").count()) === 1 && (await page.getByText(/2h do not fit before the target date/).count()) === 1);
-  check("the Planned Hours boxes show the new plan", (await page.getByLabel("Planned hours for week 4", { exact: true }).inputValue()) === "7" && (await page.getByLabel("Planned hours for week 1", { exact: true }).inputValue()) === "", `${await page.getByLabel("Planned hours for week 4", { exact: true }).inputValue()} / ${await page.getByLabel("Planned hours for week 1", { exact: true }).inputValue()}`);
   await page.getByRole("button", { name: "Plan weeks" }).click();
   await page.getByRole("dialog").getByRole("button", { name: /Carry over/ }).click();
   await page.waitForTimeout(700);

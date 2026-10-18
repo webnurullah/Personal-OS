@@ -137,6 +137,8 @@ export type CourseSummary = {
   est_hours: number;
   done_hours: number;
   spent_hours: number;
+  /** Seconds counted by the timer on the course page (the older answers have none). */
+  time_seconds?: number;
   percent: number;
   topic_count: number;
   unit_count: number;

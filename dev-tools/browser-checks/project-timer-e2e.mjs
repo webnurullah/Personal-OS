@@ -71,6 +71,15 @@ for (const width of [390, 320, 1280]) {
   const timer = page.getByRole("timer", { name: "Time spent on this project" });
   await timer.waitFor();
   await page.getByRole("button", { name: "Continue" }).waitFor();
+  if (wide) {
+    // Top right: "Due in 74 days" and the goal sit to the left of the buttons, on the right side of the header.
+    const badge = await page.getByText("Due in 74 days", { exact: true }).first().boundingBox();
+    const goal = await page.getByText("Make Fully CRM, Get 5 Lakh", { exact: true }).boundingBox();
+    const head = await page.locator("h1").boundingBox();
+    const done = await page.getByRole("button", { name: "Mark done" }).boundingBox();
+    check("wide: the due badge and the goal are at the top right, left of the buttons (not under the name)", badge.x > head.x + 400 && goal.x > head.x + head.width + 100 && badge.x + badge.width <= done.x + 2 && goal.x + goal.width <= done.x + 2 && badge.y < head.y + 60, JSON.stringify({ badge, goal, head, done }));
+  }
+
   check(`${width}px: the card shows the time already spent (1h 30m + 30m = 2:00:00) and is paused`, (await timer.innerText()).trim() === "2:00:00" && (await page.getByText(/^Paused/).count()) === 1);
   check(`${width}px: next to Tasks and Timeframe, with a Continue button (time exists already)`, (await page.getByText("Time spent", { exact: true }).count()) === 1 && (await page.getByRole("button", { name: "Continue" }).count()) === 1);
   let m = await measure(page, width);
@@ -87,9 +96,9 @@ for (const width of [390, 320, 1280]) {
 
   // It keeps running when you leave and come back (the server keeps it).
   await page.goto(`${BASE}/habits`);
-  const card = page.locator("section", { has: page.getByRole("heading", { name: "Project time" }) });
+  const card = page.locator("section", { has: page.getByRole("heading", { name: "Project & course time" }) });
   await card.waitFor();
-  check(`${width}px: Habits → Project time shows the running timer and the project`, (await card.getByText(/Timer running on/).count()) === 1 && (await card.getByRole("link", { name: /CRM/ }).count()) >= 1);
+  check(`${width}px: Habits → Project & course time shows the running timer and the project`, (await card.getByText(/Timer running on/).count()) === 1 && (await card.getByRole("link", { name: /CRM/ }).count()) >= 1);
   check(`${width}px: it shows this week's time per project (2h 00m, with today's bar) and 7 days`, (await card.getByText("2h 00m").count()) >= 1 && (await card.locator("ol li").count()) === 7, (await card.innerText()).slice(0, 200));
   m = await measure(page, width);
   check(`${width}px: the Habits page fits the screen with Project time`, !m.zoomedOut && m.mainClipped === 0 && m.offenders.length === 0, JSON.stringify(m));
@@ -133,7 +142,7 @@ for (const width of [390, 320, 1280]) {
   });
   const page = await ctx.newPage();
   await page.goto(`${BASE}/habits`);
-  await page.getByText("No time kept yet. Open a project and press Start.").waitFor();
+  await page.getByText("No time kept yet. Open a project or a course and press Start.").waitFor();
   check("Habits → Project time with no time says how to begin", true);
   await page.goto(`${BASE}/projects/p3`);
   await page.getByRole("button", { name: "Start" }).waitFor();

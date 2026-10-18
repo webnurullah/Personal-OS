@@ -4,7 +4,7 @@ import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
-import { Award, BookOpen, Check, Copy, ExternalLink, Hammer, Link2, ListVideo, Pencil, Play, Plus, RotateCcw, Star, Video, type LucideIcon } from "lucide-react";
+import { Award, BookOpen, Check, Circle, Copy, ExternalLink, Hammer, Link2, ListVideo, Pencil, Play, Plus, RotateCcw, Star, Video, type LucideIcon } from "lucide-react";
 import { toArchive } from "@/lib/archive";
 import { api, errorMessage, refresh } from "@/lib/api";
 import { formatDate, daysBetween } from "@/lib/dates";
@@ -219,19 +219,23 @@ export function ResourceRow({ item, today, courseName, onEdit, onComplete }: { i
           {item.status === "dropped" && item.dropped_reason && <p className="mt-2 text-sm text-slate-500">Dropped: {item.dropped_reason}</p>}
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            {item.status === "todo" && (
-              <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={() => run({ status: "learning" })}>
-                <Play className="size-3.5" /> Start
-              </button>
+            {(item.status === "todo" || item.status === "learning") && (
+              // Where this item stands, in one line: the button of the current step is blue; the others are a tap away.
+              <div className="grid w-full max-w-sm grid-cols-3 gap-2" role="group" aria-label={`Progress of ${item.title}`}>
+                <button type="button" className={`btn btn-sm h-9 w-full justify-center ${item.status === "todo" ? "btn-primary" : "btn-secondary"}`} disabled={busy} aria-pressed={item.status === "todo"} onClick={() => item.status !== "todo" && run({ status: "todo" })}>
+                  <Circle className="size-3.5" /> To do
+                </button>
+                <button type="button" className={`btn btn-sm h-9 w-full justify-center ${item.status === "learning" ? "btn-primary" : "btn-secondary"}`} disabled={busy} aria-pressed={item.status === "learning"} onClick={() => item.status !== "learning" && run({ status: "learning" })}>
+                  <Play className="size-3.5" /> Learning
+                </button>
+                <button type="button" className="btn btn-secondary btn-sm h-9 w-full justify-center" disabled={busy} onClick={onComplete}>
+                  <Check className="size-3.5" /> Complete
+                </button>
+              </div>
             )}
             {(item.status === "todo" || item.status === "learning") && counted && item.items_done < item.items_total && (
               <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={() => run({ items_done: item.items_done + 1 })}>
                 <Plus className="size-3.5" /> 1 {word}
-              </button>
-            )}
-            {(item.status === "todo" || item.status === "learning") && (
-              <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={onComplete}>
-                <Check className="size-3.5" /> Complete
               </button>
             )}
             {item.status === "completed" && practice && (

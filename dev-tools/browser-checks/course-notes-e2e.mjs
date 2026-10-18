@@ -46,8 +46,8 @@ for (const width of [390, 320, 1280]) {
   check(`${width}px: it is a simple note: a toolbar, nothing about public or private`, (await page.getByRole("toolbar", { name: "Text formatting" }).count()) === 1 && (await page.getByRole("switch").count()) === 0 && (await page.locator("#notes-title").locator("xpath=ancestor::section").getByText(/public|private/i).count()) === 0);
   {
     const y = async (selector) => (await page.locator(selector).first().boundingBox()).y;
-    const [topics, playlists, notes, plan] = [await y("#topics-title"), await y("section[aria-labelledby='library-title']"), await y("#notes-title"), await y("#plan-title")];
-    check(`${width}px: the Notes card comes after the Topics and the Courses & playlists sections (and before the weekly plan)`, topics < playlists && playlists < notes && notes < plan, JSON.stringify({ topics, playlists, notes, plan }));
+    const [topics, playlists, notes] = [await y("#topics-title"), await y("section[aria-labelledby='library-title']"), await y("#notes-title")];
+    check(`${width}px: the Notes card comes after the Topics and the Courses & playlists sections`, topics < playlists && playlists < notes, JSON.stringify({ topics, playlists, notes }));
   }
   let m = await measure(page, width);
   check(`${width}px: the course page does not overflow with the editor`, !m.zoomedOut && m.mainClipped === 0 && m.offenders.length === 0, JSON.stringify(m));

@@ -5,7 +5,7 @@ import useSWR from "swr";
 import { Award, Check, Copy, ExternalLink, GraduationCap, ListChecks, Plus, Search, Sparkles } from "lucide-react";
 import { formatDate } from "@/lib/dates";
 import { hm } from "@/lib/format";
-import { certificateExpiry, compareUpNext, expiryLabel, hasCertificate, kindLabel, KINDS, LEVELS, libraryStats, needsPractice, resumeLine, skillLadder, upNext, WIP_LIMIT } from "@/lib/library";
+import { certificateExpiry, compareUpNext, expiryLabel, hasCertificate, kindLabel, KINDS, LEVELS, libraryStats, needsPractice, resumeLine, skillLadder, WIP_LIMIT } from "@/lib/library";
 import { skillKey } from "@/lib/jobs";
 import { isHttpUrl } from "@/lib/projects";
 import { useProfile } from "@/lib/profile";
@@ -70,7 +70,6 @@ export function LibraryView() {
   const dropped = visible.filter((r) => r.status === "dropped");
   const completed = visible.filter((r) => r.status === "completed").sort((a, b) => newest(b).localeCompare(newest(a)));
   const certificates = visible.filter(hasCertificate).sort((a, b) => (b.issued_on ?? newest(b)).localeCompare(a.issued_on ?? newest(a)));
-  const next = upNext(visible);
   const waiting = completed.filter((r) => needsPractice(r, today)).length;
   const mySkills = new Set((profile?.skills ?? []).map(skillKey));
   const ladder = skillLadder(items, practiceProjects);
@@ -166,20 +165,6 @@ export function LibraryView() {
                     <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800 ring-1 ring-amber-100">
                       You have {stats.learning} things in progress (more than {WIP_LIMIT}). Finishing one before starting another is faster than juggling them all.
                     </p>
-                  )}
-                  {next.length > 0 && open.length > WIP_LIMIT && (
-                    <section className="card p-4" aria-labelledby="next-title">
-                      <h2 id="next-title" className="card-title">Up next</h2>
-                      <ol className="mt-2 space-y-1.5 text-sm">
-                        {next.map((r, i) => (
-                          <li key={r.id} className="flex items-baseline gap-2">
-                            <span className="font-semibold text-slate-400">{i + 1}.</span>
-                            <button type="button" className="min-w-0 text-left font-medium text-slate-800 hover:text-blue-700" onClick={() => setEditing(r)}>{r.title}</button>
-                            {r.status === "learning" && <span className="shrink-0 whitespace-nowrap text-xs text-blue-600">in progress</span>}
-                          </li>
-                        ))}
-                      </ol>
-                    </section>
                   )}
                   {open.length === 0 ? (
                     <div className="card">

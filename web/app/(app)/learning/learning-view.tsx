@@ -11,6 +11,7 @@ import { api, errorMessage, refresh } from "@/lib/api";
 import { addDays, formatDate, mondayOf } from "@/lib/dates";
 import { COURSE_TEMPLATES, templateWeeks } from "@/lib/course-templates";
 import { hm, num, plural } from "@/lib/format";
+import { spent } from "@/lib/project-time";
 import { OUTLINE_LIMITS, parseOutline } from "@/lib/outline";
 import { COURSE_STATUSES, remainingText } from "@/lib/course";
 import { useProfile } from "@/lib/profile";
@@ -139,7 +140,7 @@ export function LearningView() {
                       </span>
                       <span className="min-w-0">
                         <span className="block truncate text-base font-semibold text-slate-900" title={course.title}>{course.title}</span>
-                        <span className="block truncate text-sm text-slate-500">{(course.category ?? "").trim() ? `${course.category} · ` : ""}{plural(course.unit_count, "unit")} · {plural(course.topic_count, "topic")}</span>
+                        <span className="block truncate text-sm text-slate-500">{[(course.category ?? "").trim(), remainingText(course) || (course.unit_count === 0 ? "No units yet" : `${plural(course.unit_count, "unit")} · ${plural(course.topic_count, "topic")}`)].filter(Boolean).join(" · ")}</span>
                       </span>
                     </span>
                     <span className="mt-3 flex flex-wrap items-center gap-1.5">
@@ -159,9 +160,8 @@ export function LearningView() {
                         <span className="text-xs font-semibold text-slate-600">{course.percent}%</span>
                       </span>
                       <span className="mt-1.5 block text-xs text-slate-500">
-                        {course.topic_count === 0 ? "No topics yet" : `${num(course.done_hours)}h of ${num(course.est_hours)}h done`}
+                        {(course.time_seconds ?? 0) > 0 ? `${spent(course.time_seconds ?? 0)} studied` : "No time counted yet"}
                       </span>
-                      {remainingText(course) && <span className="mt-0.5 block text-xs font-medium text-slate-600">{remainingText(course)}</span>}
                     </span>
                   </Link>
                 </li>

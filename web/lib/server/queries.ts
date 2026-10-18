@@ -1,5 +1,6 @@
 // Database reads shared by several endpoints.
 import { doneHours } from "../course.ts";
+import { sessionSeconds } from "../project-time.ts";
 import { courseHealth } from "../study.ts";
 import { addDays, daysBetween } from "./dates.ts";
 import { must } from "./http.ts";
@@ -21,17 +22,20 @@ const round3 = (n: number) => Math.round(n * 1000) / 1000;
 /** Every course with its units and topics (the plain facts the summaries and "Study next" are worked out from). */
 export async function loadCourseFacts(db: Db) {
   // Past 1,000 topics Supabase would cut the list short, so topics and units are read page by page.
-  const [courses, topics, units] = await Promise.all([
+  const [courses, topics, units, times] = await Promise.all([
     db.from("courses").select("id, title, subtitle, start_date, target_date, color, category, status").order("created_at").then(must),
     fetchAll(() => db.from("course_topics").select("id, course_id, unit_id, code, title, est_hours, actual_hours, status, planned_week, position").order("id")),
     fetchAll(() => db.from("course_units").select("id, course_id, position").order("id")),
+    // The time counted by the timer on each course page.
+    fetchAll(() => db.from("course_time").select("course_id, started_at, ended_at").order("id")),
   ]);
-  return { courses, topics, units };
+  return { courses, topics, units, times };
 }
 export type CourseFacts = Awaited<ReturnType<typeof loadCourseFacts>>;
 
 /** Short progress summary for each course (the Learning page and the course list). */
-export function summariseCourses({ courses, topics, units }: CourseFacts, today: string) {
+export function summariseCourses({ courses, topics, units, times = [] }: Omit<CourseFacts, "times"> & { times?: CourseFacts["times"] }, today: string) {
+  const now = Date.now();
   return courses.map((course) => {
     const mine = topics.filter((t) => t.course_id === course.id);
     const est = mine.reduce((sum, t) => sum + Number(t.est_hours), 0);
@@ -53,6 +57,8 @@ export function summariseCourses({ courses, topics, units }: CourseFacts, today:
       est_hours: round3(est),
       done_hours: round3(done),
       spent_hours: round3(mine.reduce((sum, t) => sum + Number(t.actual_hours), 0)),
+      // Seconds counted by the timer on the course page (a running timer is counted up to now).
+      time_seconds: times.filter((r) => r.course_id === course.id).reduce((sum, r) => sum + sessionSeconds(r, now), 0),
       percent: est ? Math.round((done / est) * 100) : 0,
       topic_count: mine.length,
       // Counted from the units themselves, so a unit with no topics yet is still a unit.

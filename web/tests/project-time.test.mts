@@ -2,7 +2,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { clock, dayOf, endFor, MAX_SESSION_SECONDS, projectState, sessionSeconds, spent, summariseTime, type TimeRow } from "../lib/project-time.ts";
-import { pauseTimer, startTimer, timeState } from "../lib/server/project-time.ts";
+import { pauseTimer, startTimer, timeState, timeSummary } from "../lib/server/project-time.ts";
 import { HttpError } from "../lib/server/http.ts";
 import type { Db } from "../lib/server/supabase.ts";
 
@@ -54,7 +54,7 @@ test("time per project and per day: this week, all time, today, and projects wit
 test("a running timer is counted up to now and reported, and the summary says what time the server read", () => {
   const withRunning: TimeRow[] = [...rows, { project_id: "b", started_at: "2026-10-18T09:00:00Z", ended_at: null }];
   const sum = summariseTime(withRunning, projects, "2026-10-18", "Asia/Dhaka", 7, T("2026-10-18T09:30:00Z"));
-  assert.deepEqual(sum.running, { project_id: "b", name: "Blog", started_at: "2026-10-18T09:00:00Z" });
+  assert.deepEqual(sum.running, { project_id: "b", kind: "project", name: "Blog", started_at: "2026-10-18T09:00:00Z" });
   assert.equal(sum.projects.find((p) => p.id === "b")!.by_day[6], 1800);
   assert.equal(sum.now, "2026-10-18T09:30:00.000Z");
 });
@@ -64,7 +64,7 @@ test("the state of one project: finished time and today's share, plus a running 
   const idle = projectState(own, "a", "", "2026-10-18", "Asia/Dhaka", T("2026-10-18T10:00:00Z"));
   assert.deepEqual([idle.closed_seconds, idle.today_closed_seconds, idle.running], [12600, 3600, null]);
   const elsewhere = projectState([...own, { project_id: "b", started_at: "2026-10-18T09:00:00Z", ended_at: null }], "a", "Blog", "2026-10-18", "Asia/Dhaka", T("2026-10-18T10:00:00Z"));
-  assert.deepEqual(elsewhere.running, { project_id: "b", name: "Blog", started_at: "2026-10-18T09:00:00Z", started_today: true });
+  assert.deepEqual(elsewhere.running, { project_id: "b", kind: "project", name: "Blog", started_at: "2026-10-18T09:00:00Z", started_today: true });
   assert.equal(elsewhere.closed_seconds, 12600, "time of the project that is running elsewhere is not added to this one");
 });
 
@@ -116,9 +116,9 @@ const NOW = T("2026-10-18T10:00:00Z");
 test("Start begins a timer; starting again on the same project changes nothing", async () => {
   const tables = { projects: [{ id: "a", name: "CRM", archived_at: null }, { id: "b", name: "Blog", archived_at: null }], project_time: [] as Row[] };
   const { db, log } = fakeDb(tables);
-  await startTimer(db, "a", NOW);
+  await startTimer(db, "project", "a", NOW);
   assert.deepEqual(tables.project_time.map((r) => [r.project_id, r.ended_at]), [["a", null]]);
-  await startTimer(db, "a", NOW + 5000);
+  await startTimer(db, "project", "a", NOW + 5000);
   assert.equal(tables.project_time.length, 1);
   assert.equal(log.filter((l) => l.startsWith("insert")).length, 1);
 });
@@ -126,30 +126,30 @@ test("Start begins a timer; starting again on the same project changes nothing",
 test("starting another project pauses the first one (one timer at a time)", async () => {
   const tables = { projects: [{ id: "a", name: "CRM", archived_at: null }, { id: "b", name: "Blog", archived_at: null }], project_time: [{ project_id: "a", started_at: "2026-10-18T08:00:00.000Z", ended_at: null }] as Row[] };
   const { db } = fakeDb(tables);
-  await startTimer(db, "b", NOW);
+  await startTimer(db, "project", "b", NOW);
   assert.deepEqual(tables.project_time.map((r) => [r.project_id, r.ended_at]), [["a", "2026-10-18T10:00:00.000Z"], ["b", null]]);
 });
 
 test("a timer left running for more than 12 hours is cut at 12 hours when it is paused", async () => {
   const tables = { projects: [{ id: "a", name: "CRM", archived_at: null }], project_time: [{ project_id: "a", started_at: "2026-10-17T00:00:00.000Z", ended_at: null }] as Row[] };
   const { db } = fakeDb(tables);
-  await pauseTimer(db, "a", NOW);
+  await pauseTimer(db, "project", "a", NOW);
   assert.equal(tables.project_time[0].ended_at, "2026-10-17T12:00:00.000Z");
 });
 
 test("Pause only pauses a timer that runs on this project", async () => {
-  const tables = { projects: [{ id: "a", name: "CRM", archived_at: null }], project_time: [{ project_id: "other", started_at: "2026-10-18T08:00:00.000Z", ended_at: null }] as Row[] };
+  const tables = { projects: [{ id: "a", name: "CRM", archived_at: null }, { id: "other", name: "Other", archived_at: null }], project_time: [{ project_id: "other", started_at: "2026-10-18T08:00:00.000Z", ended_at: null }] as Row[] };
   const { db, log } = fakeDb(tables);
-  await pauseTimer(db, "a", NOW);
+  await pauseTimer(db, "project", "a", NOW);
   assert.equal(tables.project_time[0].ended_at, null);
   assert.equal(log.length, 0);
 });
 
 test("an archived project cannot be timed, and two taps at once leave one running timer without an error", async () => {
   const archived = fakeDb({ projects: [{ id: "a", name: "CRM", archived_at: "2026-10-01T00:00:00Z" }], project_time: [] });
-  await assert.rejects(() => startTimer(archived.db, "a", NOW), (e) => e instanceof HttpError && e.status === 400);
+  await assert.rejects(() => startTimer(archived.db, "project", "a", NOW), (e) => e instanceof HttpError && e.status === 400);
   const race = fakeDb({ projects: [{ id: "a", name: "CRM", archived_at: null }], project_time: [] }, { uniqueRace: true });
-  await startTimer(race.db, "a", NOW); // the database refused the second timer: that is fine
+  await startTimer(race.db, "project", "a", NOW); // the database refused the second timer: that is fine
 });
 
 test("the state answers with the time already spent and where the timer runs", async () => {
@@ -161,6 +161,50 @@ test("the state answers with the time already spent and where the timer runs", a
     ] as Row[],
   };
   const { db } = fakeDb(tables);
-  const state = await timeState(db, "a", "Asia/Dhaka", "2026-10-18", NOW);
+  const state = await timeState(db, "project", "a", "Asia/Dhaka", "2026-10-18", NOW);
   assert.deepEqual([state.closed_seconds, state.today_closed_seconds, state.running?.project_id, state.running?.name], [3600, 3600, "b", "Blog"]);
+});
+
+test("a course has its own timer, and starting it pauses a running project (one timer at a time across both)", async () => {
+  const tables = {
+    projects: [{ id: "a", name: "CRM", archived_at: null }],
+    courses: [{ id: "c", title: "Digital Marketing" }],
+    project_time: [{ project_id: "a", started_at: "2026-10-18T08:00:00.000Z", ended_at: null }] as Row[],
+    course_time: [] as Row[],
+  };
+  const { db } = fakeDb(tables);
+  await startTimer(db, "course", "c", NOW);
+  assert.equal(tables.project_time[0].ended_at, "2026-10-18T10:00:00.000Z", "the project timer was paused");
+  assert.deepEqual(tables.course_time.map((r) => [r.course_id, r.ended_at]), [["c", null]]);
+  await startTimer(db, "course", "c", NOW + 4000);
+  assert.equal(tables.course_time.length, 1, "starting again on the same course changes nothing");
+  // And the other way round: a project start pauses the course.
+  await startTimer(db, "project", "a", NOW + 60_000);
+  assert.equal(tables.course_time[0].ended_at, new Date(NOW + 60_000).toISOString());
+  assert.equal(tables.project_time.filter((r) => !r.ended_at).length, 1);
+});
+
+test("the state of a course says where the timer runs, even when it is on a project", async () => {
+  const tables = {
+    projects: [{ id: "a", name: "CRM", archived_at: null }],
+    courses: [{ id: "c", title: "Digital Marketing" }],
+    project_time: [{ project_id: "a", started_at: "2026-10-18T09:00:00.000Z", ended_at: null }] as Row[],
+    course_time: [{ course_id: "c", started_at: "2026-10-18T04:00:00.000Z", ended_at: "2026-10-18T05:30:00.000Z" }] as Row[],
+  };
+  const { db } = fakeDb(tables);
+  const state = await timeState(db, "course", "c", "Asia/Dhaka", "2026-10-18", NOW);
+  assert.deepEqual([state.closed_seconds, state.running?.project_id, state.running?.kind, state.running?.name], [5400, "a", "project", "CRM"]);
+});
+
+test("the Habits summary lists projects and courses together, and says what the running timer is on", async () => {
+  const tables = {
+    projects: [{ id: "a", name: "CRM", color: "amber" }],
+    courses: [{ id: "c", title: "Digital Marketing", color: "blue" }],
+    project_time: [{ project_id: "a", started_at: "2026-10-18T04:00:00.000Z", ended_at: "2026-10-18T05:00:00.000Z" }] as Row[],
+    course_time: [{ course_id: "c", started_at: "2026-10-18T06:00:00.000Z", ended_at: null }] as Row[],
+  };
+  const { db } = fakeDb(tables);
+  const sum = await timeSummary(db, "Asia/Dhaka", "2026-10-18", 7, T("2026-10-18T06:30:00Z"));
+  assert.deepEqual(sum.projects.map((p) => [p.kind, p.name, p.week_seconds]).sort(), [["course", "Digital Marketing", 1800], ["project", "CRM", 3600]]);
+  assert.deepEqual([sum.running?.kind, sum.running?.name], ["course", "Digital Marketing"]);
 });

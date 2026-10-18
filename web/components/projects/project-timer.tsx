@@ -4,23 +4,24 @@ import { useState } from "react";
 import useSWR from "swr";
 import { Pause, Play } from "lucide-react";
 import { api, errorMessage, refresh } from "@/lib/api";
-import { clock, MAX_SESSION_SECONDS, spent, type ProjectTimeState } from "@/lib/project-time";
+import { clock, MAX_SESSION_SECONDS, spent, type ProjectTimeState, type TimeKind } from "@/lib/project-time";
 import { useSecond } from "@/lib/use-second";
 import { useFeedback } from "@/components/ui/feedback";
 
 /**
- * "Time spent" on a project page: a clock that counts up while you work on it. Press Start, and Pause when you stop; pressing Start
+ * "Time spent" on a project page or a course page: a clock that counts up while you work on it. Press Start, and Pause when you stop; pressing Start
  * again carries on from the time already spent. The timer lives on the server, so it keeps running if you close the page.
  * Only one project can have a running timer: starting here stops the other one.
  */
-export function ProjectTimer({ projectId, archived }: { projectId: string; archived: boolean }) {
+export function ProjectTimer({ kind = "project", projectId, archived = false }: { kind?: TimeKind; projectId: string; archived?: boolean }) {
   const { toast } = useFeedback();
   // How far this device's clock is from the server's, so a wrong clock on the phone does not show wrong seconds.
   const [skew, setSkew] = useState(0);
   const [busy, setBusy] = useState(false);
-  const { data, error, mutate } = useSWR<ProjectTimeState>(`/projects/${projectId}/time`, { onSuccess: (d) => setSkew(new Date(d.now).getTime() - Date.now()) });
+  const base = `/${kind === "course" ? "courses" : "projects"}/${projectId}/time`;
+  const { data, error, mutate } = useSWR<ProjectTimeState>(base, { onSuccess: (d) => setSkew(new Date(d.now).getTime() - Date.now()) });
 
-  const here = data?.running?.project_id === projectId;
+  const here = data?.running?.project_id === projectId && data.running.kind === kind;
   const second = useSecond(Boolean(data?.running));
   const sinceStart = data?.running ? Math.min(MAX_SESSION_SECONDS, Math.max(0, Math.floor((second + skew - new Date(data.running.started_at).getTime()) / 1000))) : 0;
   const elsewhere = Boolean(data?.running && !here);
@@ -30,7 +31,7 @@ export function ProjectTimer({ projectId, archived }: { projectId: string; archi
   const press = async (action: "start" | "pause") => {
     setBusy(true);
     try {
-      const next = await api<ProjectTimeState>(`/projects/${projectId}/time`, { method: "POST", body: { action } });
+      const next = await api<ProjectTimeState>(base, { method: "POST", body: { action } });
       setSkew(new Date(next.now).getTime() - Date.now());
       await mutate(next, { revalidate: false });
       void refresh("/project-time");
@@ -46,7 +47,7 @@ export function ProjectTimer({ projectId, archived }: { projectId: string; archi
   return (
     <section className="card p-5" aria-labelledby="timer-title">
       <p id="timer-title" className="text-xs font-medium text-slate-500">Time spent</p>
-      <p className="mt-0.5 flex items-center gap-2 text-2xl font-bold tabular-nums text-slate-900" role="timer" aria-label="Time spent on this project">
+      <p className="mt-0.5 flex items-center gap-2 text-2xl font-bold tabular-nums text-slate-900" role="timer" aria-label={`Time spent on this ${kind}`}>
         {data ? clock(total) : error ? "–:––:––" : "0:00:00"}
         {here && <span className="size-2.5 shrink-0 animate-pulse rounded-full bg-emerald-500" title="Running" aria-hidden />}
       </p>

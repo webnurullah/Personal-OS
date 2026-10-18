@@ -168,6 +168,41 @@ export type Database = {
 
         ];
       };
+      course_time: {
+        Row: {
+          id: string;
+          user_id: string;
+          course_id: string;
+          started_at: string;
+          ended_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string;
+          course_id: string;
+          started_at?: string;
+          ended_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          course_id?: string;
+          started_at?: string;
+          ended_at?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'course_time_course_id_fkey';
+            columns: ['course_id'];
+            isOneToOne: false;
+            referencedRelation: 'courses';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       course_topics: {
         Row: {
           id: string;

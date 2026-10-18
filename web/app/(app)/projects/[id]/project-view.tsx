@@ -177,14 +177,18 @@ export function ProjectView({ id }: { id: string }) {
             <p className="mt-1 text-slate-500 [overflow-wrap:anywhere]">
               {project.client || "Your own project"} · {kindLabel(project.kind)}
             </p>
-            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          </div>
+        </div>
+        {/* Top right: how it stands in time and the goal, then the buttons. */}
+        <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-start lg:justify-end lg:gap-6">
+          <div className="min-w-0 lg:max-w-sm lg:pt-1 lg:text-right">
+            <div className="flex flex-wrap items-center gap-1.5 lg:justify-end">
               <TimeBadge timeframe={project.timeframe} />
               {project.status === "paused" && <span className="badge bg-slate-100 text-slate-500">Paused</span>}
             </div>
-            {project.goal && <p className="mt-3 max-w-2xl text-slate-700 [overflow-wrap:anywhere]">{project.goal}</p>}
+            {project.goal && <p className="mt-2 text-slate-700 [overflow-wrap:anywhere]">{project.goal}</p>}
           </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
           {!archived &&
             (project.status === "done" ? (
               <button type="button" className="btn btn-secondary" onClick={() => setStatus("active")}>
@@ -207,6 +211,7 @@ export function ProjectView({ id }: { id: string }) {
               Archive
             </button>
           )}
+          </div>
         </div>
       </header>
 

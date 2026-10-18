@@ -5,19 +5,19 @@ import { useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
-import { CalendarCheck, CalendarDays, ChevronLeft, ClipboardPaste, Clock, GraduationCap, Hourglass, Layers, ListPlus, Pencil, Plus, Route, Target, Trash2 } from "lucide-react";
+import { CalendarCheck, CalendarDays, ChevronLeft, ClipboardPaste, GraduationCap, Layers, ListPlus, Pencil, Plus, Route, Trash2 } from "lucide-react";
 import { api, ApiError, errorMessage, refresh } from "@/lib/api";
 import { cacheMutate } from "@/lib/cache";
 import { colorOf } from "@/lib/colors";
 import { COURSE_STATUSES, courseStats, nextNumber, timeLeft } from "@/lib/course";
 import { addDays, formatDate } from "@/lib/dates";
-import { num, pct, plural } from "@/lib/format";
+import { num, plural } from "@/lib/format";
 import type { CourseDetail, CourseStatus, Topic, TopicStatus, Unit } from "@/lib/types";
 import { useProfile } from "@/lib/profile";
 import { useMedia } from "@/lib/use-media";
 import { useSaveLater } from "@/lib/use-save-later";
 import { CourseNotes } from "./course-notes";
-import { Progress } from "@/components/ui/charts";
+import { ProjectTimer } from "@/components/projects/project-timer";
 import { ColorPicker, Field, Segmented } from "@/components/ui/controls";
 import { useFeedback } from "@/components/ui/feedback";
 import { Modal, ModalActions } from "@/components/ui/modal";
@@ -36,49 +36,12 @@ const unitName = (unit: Pick<Unit, "code" | "title">) => unit.title || `Unit ${u
 
 type TopicModal = { unitId: string; topic?: Topic };
 
-const clampHours = (value: number, max: number) => Math.min(max, Math.max(0, value));
-
-/**
- * A number box for hours that saves as you type. While you are typing it shows what you typed; when you leave it, it shows
- * the value that is saved (the limits applied, or the number the database kept instead, for example a total that cannot
- * be lower than the study sessions), so what is on screen is never different from what is stored.
- */
-function HoursBox({ value, max, label, className, onValue }: { value: number; max: number; label: string; className: string; onValue: (hours: number) => void }) {
-  const [draft, setDraft] = useState<string | null>(null);
-  return (
-    <input
-      type="number"
-      min={0}
-      max={max}
-      step={0.25}
-      value={draft ?? (value ? String(value) : "")}
-      placeholder="–"
-      className={className}
-      aria-label={label}
-      onFocus={() => setDraft(value ? String(value) : "")}
-      onChange={(e) => {
-        setDraft(e.target.value);
-        // A half-typed number ("-", "1e", ".") reads as empty: nothing is saved until it is a number (or really empty).
-        if (e.target.value === "" && e.target.validity.badInput) return;
-        const hours = e.target.value === "" ? 0 : e.target.valueAsNumber;
-        if (!Number.isNaN(hours)) onValue(clampHours(hours, max));
-      }}
-      onBlur={(e) => {
-        setDraft(null);
-        // Leftover junk text is cleared, so the box shows the saved value (or nothing) again.
-        if (e.currentTarget.validity.badInput) e.currentTarget.value = "";
-      }}
-    />
-  );
-}
-
 export function CourseView({ id }: { id: string }) {
   const router = useRouter();
   const { data, error, mutate } = useSWR<CourseDetail>(`/courses/${id}`);
   const { toast, confirm } = useFeedback();
   const saveLater = useSaveLater();
   const wide = useMedia("(min-width: 40rem)"); // one layout of the topics at a time: cards on a phone, the table from tablet up
-  const [syncKey, setSyncKey] = useState(0); // changes after a failed save so the number boxes start again from the real values
   // What a topic's fields were before a series of unsaved changes (typing a number sends many): a failed save goes back to these.
   const baseline = useRef(new Map<string, Record<string, unknown>>());
   // The newest change made to each topic: an answer to an older save must not undo a newer one.
@@ -114,9 +77,8 @@ export function CourseView({ id }: { id: string }) {
   const failed = async (e: unknown, undo?: () => void) => {
     toast(errorMessage(e), "error");
     undo?.(); // back to what was saved, also when there is no connection to ask again
-    // Then ask again; the number boxes are made new only once the saved values are back.
+    // Then ask again.
     await mutate().catch(() => undefined);
-    setSyncKey((k) => k + 1);
   };
 
   /** Puts a topic's values back to what they were before the changes that could not be saved. */
@@ -177,14 +139,6 @@ export function CourseView({ id }: { id: string }) {
     else save();
   };
 
-  const changePlan = (week: number, hours: number) => {
-    const plan = stats.plan.map((h, i) => (i === week ? hours : h)).slice(0, 156);
-    mutate((current) => current && { ...current, course: { ...current.course, weekly_plan: plan } }, { revalidate: false });
-    saveLater("plan", () => {
-      api(`/courses/${course.id}`, { method: "PATCH", body: { weekly_plan: plan } }).catch(failed);
-    });
-  };
-
   /** A task for each topic still to study in this week's plan (due at the end of the week); pressing it twice adds nothing twice. */
   const addWeekTasks = async () => {
     try {
@@ -231,11 +185,6 @@ export function CourseView({ id }: { id: string }) {
     }
   };
 
-  const tiles = [
-    { label: "Total Learning Time", icon: Target, box: "bg-blue-50 ring-blue-100", tint: "text-blue-600", value: num(stats.total), unit: "hours", note: "(Estimated)", valueColor: "text-[#12305a]" },
-    { label: "Time Completed", icon: Clock, box: "bg-emerald-50 ring-emerald-100", tint: "text-emerald-600", value: num(stats.done), unit: "hours", note: `(${stats.progress}%)`, valueColor: "text-emerald-800" },
-    { label: "Time Remaining", icon: Hourglass, box: "bg-amber-50 ring-amber-100", tint: "text-amber-600", value: num(stats.left), unit: "hours", note: `(${pct(stats.left, stats.total)}%)`, valueColor: "text-[#12305a]" },
-  ];
 
   return (
     <>
@@ -248,7 +197,22 @@ export function CourseView({ id }: { id: string }) {
           <span>/</span>
           <span className="min-w-0 truncate text-slate-700">{course.title}</span>
         </nav>
-        {/* Top right: the course's status, Edit and Delete. */}
+      </div>
+
+      {/* Title + key numbers */}
+      <div className="mt-4 flex flex-col gap-5">
+        <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+        <div className="flex min-w-0 gap-4">
+          <span className="grid size-16 shrink-0 place-items-center rounded-2xl bg-[#12305a] text-white shadow-lg shadow-blue-900/20">
+            <GraduationCap className="size-9" />
+          </span>
+          <div className="min-w-0">
+            <h1 className="text-2xl font-bold leading-tight tracking-tight text-[#12305a] sm:text-[1.65rem]">{course.title}</h1>
+            {course.subtitle && <p className="mt-1 text-lg text-slate-700">{course.subtitle}</p>}
+            {course.quote && <p className="font-hand text-2xl text-slate-600">“{course.quote}”</p>}
+          </div>
+        </div>
+        {/* Top right of the title row: the course's status, Edit and Delete. */}
         <div className="flex max-w-full flex-wrap items-center justify-end gap-2">
           <div className="max-w-full overflow-x-auto">
             <Segmented label="Course status" value={course.status ?? "active"} onChange={setStatus} options={COURSE_STATUSES.map((x) => ({ value: x.value, label: x.label }))} />
@@ -262,33 +226,41 @@ export function CourseView({ id }: { id: string }) {
             </button>
           </span>
         </div>
-      </div>
-
-      {/* Title + key numbers */}
-      <div className="mt-4 grid grid-cols-1 gap-5 2xl:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] 2xl:items-center">
-        <div className="flex gap-4">
-          <span className="grid size-16 shrink-0 place-items-center rounded-2xl bg-[#12305a] text-white shadow-lg shadow-blue-900/20">
-            <GraduationCap className="size-9" />
-          </span>
-          <div className="min-w-0">
-            <h1 className="text-2xl font-bold leading-tight tracking-tight text-[#12305a] sm:text-[1.65rem]">{course.title}</h1>
-            {course.subtitle && <p className="mt-1 text-lg text-slate-700">{course.subtitle}</p>}
-            {course.quote && <p className="font-hand text-2xl text-slate-600">“{course.quote}”</p>}
-          </div>
         </div>
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          {tiles.map((tile) => (
-            <div key={tile.label} className={`rounded-2xl p-3 text-center ring-1 sm:p-4 ${tile.box}`}>
-              <p className="flex items-center justify-center gap-2 text-[13px] font-semibold leading-tight text-slate-700">
-                <tile.icon className={`size-5 shrink-0 ${tile.tint}`} />
-                {tile.label}
-              </p>
-              <p className={`mt-2 font-bold ${tile.valueColor}`}>
-                <span className="text-2xl sm:text-3xl">{tile.value}</span> <span className="text-base sm:text-lg">{tile.unit}</span>
-              </p>
-              <p className="text-sm text-slate-500">{tile.note}</p>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          <section className="card p-5" aria-labelledby="week-title">
+            <div className="flex items-center gap-3">
+              <span className="icon-tile size-10 bg-[#12305a] text-white">
+                <CalendarDays className="size-5" />
+              </span>
+              <div>
+                <h2 id="week-title" className="text-lg font-bold leading-tight text-[#12305a]">{ended ? "Last Week's Plan" : started ? "This Week's Plan" : "First Week's Plan"}</h2>
+                <p className="text-sm font-semibold text-slate-500">
+                  (Week {stats.thisWeek} · {formatDate(weekStartDate, "short")} – {formatDate(addDays(weekStartDate, 6), "short")})
+                </p>
+              </div>
             </div>
-          ))}
+            {stats.weekTopics.length ? (
+              <ul className="mt-4 space-y-2.5 text-sm">
+                {stats.weekTopics.map((topic) => (
+                  <li key={topic.id} className="flex items-center gap-2.5">
+                    <input id={`wk-${topic.id}`} type="checkbox" className="checkbox checkbox-green peer" checked={topic.status === "done"} onChange={() => toggleDone(topic)} />
+                    <label htmlFor={`wk-${topic.id}`} className="text-slate-700 peer-checked:text-slate-400 peer-checked:line-through">
+                      {topic.code} {topic.short_title || topic.title}
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-4 text-sm text-slate-500">No topics planned for this week. Give topics a week in the table below.</p>
+            )}
+            {stats.weekTopics.some((t) => t.status !== "done") && (
+              <button type="button" className="btn btn-secondary btn-sm mt-4" onClick={addWeekTasks}>
+                <ListPlus className="size-4" /> Add to my tasks
+              </button>
+            )}
+          </section>
+          <ProjectTimer kind="course" projectId={course.id} />
           <div className="rounded-2xl bg-violet-50 p-3 text-center ring-1 ring-violet-100 sm:p-4">
             <p className="flex items-center justify-center gap-2 text-[13px] font-semibold leading-tight text-slate-700">
               <CalendarCheck className="size-5 shrink-0 text-violet-600" />
@@ -301,40 +273,7 @@ export function CourseView({ id }: { id: string }) {
       </div>
 
       {/* Overview row */}
-      <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-2 2xl:grid-cols-[1.3fr_0.85fr]">
-        <section className="card p-5" aria-labelledby="week-title">
-          <div className="flex items-center gap-3">
-            <span className="icon-tile size-10 bg-[#12305a] text-white">
-              <CalendarDays className="size-5" />
-            </span>
-            <div>
-              <h2 id="week-title" className="text-lg font-bold leading-tight text-[#12305a]">{ended ? "Last Week's Plan" : started ? "This Week's Plan" : "First Week's Plan"}</h2>
-              <p className="text-sm font-semibold text-slate-500">
-                (Week {stats.thisWeek} · {formatDate(weekStartDate, "short")} – {formatDate(addDays(weekStartDate, 6), "short")})
-              </p>
-            </div>
-          </div>
-          {stats.weekTopics.length ? (
-            <ul className="mt-4 space-y-2.5 text-sm">
-              {stats.weekTopics.map((topic) => (
-                <li key={topic.id} className="flex items-center gap-2.5">
-                  <input id={`wk-${topic.id}`} type="checkbox" className="checkbox checkbox-green peer" checked={topic.status === "done"} onChange={() => toggleDone(topic)} />
-                  <label htmlFor={`wk-${topic.id}`} className="text-slate-700 peer-checked:text-slate-400 peer-checked:line-through">
-                    {topic.code} {topic.short_title || topic.title}
-                  </label>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="mt-4 text-sm text-slate-500">No topics planned for this week. Give topics a week in the table below.</p>
-          )}
-          {stats.weekTopics.some((t) => t.status !== "done") && (
-            <button type="button" className="btn btn-secondary btn-sm mt-4" onClick={addWeekTasks}>
-              <ListPlus className="size-4" /> Add to my tasks
-            </button>
-          )}
-        </section>
-
+      <div className="mt-5 grid grid-cols-1 gap-5">
         <section className="flex flex-col justify-center rounded-[1.25rem] bg-pink-50 p-6 text-center ring-1 ring-pink-100">
           <p className="font-hand text-3xl leading-tight text-slate-800">“Small steps every week make big progress.”</p>
           <svg viewBox="0 0 80 8" className="mx-auto mt-3 w-20 text-slate-700" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
@@ -435,12 +374,11 @@ export function CourseView({ id }: { id: string }) {
                   <th className="w-12 px-2 py-3"><span className="sr-only">Edit</span></th>
                 </tr>
               </thead>
-              {stats.units.map(({ unit, est }) => {
+              {stats.units.map(({ unit }) => {
                 const unitCell = (
                   <th scope="rowgroup" rowSpan={unit.topics.length + 1} className={`border-r border-white px-3 text-center align-middle ${colorOf(unit.color).soft}`}>
                     <button type="button" className="group rounded-lg px-1 py-1 hover:bg-white/60" onClick={() => setUnitModal(unit)} title="Edit unit">
                       <span className="block text-lg font-bold text-[#12305a]">{unitName(unit)}</span>
-                      <span className="text-sm font-normal text-slate-600">({num(est)} hours)</span>
                       <Pencil className="reveal mx-auto mt-1 size-3.5 text-slate-400" />
                     </button>
                   </th>
@@ -527,80 +465,6 @@ export function CourseView({ id }: { id: string }) {
         onSaved={(saved) => mutate((current) => current && { ...current, course: { ...current.course, ...saved } }, { revalidate: false })}
       />
 
-      {/* Weekly plan + overall progress */}
-      <div className="mt-5 grid grid-cols-1 gap-5 2xl:grid-cols-[minmax(0,1fr)_24rem]">
-        <section className="card min-w-0 p-5" aria-labelledby="plan-title">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 id="plan-title" className="flex flex-wrap items-center gap-x-2.5 text-lg font-bold text-[#12305a]">
-              <CalendarDays className="size-5" />
-              Weekly Learning Plan <span className="text-sm font-medium text-slate-500">(Set Your Own Schedule)</span>
-            </h2>
-            <p className={`text-sm ${stats.plannedTotal < stats.total ? "text-amber-600" : "text-slate-500"}`}>
-              {num(stats.plannedTotal)}h planned for {num(stats.total)}h of topics.
-            </p>
-          </div>
-          <div className="relative mt-4 overflow-x-auto">
-            <table className="w-full border-collapse text-center text-sm" style={{ minWidth: `${8 + stats.weeks * 3.75}rem` }}>
-              <tbody>
-                <tr className="bg-slate-50 text-xs font-semibold text-slate-600">
-                  <th className="w-32 border border-slate-100 px-3 py-2 text-left">Week</th>
-                  {stats.plan.map((_, i) => (
-                    <th key={i} className={`border border-slate-100 px-1 py-2 ${i + 1 === stats.thisWeek && started ? "bg-blue-100 text-blue-800" : ""}`} title={`Starts ${formatDate(addDays(course.start_date, i * 7), "date")}`}>
-                      W{i + 1}
-                    </th>
-                  ))}
-                </tr>
-                <tr>
-                  <th className="border border-slate-100 px-3 py-1.5 text-left font-medium text-slate-700">Planned Hours</th>
-                  {stats.plan.map((hours, i) => (
-                    <td key={i} className="border border-slate-100 px-0.5 py-1">
-                      <HoursBox
-                        key={syncKey}
-                        value={hours}
-                        max={80}
-                        className="cell-input w-full max-w-14"
-                        label={`Planned hours for week ${i + 1}`}
-                        onValue={(value) => changePlan(i, value)}
-                      />
-                    </td>
-                  ))}
-                </tr>
-                <tr>
-                  <th className="border border-slate-100 px-3 py-2 text-left font-medium text-slate-700">Actual Hours</th>
-                  {stats.actualByWeek.map((hours, i) => (
-                    <td
-                      key={i}
-                      className={`border border-slate-100 px-1 py-2 font-medium ${hours ? (hours >= stats.plan[i] ? "bg-emerald-50 text-emerald-700" : "text-slate-700") : "text-slate-300"}`}
-                    >
-                      {hours ? num(hours) : "–"}
-                    </td>
-                  ))}
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <p className="mt-3 text-xs text-slate-500">Actual hours add up the time logged on topics planned for that week.</p>
-        </section>
-
-        <section className="flex flex-col justify-center rounded-[1.25rem] bg-[#e8f1fc] p-6 ring-1 ring-blue-100" aria-labelledby="overall-title">
-          <h2 id="overall-title" className="text-lg font-bold text-[#12305a]">Overall Progress</h2>
-          <div className="mt-3 flex items-center gap-4">
-            <Progress value={stats.progress} fill="bg-emerald-600" track="bg-white" className="h-4 flex-1" />
-            <span className="text-2xl font-bold text-[#12305a]">{stats.progress}%</span>
-          </div>
-          <p className="mt-3 text-sm text-slate-600">
-            {stats.total === 0
-              ? "Add topics with estimated hours to see your pace."
-              : stats.left <= 0
-                ? "Every topic is done. Congratulations!"
-                : stats.pace === null
-                  ? "The target date has passed. Set a new one with “Edit course”."
-                  : `About ${num(stats.pace)}h a week gets you there by ${formatDate(course.target_date, "gb")}.`}
-          </p>
-          <p className="font-hand mt-2 text-2xl text-slate-700">“Consistent effort leads to success.”</p>
-        </section>
-      </div>
-
       <Modal open={editingCourse} onClose={() => setEditingCourse(false)} title="Edit course">
         <CourseForm today={today} course={course} onClose={() => setEditingCourse(false)} />
       </Modal>
@@ -611,7 +475,7 @@ export function CourseView({ id }: { id: string }) {
             hasPlan={units.some((u) => u.topics.some((t) => t.planned_week != null))}
             weeklyGoal={weeklyGoal}
             onClose={() => setOutlineOpen(false)}
-            onDone={() => setSyncKey((k) => k + 1)}
+            onDone={() => undefined}
           />
         )}
       </Modal>
@@ -623,7 +487,7 @@ export function CourseView({ id }: { id: string }) {
             today={today}
             weeklyGoal={weeklyGoal}
             onClose={() => setPlanOpen(false)}
-            onDone={() => setSyncKey((k) => k + 1)}
+            onDone={() => undefined}
           />
         )}
       </Modal>
@@ -767,7 +631,6 @@ function TopicForm({ courseId, units, unitId, topic, weeks, thisWeek, onClose, o
       title: String(form.get("title")),
       short_title: String(form.get("short_title")),
       outcome: String(form.get("outcome")),
-      est_hours: Number(form.get("est_hours")),
       // An unchanged week is not sent again: a week left beyond the course end would otherwise block every other edit.
       ...(topic && planned_week === topic.planned_week ? {} : { planned_week }),
       notes: String(form.get("notes")),
@@ -850,10 +713,7 @@ function TopicForm({ courseId, units, unitId, topic, weeks, thisWeek, onClose, o
           <input id="topic-outcome" name="outcome" className="input" maxLength={300} defaultValue={topic?.outcome} autoComplete="off" />
         </Field>
       </div>
-      <div className="grid grid-cols-2 gap-4">
-        <Field label="Estimated hours" htmlFor="topic-est">
-          <input id="topic-est" name="est_hours" type="number" min={0.25} max={500} step={0.25} className="input" required defaultValue={topic ? Number(topic.est_hours) : 3} />
-        </Field>
+      <div className="grid grid-cols-1 gap-4">
         <Field label="Planned week" htmlFor="topic-week">
           <select id="topic-week" name="planned_week" className="select select-lg" defaultValue={topic ? (topic.planned_week ?? "") : thisWeek}>
             <option value="">Not planned</option>
