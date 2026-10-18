@@ -1,4 +1,4 @@
-// Browser check for Learning step 6 (connect to the rest): the focus timer, revision, goals that follow
+// Browser check for Learning step 6 (connect to the rest): revision, goals that follow
 // a course, study sessions on the Calendar, and a course's week as tasks.
 // The built app must be running on http://localhost:3123.   Run:  node step6-e2e.mjs   (a stand-in API answers; SHOTS=<folder> saves pictures)
 import { launch, newPhone, apiMock, measure, BASE, TODAY } from "/home/user/Personal-OS/dev-tools/browser-checks/audit-lib.mjs";
@@ -31,7 +31,7 @@ const week = {
 
 const browser = await launch();
 
-// ---------- Learning page: revision and the focus timer ----------
+// ---------- Learning page: revision ----------
 for (const width of [390, 320]) {
   const ctx = await newPhone(browser, width);
   const calls = [];
@@ -62,29 +62,7 @@ for (const width of [390, 320]) {
   check(`${width}px: and a library item`, rev2?.body?.revision_step === 2, JSON.stringify(rev2?.body));
 
   if (width === 390) {
-    // The focus timer: start on a topic, reload (it survives), stop: the form opens with the time and the topic.
-    await card.getByRole("button", { name: /Start a focus timer on 2\.1/ }).click();
-    const timer = page.getByRole("timer", { name: "Focus timer" });
-    await timer.waitFor();
-    check("the focus timer shows on the topic", (await timer.innerText()).includes("2.1"), await timer.innerText());
-    // Pretend 50 minutes passed (the time it started is what is stored).
-    await page.evaluate((id) => localStorage.setItem("pos-focus", JSON.stringify({ startedAt: Date.now() - 50 * 60_000, choice: `t:${id}` })), T1);
-    await page.reload();
-    const again = page.getByRole("timer", { name: "Focus timer" });
-    await again.waitFor();
-    check("it survives a reload and keeps counting (about 50 minutes)", /^\s*(49|50|51):\d\d/m.test(await again.innerText()), await again.innerText());
-    const mt = await measure(page, width);
-    check("the timer bar does not overflow with a very long topic", !mt.zoomedOut && mt.mainClipped === 0 && mt.offenders.length === 0, JSON.stringify(mt));
-    await again.getByRole("button", { name: "Stop and log" }).click();
-    const dialog = page.getByRole("dialog");
-    check("Stop and log opens the form on that topic with the time to the nearest quarter hour (0.75)", (await dialog.locator("#session-pick").inputValue()) === `t:${T1}` && (await dialog.locator("input[name=hours]").inputValue()) === "0.75", `${await dialog.locator("#session-pick").inputValue()} / ${await dialog.locator("input[name=hours]").inputValue()}`);
-    check("and the timer is gone", (await page.getByRole("timer").count()) === 0);
-    await page.keyboard.press("Escape");
-    // Start with no topic, then cancel.
-    await page.getByRole("button", { name: "Focus", exact: true }).click();
-    await page.getByRole("timer", { name: "Focus timer" }).waitFor();
-    await page.getByRole("button", { name: "Cancel", exact: true }).click();
-    check("Cancel forgets the timer", (await page.getByRole("timer").count()) === 0 && (await page.evaluate(() => localStorage.getItem("pos-focus"))) === null);
+    check("there is no focus timer any more", (await page.getByRole("button", { name: /focus timer/i }).count()) === 0 && (await page.getByRole("button", { name: "Focus", exact: true }).count()) === 0);
   }
   await ctx.close();
 }

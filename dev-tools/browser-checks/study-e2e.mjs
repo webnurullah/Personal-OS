@@ -114,9 +114,19 @@ for (const width of [390, 320]) {
     const lib = calls.find((c) => c.method === "POST" && c.url === "/learning/blocks");
     check("a library session names the item and no topic", lib?.body?.resource_id === "r1" && lib.body.topic_id === null, JSON.stringify(lib?.body));
 
-    // The plain button still works: nothing picked.
-    await page.getByRole("button", { name: "Log Study Session" }).click();
-    check("the header button opens the form on 'Something else'", (await page.locator("#session-pick").inputValue()) === "");
+    // The old header buttons are gone (Log time on a topic is the way in).
+    check("no Log Study Session or Focus button at the top of the page", (await page.getByRole("button", { name: "Log Study Session" }).count()) === 0 && (await page.getByRole("button", { name: "Focus", exact: true }).count()) === 0 && (await page.getByRole("button", { name: /focus timer/i }).count()) === 0);
+
+    // A day still to come is not 'already done' in the session form (opened with Log time on a topic).
+    await card.getByRole("button", { name: "Log time" }).first().click();
+    const day = page.locator("#session-day");
+    if (await day.count()) {
+      const done = page.getByLabel(/Already done/);
+      await day.selectOption("6"); // Sunday: still to come
+      check("a day still to come is not marked done by default", !(await done.isChecked()));
+      await day.selectOption("0"); // Monday: already gone
+      check("a day gone by is marked done by default", await done.isChecked());
+    }
     await page.keyboard.press("Escape");
 
     // Done on the second item.

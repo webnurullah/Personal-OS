@@ -1,7 +1,6 @@
 // Learning: revision schedule, focus timer and topic matching for Quick Add. Run with: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
-import { clock, elapsedMs, FOCUS_KEY, loggedHours, readFocus } from "../lib/focus.ts";
 import { finishedText, REVISION_DAYS, revisionDue, type RevisionCandidate } from "../lib/revision.ts";
 import { matchBest, wordsOf } from "../lib/study-match.ts";
 
@@ -31,30 +30,6 @@ test("how finishing reads", () => {
   assert.equal(finishedText(0), "finished today");
   assert.equal(finishedText(1), "finished yesterday");
   assert.equal(finishedText(7), "finished 7 days ago");
-});
-
-test("the focus timer: what is stored, the clock, and the hours it becomes", () => {
-  const id = "3f2c8a1e-9c1b-4d6e-8f4a-1b2c3d4e5f60";
-  assert.equal(FOCUS_KEY, "pos-focus");
-  assert.deepEqual(readFocus(JSON.stringify({ startedAt: 1_700_000_000_000, choice: `t:${id}` })), { startedAt: 1_700_000_000_000, choice: `t:${id}` });
-  assert.deepEqual(readFocus(JSON.stringify({ startedAt: 1_700_000_000_000 })), { startedAt: 1_700_000_000_000, choice: "" });
-  assert.deepEqual(readFocus(JSON.stringify({ startedAt: 1_700_000_000_000, choice: "t:not-an-id" })), { startedAt: 1_700_000_000_000, choice: "" });
-  for (const bad of [null, "", "nope", "{}", JSON.stringify({ startedAt: "x" }), JSON.stringify({ startedAt: -5 }), JSON.stringify({ startedAt: 0 }), JSON.stringify([1])]) assert.equal(readFocus(bad), null, String(bad));
-  assert.equal(elapsedMs({ startedAt: 1000, choice: "" }, 4000), 3000);
-  assert.equal(elapsedMs({ startedAt: 5000, choice: "" }, 4000), 0, "a clock set back never gives a negative time");
-  assert.equal(clock(0), "00:00");
-  assert.equal(clock(59_999), "00:59");
-  assert.equal(clock(12 * 60_000 + 3000), "12:03");
-  assert.equal(clock(3_723_000), "1:02:03");
-  const min = 60_000;
-  assert.equal(loggedHours(0), 0.25, "at least a quarter hour");
-  assert.equal(loggedHours(5 * min), 0.25);
-  assert.equal(loggedHours(10 * min), 0.25);
-  assert.equal(loggedHours(11 * min), 0.25);
-  assert.equal(loggedHours(23 * min), 0.5, "to the nearest quarter");
-  assert.equal(loggedHours(60 * min), 1);
-  assert.equal(loggedHours(100 * min), 1.75);
-  assert.equal(loggedHours(30 * 60 * min), 24, "at most a day");
 });
 
 test("which topic the words are about", () => {

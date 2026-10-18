@@ -6,19 +6,16 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
-import { GraduationCap, Hourglass, ListChecks, Plus, Sparkles, Timer, Trash2 } from "lucide-react";
+import { GraduationCap, ListChecks, Plus, Sparkles, Trash2 } from "lucide-react";
 import { api, errorMessage, refresh } from "@/lib/api";
 import { addDays, formatDate, mondayOf, weekdayIndex } from "@/lib/dates";
 import { COURSE_TEMPLATES, templateWeeks } from "@/lib/course-templates";
 import { hm, num, plural } from "@/lib/format";
-import { useNewAction } from "@/lib/new-action";
 import { OUTLINE_LIMITS, parseOutline } from "@/lib/outline";
 import { COURSE_STATUSES, remainingText } from "@/lib/course";
 import { useProfile } from "@/lib/profile";
-import { clock } from "@/lib/focus";
 import { REVISION_DAYS } from "@/lib/revision";
 import { forecastText } from "@/lib/study";
-import { useFocus } from "@/lib/use-focus";
 import type { CourseStatus, CourseSummary, LearningWeek, RevisionDue, StudyBlock, StudyNextItem } from "@/lib/types";
 import { Progress } from "@/components/ui/charts";
 import { Field, Segmented } from "@/components/ui/controls";
@@ -60,16 +57,12 @@ export function LearningView() {
   const [logging, setLogging] = useState(false);
   const [logChoice, setLogChoice] = useState(""); // what the session form starts on: "t:<topic id>", "r:<library item id>" or nothing
   const [logNow, setLogNow] = useState(false); // from "Study next" (always about today): this week, even when another week is on screen
-  const [logHours, setLogHours] = useState<number | undefined>(undefined); // from the focus timer: the time on the clock
-  const focus = useFocus();
   const [newCourse, setNewCourse] = useState<NewCourseStart | null>(null); // the New course dialog, and where its cursor starts
-  const openLog = (choice = "", now = false, hours?: number) => {
+  const openLog = (choice = "", now = false) => {
     setLogChoice(choice);
     setLogNow(now);
-    setLogHours(hours);
     setLogging(true);
   };
-  useNewAction(() => openLog());
 
   if (error && !data) return <LoadError error={error} retry={() => mutate()} />;
   if (!data) return <PageSkeleton />;
@@ -99,16 +92,6 @@ export function LearningView() {
     run(() => api(`/learning/blocks/${block.id}`, { method: "DELETE" }), "Block moved to the Archive");
   };
 
-  /** Stops the focus timer and opens the session form with the time on the clock (to the nearest quarter hour). */
-  const stopFocus = () => {
-    const done = focus.stop();
-    if (done) openLog(done.choice, true, done.hours);
-  };
-  const focusLabel = focus.choice.startsWith("t:")
-    ? data.open_topics?.find((t) => t.id === focus.choice.slice(2))?.label
-    : focus.choice.startsWith("r:")
-      ? data.library?.find((r) => r.id === focus.choice.slice(2))?.title
-      : undefined;
   const markRevised = (item: RevisionDue) =>
     run(
       () => api(item.kind === "topic" ? `/topics/${item.id}` : `/resources/${item.id}`, { method: "PATCH", body: { revision_step: item.step + 1 } }),
@@ -128,16 +111,6 @@ export function LearningView() {
   return (
     <>
       <PageHeader title="Learning" description="Plan your study week and watch the hours add up.">
-        {!focus.running && (
-          <button type="button" className="btn btn-secondary" onClick={() => focus.start()}>
-            <Hourglass className="size-4" />
-            Focus
-          </button>
-        )}
-        <button type="button" className="btn btn-primary" onClick={() => openLog()}>
-          <Timer className="size-4" />
-          Log Study Session
-        </button>
       </PageHeader>
       <LearningToolbar
         current="courses"
@@ -168,18 +141,6 @@ export function LearningView() {
           </>
         }
       />
-
-      {focus.running && (
-        <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl bg-indigo-600 px-4 py-3 text-white shadow-lg shadow-indigo-600/20" role="timer" aria-label="Focus timer">
-          <Hourglass className="size-5 shrink-0" aria-hidden />
-          <span className="text-xl font-bold tabular-nums">{clock(focus.elapsed)}</span>
-          <span className="min-w-0 flex-1 truncate text-sm text-indigo-100">{focusLabel ?? "Focusing"}</span>
-          <span className="flex gap-2">
-            <button type="button" className="btn btn-sm bg-white text-indigo-700 hover:bg-indigo-50" onClick={stopFocus}>Stop and log</button>
-            <button type="button" className="btn btn-sm bg-indigo-500 text-white hover:bg-indigo-400" onClick={focus.cancel}>Cancel</button>
-          </span>
-        </div>
-      )}
 
       <section className="mt-5" aria-labelledby="courses-title">
         <h2 id="courses-title" className="sr-only">My courses</h2>
@@ -241,7 +202,7 @@ export function LearningView() {
         )}
       </section>
 
-      <StudyNext data={data} onLog={(topicId) => openLog(`t:${topicId}`, true)} onFinish={finishTopic} onFocus={(topicId) => focus.start(`t:${topicId}`)} onRevised={markRevised} />
+      <StudyNext data={data} onLog={(topicId) => openLog(`t:${topicId}`, true)} onFinish={finishTopic} onRevised={markRevised} />
 
       <LearningProgressCard />
 
@@ -285,7 +246,7 @@ export function LearningView() {
         description={isThisWeek || logNow ? "It is added as a block for this week." : `It is added to the week of ${formatDate(data.week_start, "short")}.`}
         size="md"
       >
-        <SessionForm data={data} weekStart={logNow ? thisWeek : data.week_start} choice={logChoice} defaultHours={logHours} onClose={() => setLogging(false)} />
+        <SessionForm data={data} weekStart={logNow ? thisWeek : data.week_start} choice={logChoice} onClose={() => setLogging(false)} />
       </Modal>
       <Modal open={newCourse !== null} onClose={() => setNewCourse(null)} title="New course" description="Then add its units and topics on the course page.">
         <CourseForm today={data.today} start={newCourse ?? "blank"} onClose={() => setNewCourse(null)} />

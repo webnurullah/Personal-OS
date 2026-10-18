@@ -155,7 +155,7 @@ const browser = await launch();
   };
   const row = await toolbar();
   check("the header row has the sections, the status buttons, Ideas, Paste a list and Add on one line, in that order", Math.max(...row.y) - Math.min(...row.y) <= 6 && row.x[0] < row.x[1] && row.x[1] < row.x[2] && row.x[2] < row.x[3], JSON.stringify(row));
-  check("the buttons Focus and Log Study Session stay at the top right, next to the title", (await page.getByRole("button", { name: "Focus" }).count()) === 1 && (await page.getByRole("button", { name: "Log Study Session" }).count()) === 1 && (await page.getByRole("button", { name: "Focus" }).boundingBox()).y < row.y[0]);
+  check("the Focus and Log Study Session buttons are gone from the top right", (await page.getByRole("button", { name: "Focus", exact: true }).count()) === 0 && (await page.getByRole("button", { name: "Log Study Session" }).count()) === 0 && (await page.getByRole("timer").count()) === 0);
   check("the status buttons are not repeated next to the categories", (await page.getByRole("tablist", { name: "Status" }).count()) === 1);
   check("the course boxes have no 'New' button of their own any more", (await section.getByRole("button", { name: "New" }).count()) === 0);
   const titles = async () => (await section.locator("a").evaluateAll((els) => els.map((e) => e.querySelector("span.truncate")?.textContent ?? ""))).sort();
@@ -281,15 +281,6 @@ const browser = await launch();
 
   check("the week arrows are gone (the page is always this week)", (await page.getByLabel("Next week").count()) === 0 && (await page.getByText("Week in review").count()) === 0);
 
-  // session dialog: a day still to come is not 'already done'
-  await page.getByRole("button", { name: "Log Study Session" }).click();
-  await page.locator("#session-day").waitFor();
-  const done = page.getByLabel(/Already done/);
-  check("the dialog says it adds to this week", (await page.getByText("It is added as a block for this week.").count()) === 1);
-  await page.locator("#session-day").selectOption("6"); // Sunday: still to come
-  check("a day still to come is not marked done by default", !(await done.isChecked()));
-  await page.locator("#session-day").selectOption("0"); // Monday: already gone
-  check("a day gone by is marked done by default", await done.isChecked());
   await ctx.close();
 }
 

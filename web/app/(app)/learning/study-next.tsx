@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Check, Flame, ListChecks, RotateCcw, Timer, Hourglass } from "lucide-react";
+import { Check, Flame, ListChecks, RotateCcw, Timer } from "lucide-react";
 import { formatDate } from "@/lib/dates";
 import { hm, num, plural } from "@/lib/format";
 import { finishedText } from "@/lib/revision";
@@ -36,7 +36,7 @@ function WeekBars({ weeks, goal }: { weeks: LearningWeek["stats"]["weeks"]; goal
 }
 
 /** What to study today: the few topics that matter most, with one tap to log time or finish them. */
-export function StudyNext({ data, onLog, onFinish, onFocus, onRevised }: { data: LearningWeek; onLog: (topicId: string) => void; onFinish: (item: StudyNextItem) => void; onFocus: (topicId: string) => void; onRevised: (item: RevisionDue) => void }) {
+export function StudyNext({ data, onLog, onFinish, onRevised }: { data: LearningWeek; onLog: (topicId: string) => void; onFinish: (item: StudyNextItem) => void; onRevised: (item: RevisionDue) => void }) {
   if (!data.study_next || !data.stats) return null; // a copy saved before this existed: shown once the fresh answer arrives
   const revision = data.revision ?? [];
   if (!data.courses.length && !revision.length) return null; // the "My courses" card already says how to start
@@ -79,9 +79,6 @@ export function StudyNext({ data, onLog, onFinish, onFocus, onRevised }: { data:
               <div className="flex shrink-0 gap-2">
                 <button type="button" className="btn btn-primary btn-sm" onClick={() => onLog(item.topic_id)}>
                   <Timer className="size-4" /> Log time
-                </button>
-                <button type="button" className="btn btn-ghost btn-sm btn-icon" onClick={() => onFocus(item.topic_id)} aria-label={`Start a focus timer on ${item.code} ${item.title}`} title="Start a focus timer">
-                  <Hourglass className="size-4" />
                 </button>
                 <button type="button" className="btn btn-secondary btn-sm" onClick={() => onFinish(item)} aria-label={`Mark ${item.code} ${item.title} finished`}>
                   <Check className="size-4" /> Done

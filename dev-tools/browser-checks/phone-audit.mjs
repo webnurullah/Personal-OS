@@ -872,12 +872,6 @@ unit("learning", "/learning", heading, () => ({ "/learning/week": (_m, url) => (
     await press(page.locator("details", { hasText: "Study sessions this week" }).locator("summary"));
     await snap("sessions list open");
   }),
-  scene("Log study session dialog", async (page, snap) => {
-    await openDialog(page, button(page, "Log Study Session"));
-    await snap("empty form (long topic names in the picker)");
-    await fillAll(page, dlg(page));
-    await snap("long text typed");
-  }),
   scene("Log time from Study next", async (page, snap) => {
     await openDialog(page, page.getByRole("button", { name: "Log time" }).first());
     await snap("form on a topic");
@@ -891,14 +885,6 @@ unit("learning", "/learning", heading, () => ({ "/learning/week": (_m, url) => (
     await dlg(page).locator("#course-outline").fill(("Unit 1: " + WORD + "\n- " + SENT + " | 1h\n").repeat(3));
     await snap("outline pasted");
   }),
-  scene("Focus timer", async (page, snap) => {
-    await page.evaluate((id) => localStorage.setItem("pos-focus", JSON.stringify({ startedAt: Date.now() - 50 * 60000, choice: `t:${id}` })), uuid(1));
-    await page.reload();
-    await page.getByRole("timer").waitFor({ timeout: 8000 });
-    await settle(page, 400);
-    await snap("timer bar with a long topic");
-    await page.evaluate(() => localStorage.removeItem("pos-focus"));
-  }, { reload: true }),
 ]);
 
 unit("course", "/learning/c0", heading, () => ({ "/courses/c0": courseDetail, "/resources": resources, "/courses": coursesResponse }), [
