@@ -50,7 +50,12 @@ for (const width of [390, 320, 1280]) {
   check(`${width}px: the first circle sits right above the AI circle (a small gap), inside the screen`, box && box.x + box.width <= width && (!aiBox || (box.y + box.height <= aiBox.y && aiBox.y - (box.y + box.height) <= 12)), JSON.stringify({ box, aiBox }));
 
   if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/circles-${width}.png` });
+  const before = await circle("Project CRM").boundingBox();
+  const courseBefore = await circle("Course Digital").boundingBox();
   await circle("Project CRM").click();
+  await page.getByRole("timer", { name: /Time spent on CRM/ }).waitFor();
+  const after = await circle("Project CRM").boundingBox();
+  check(`${width}px: opening the card does not move any circle`, Math.abs(after.x - before.x) < 1 && Math.abs(after.y - before.y) < 1 && Math.abs((await circle("Course Digital").boundingBox()).y - courseBefore.y) < 1, JSON.stringify({ before, after }));
   if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/circles-open-${width}.png` });
   const card = page.getByRole("timer", { name: /Time spent on CRM/ });
   await card.waitFor();
