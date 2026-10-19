@@ -119,7 +119,7 @@ export function CourseNotes({ course, onSaved }: { course: Course; onSaved: (sav
   const status = text.length > LIMIT ? "Too long to save" : { saved: "Saved", saving: "Saving…", unsaved: "Not saved yet", error: "Could not save" }[state];
 
   return (
-    <section className="card mt-5 p-5" aria-labelledby="notes-title" onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) void saveLater.flush("notes"); }}>
+    <section className="card mt-5 p-5" data-live-skip aria-labelledby="notes-title" onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) void saveLater.flush("notes"); }}>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h2 id="notes-title" className="flex items-center gap-2 text-lg font-bold text-[#12305a]">
           <StickyNote className="size-5" aria-hidden /> Notes

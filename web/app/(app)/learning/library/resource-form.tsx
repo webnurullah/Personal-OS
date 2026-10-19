@@ -57,7 +57,7 @@ export function ResourceForm({ item, courseId, onClose, onSaved }: { item: Learn
   const { data: courses } = useSWR<{ items: CourseSummary[] }>("/courses");
   const { data: detail } = useSWR<CourseDetail>(f.course ? `/courses/${f.course}` : null);
   // Only the units of the course chosen now: while its page loads, SWR may still hold the previous course's.
-  const units = f.course && detail?.course.id === f.course ? detail.units : [];
+  const units = f.course && detail?.course?.id === f.course ? (detail.units ?? []) : [];
 
   const read = async (link: string) => {
     const url = fixLink(link);

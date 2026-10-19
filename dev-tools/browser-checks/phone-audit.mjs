@@ -921,7 +921,7 @@ unit("course", "/learning/c0", heading, () => ({ "/courses/c0": courseDetail, "/
   }),
   confirmScene("Delete course question", (p) => p.getByRole("button", { name: "Delete", exact: true }).first()),
   scene("Library: add dialog", async (page, snap) => {
-    await openDialog(page, page.locator("section[aria-labelledby='library-title']").getByRole("button", { name: "Add Certificate", exact: true }));
+    await openDialog(page, page.locator("section[aria-labelledby='library-title']").getByRole("button", { name: "Add", exact: true }));
     await snap("empty form");
   }),
 ]);
@@ -939,10 +939,11 @@ unit("library", "/learning/library", heading, () => ({ "/resources": resources, 
     }
   }),
   scene("Add dialog", async (page, snap) => {
-    await openDialog(page, button(page, "Add", true));
+    await openDialog(page, button(page, "Add Certificate", true));
     await snap("empty form");
     await fillAll(page, dlg(page));
     await snap("long text typed");
+    if (process.env.DEBUG) console.log("DLG:", (await page.locator("dialog[open]").count()), (await dlg(page).innerText().catch((e) => String(e))).slice(0, 700));
     await dlg(page).locator("#res-status").selectOption("completed");
     await fillAll(page, dlg(page), 3);
     await snap("status completed (certificate fields)");
@@ -1072,6 +1073,7 @@ let measured = 0;
 async function runUnit(browser, u, width) {
   const ctx = await newPhone(browser, width, 844);
   const page = await ctx.newPage();
+  if (process.env.DEBUG) page.on("pageerror", (e) => console.log("PAGEERROR:", String(e.stack ?? e).slice(0, 600)));
   page.setDefaultTimeout(5000);
   try {
     await apiMock(ctx, { ...shared(), ...u.fixtures() });
@@ -1134,7 +1136,8 @@ async function runUnit(browser, u, width) {
         await sc.run(page, snap);
         if (!taken.length) await snap("result");
       } catch (e) {
-        notExercised.push({ page: u.id, width, scene: sc.name, reason: String(e.message).split("\n")[0].slice(0, 160) });
+        if (process.env.DEBUG) console.log("BODY:", sc.name, (await page.locator("body").innerText({ timeout: 2000 }).catch(() => "?")).replace(/\s+/g, " ").slice(0, 300), "URL:", page.url());
+        notExercised.push({ page: u.id, width, scene: sc.name, reason: process.env.DEBUG ? String(e.message).slice(0, 1500) : String(e.message).split("\n")[0].slice(0, 160) });
       }
       // Back to a clean page for the next scene.
       try {

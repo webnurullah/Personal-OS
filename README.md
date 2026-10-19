@@ -56,6 +56,7 @@ Frontend and backend are **one Vercel project**. Every push to GitHub `main` put
    27. `20261025000000_resource_time.sql` (Learning: a timer on every certificate course in the library, kept in `course_time` with the item in `resource_id`, so its time counts on its course; one timer at a time)
    28. `20261026000000_timer_circles.sql` (timers: several can run at once, one per project / course / certificate course; the old "one running timer per person" indexes are dropped)
    29. `20261027000000_habit_time_goals.sql` (Habits: a daily time goal in minutes fed by the timers of chosen projects and courses (`habit_sources`); reaching it ticks the day once a day, ticking by hand still works)
+   30. `20261028000000_realtime.sql` (real-time sync: the app's tables join the `supabase_realtime` publication so a change on one device shows on the others without a reload; `google_connections` is never published)
 
    Already set up? Only run the files you have not run yet. Each new file is listed here when it is added.
 3. **Authentication → URL Configuration**

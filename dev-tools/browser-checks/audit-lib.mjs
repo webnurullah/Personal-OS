@@ -30,6 +30,8 @@ export async function newPhone(browser, width = 390, height = 844) {
  * Look at web/lib/types.ts for the shapes the pages expect and web/app/api/(name)/route.ts for what each endpoint returns.
  */
 export async function apiMock(ctx, fixtures = {}) {
+  // The live-sync channel (Supabase Realtime) has no server here: take the connection and stay silent.
+  await ctx.routeWebSocket(/\/realtime\//, () => {});
   await ctx.route("**/api/**", async (route) => {
     const req = route.request(), u = new URL(req.url()), path = u.pathname.replace("/api", ""), full = path + u.search;
     const hit = fixtures[full] ?? fixtures[path];
