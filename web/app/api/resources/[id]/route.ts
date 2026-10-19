@@ -2,6 +2,7 @@ import { archiveItem } from "@/lib/server/archive";
 import { handle, ok } from "@/lib/server/api";
 import { applyChange, certificateDatesAfter } from "@/lib/library";
 import { completeCourseIfFinished } from "@/lib/server/course-status";
+import { autoCheckHabits } from "@/lib/server/habit-time";
 import { pauseTimer } from "@/lib/server/project-time";
 import { HttpError, must } from "@/lib/server/http";
 import { resolveSubject } from "@/lib/server/resources-db";
@@ -9,7 +10,7 @@ import { ResourceFields } from "@/lib/server/schemas";
 import { nonEmpty, parse, s } from "@/lib/server/validate";
 
 // Change one item. The status, the counts and the dates are kept in step (finishing the last video completes it).
-export const PATCH = handle<{ id: string }>(async ({ db, params, body, today }) => {
+export const PATCH = handle<{ id: string }>(async ({ db, params, body, today, profile }) => {
   const id = parse(s.id, params.id);
   const changes = nonEmpty(parse(ResourceFields, await body()));
   const current = must(await db.from("learning_resources").select("*").eq("id", id).single());
@@ -24,7 +25,10 @@ export const PATCH = handle<{ id: string }>(async ({ db, params, body, today }) 
 
   const saved = must(await db.from("learning_resources").update(row).eq("id", id).select().single());
   // Finished, dropped or put back to To do: its timer stops.
-  if (saved.status !== "learning") await pauseTimer(db, "resource", id);
+  if (saved.status !== "learning") {
+    await pauseTimer(db, "resource", id);
+    await autoCheckHabits(db, await today(), (await profile()).timezone);
+  }
   if (saved.status === "completed" || saved.status === "dropped") await completeCourseIfFinished(db, saved.course_id);
   return saved;
 });

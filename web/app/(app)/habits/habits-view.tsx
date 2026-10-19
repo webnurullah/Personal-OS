@@ -6,6 +6,7 @@ import useSWR from "swr";
 import { ChartPie, CircleCheck, Flame, Lightbulb, Plus, Sparkles, TriangleAlert, Trophy } from "lucide-react";
 import { api, errorMessage, refresh } from "@/lib/api";
 import { formatDate } from "@/lib/dates";
+import { minutesText } from "@/lib/habit-time";
 import { useNewAction } from "@/lib/new-action";
 import type { Habit, HabitsResponse } from "@/lib/types";
 import { HABITS_KEY, HabitTracker } from "@/components/habits/habit-tracker";
@@ -142,15 +143,29 @@ function Insight({ icon, tile, title, text }: { icon: ReactNode; tile: string; t
 function HabitForm({ editing, onClose }: { editing: Habit | null; onClose: () => void }) {
   const { toast } = useFeedback();
   const [busy, setBusy] = useState(false);
+  // A time goal: the minutes a day, and the projects and courses whose timer counts for it.
+  const [minutes, setMinutes] = useState(editing?.target_minutes ? String(editing.target_minutes) : "");
+  const [picked, setPicked] = useState<Set<string>>(new Set((editing?.sources ?? []).map((s) => `${s.kind}:${s.id}`)));
+  const { data: projects } = useSWR<{ items: { id: string; name: string; status: string }[] }>("/projects");
+  const { data: courses } = useSWR<{ items: { id: string; title: string; status?: string }[] }>("/courses");
+  const options = [
+    ...(projects?.items ?? []).filter((p) => p.status !== "done" || picked.has(`project:${p.id}`)).map((p) => ({ key: `project:${p.id}`, kind: "project" as const, id: p.id, name: p.name })),
+    ...(courses?.items ?? []).filter((c) => c.status !== "done" || picked.has(`course:${c.id}`)).map((c) => ({ key: `course:${c.id}`, kind: "course" as const, id: c.id, name: c.title })),
+  ];
+  const goal = Number(minutes);
+  const goalBad = minutes !== "" && (!Number.isInteger(goal) || goal < 1 || goal > 1440);
 
   const submit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (goalBad) return toast("The daily goal is a whole number of minutes, from 1 to 1440.", "error");
     const form = new FormData(e.currentTarget);
     const body = {
       name: String(form.get("name")),
       goal_text: String(form.get("goal_text")),
       icon: String(form.get("icon") || "circle-check"),
       color: String(form.get("color") || "emerald"),
+      target_minutes: minutes === "" ? null : goal,
+      sources: minutes === "" ? [] : options.filter((o) => picked.has(o.key)).map((o) => ({ kind: o.kind, id: o.id })),
     };
     setBusy(true);
     try {
@@ -173,6 +188,36 @@ function HabitForm({ editing, onClose }: { editing: Habit | null; onClose: () =>
       <Field label="Goal" htmlFor="habit-goal">
         <input id="habit-goal" name="goal_text" className="input" maxLength={80} defaultValue={editing?.goal_text} placeholder="e.g. 20 min · every day" autoComplete="off" />
       </Field>
+      <Field label="Daily time goal (minutes)" htmlFor="habit-minutes" hint="Optional. When the timers of the projects and courses you pick below add up to this today, the day is ticked for you. You can still tick it yourself.">
+        <div className="flex flex-wrap items-center gap-2">
+          <input id="habit-minutes" type="number" inputMode="numeric" min={1} max={1440} step={1} className="input w-28" value={minutes} onChange={(e) => setMinutes(e.target.value)} placeholder="e.g. 120" />
+          {[30, 60, 120].map((m) => (
+            <button key={m} type="button" className={`btn btn-sm ${minutes === String(m) ? "btn-primary" : "btn-secondary"}`} onClick={() => setMinutes(String(m))}>{minutesText(m)}</button>
+          ))}
+          {minutes !== "" && <button type="button" className="btn btn-ghost btn-sm" onClick={() => setMinutes("")}>No time goal</button>}
+        </div>
+      </Field>
+      {minutes !== "" && (
+        <fieldset className="space-y-2">
+          <legend className="text-sm font-medium text-slate-700">Counts time from</legend>
+          {options.length ? (
+            <ul className="max-h-44 space-y-1 overflow-y-auto rounded-xl border border-slate-200 p-2">
+              {options.map((o) => (
+                <li key={o.key}>
+                  <label className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-50">
+                    <input type="checkbox" className="checkbox" checked={picked.has(o.key)} onChange={() => setPicked((p) => { const next = new Set(p); if (next.has(o.key)) next.delete(o.key); else next.add(o.key); return next; })} />
+                    <span className="min-w-0 truncate">{o.name}</span>
+                    <span className="ml-auto shrink-0 text-xs text-slate-400">{o.kind === "project" ? "Project" : "Course"}</span>
+                  </label>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-slate-500">Add a project or a course first, then pick it here.</p>
+          )}
+          {picked.size === 0 && options.length > 0 && <p className="text-xs text-amber-700">Pick at least one, or no time will count.</p>}
+        </fieldset>
+      )}
       <Field label="Icon">
         <IconPicker name="icon" value={editing?.icon ?? "footprints"} icons={HABIT_ICONS} />
       </Field>

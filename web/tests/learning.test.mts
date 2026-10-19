@@ -1,7 +1,7 @@
 // Learning: course numbers, wording, date limits and the request schemas. Run with: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
-import { courseStats, courseWeeks, currentWeek, doneHours, inWeek, MAX_COURSE_WEEKS, nextNumber, planRange, nextPosition, remainingText, timeLeft } from "../lib/course.ts";
+import { certificateText, courseStats, courseWeeks, currentWeek, doneHours, inWeek, MAX_COURSE_WEEKS, nextNumber, planRange, nextPosition, remainingText, timeLeft } from "../lib/course.ts";
 import { hm, num, plural } from "../lib/format.ts";
 import { HttpError } from "../lib/server/http.ts";
 import { checkDates, checkPlanDates, checkPlannedWeek, CourseFields, TopicFields, UnitFields } from "../lib/server/schemas.ts";
@@ -233,4 +233,13 @@ test("a course is finished when all topics are done and its certificates are com
   assert.equal(courseFinished([done], [{ kind: "certificate", status: "todo" }]), false);
   assert.equal(courseFinished([done], [{ kind: "certificate", status: "completed" }, { kind: "certificate", status: "dropped" }]), true);
   assert.equal(courseFinished([done], [{ kind: "playlist", status: "todo" }]), true); // only certificates count
+});
+
+test("the course box says how many certificate courses are left", () => {
+  assert.equal(certificateText({}), "");
+  assert.equal(certificateText({ certificate_count: 0, certificates_left: 0 }), "");
+  assert.equal(certificateText({ certificate_count: 2, certificates_left: 1 }), "1 of 2 certificates left");
+  assert.equal(certificateText({ certificate_count: 1, certificates_left: 1 }), "1 of 1 certificate left");
+  assert.equal(certificateText({ certificate_count: 2, certificates_left: 0 }), "All 2 certificates done");
+  assert.equal(certificateText({ certificate_count: 1, certificates_left: 0 }), "1 certificate done");
 });

@@ -106,6 +106,15 @@ export function remainingText(c: { unit_count: number; units_left?: number; topi
   return [part(c.unit_count, c.units_left, "unit"), part(c.topic_count, c.topics_left, "topic")].filter(Boolean).join(" · ");
 }
 
+/** "1 of 2 certificates left", "All 2 certificates done" (empty when the course has no certificate course). */
+export function certificateText(c: { certificate_count?: number; certificates_left?: number }) {
+  const total = c.certificate_count ?? 0;
+  const left = c.certificates_left;
+  if (total === 0 || left === undefined) return "";
+  if (left === 0) return total === 1 ? "1 certificate done" : `All ${total} certificates done`;
+  return `${left} of ${total} certificate${total === 1 ? "" : "s"} left`;
+}
+
 /**
  * Is this topic planned for the week that starts on `weekStart` (week number `weekNo` of the course)? A topic planned for dates counts
  * when its dates touch that week; a topic planned only for a week number counts in that week.

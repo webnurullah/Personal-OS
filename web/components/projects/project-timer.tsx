@@ -33,7 +33,7 @@ export function ProjectTimer({ kind = "project", projectId, archived = false }: 
       const next = await api<ProjectTimeState>(base, { method: "POST", body: { action } });
       setSkew(new Date(next.now).getTime() - Date.now());
       await mutate(next, { revalidate: false });
-      void refresh("/project-time", "/timer");
+      void refresh("/project-time", "/timer", "/habits");
       toast(action === "start" ? "Timer started" : `Paused at ${clock(next.closed_seconds)}`);
     } catch (e) {
       toast(errorMessage(e), "error");

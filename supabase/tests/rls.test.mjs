@@ -502,6 +502,27 @@ check('deleting the practice project keeps the item', (await one('select practic
   await qa('delete from projects where id = $1', [tp2]);
 }
 
+// Habits -> time goals (20261027000000_habit_time_goals.sql)
+{
+  const hp = (await one(`insert into projects (name) values ('Goal project') returning id`)).id;
+  const hc = (await one(`insert into courses (title, start_date, target_date) values ('Goal course', '2026-10-05', '2026-12-28') returning id`)).id;
+  const hb = (await one(`insert into habits (name, goal_text, target_minutes) values ('Personal Project', '2 hours daily', 120) returning id, target_minutes, auto_checked_on`));
+  check('a habit can have a goal in minutes', hb.target_minutes === 120 && hb.auto_checked_on === null);
+  await expectError('the goal is between 1 and 1440 minutes', () => qa(`update habits set target_minutes = 0 where id = $1`, [hb.id]), 'check constraint');
+  await expectError('the goal cannot be longer than a day', () => qa(`update habits set target_minutes = 1441 where id = $1`, [hb.id]), 'check constraint');
+  await qa(`insert into habit_sources (habit_id, project_id) values ($1, $2)`, [hb.id, hp]);
+  await qa(`insert into habit_sources (habit_id, course_id) values ($1, $2)`, [hb.id, hc]);
+  await expectError('a project is listed once per habit', () => qa(`insert into habit_sources (habit_id, project_id) values ($1, $2)`, [hb.id, hp]), 'duplicate key');
+  await expectError('a source is a project or a course, not both', () => qa(`insert into habit_sources (habit_id, project_id, course_id) values ($1, $2, $3)`, [hb.id, hp, hc]), 'check constraint');
+  await expectError('a source is a project or a course, not neither', () => qa(`insert into habit_sources (habit_id) values ($1)`, [hb.id]), 'check constraint');
+  check("nobody else sees my habit sources", (await qb('select count(*)::int n from habit_sources'))[0].n === 0);
+  await expectError("nobody can link someone else's habit", () => qb(`insert into habit_sources (habit_id, project_id) values ($1, $2)`, [hb.id, hp]), 'row-level security');
+  await expectError('a signed-out visitor cannot read them', () => qanon('select * from habit_sources'), 'permission denied');
+  check('deleting a project removes it from the habit', (await qa('delete from projects where id = $1 returning id', [hp])).length === 1 && (await qa('select id from habit_sources where habit_id = $1', [hb.id])).length === 1);
+  check('deleting a habit removes its sources', (await qa('delete from habits where id = $1 returning id', [hb.id])).length === 1 && (await qa('select id from habit_sources where habit_id = $1', [hb.id])).length === 0);
+  await qa('delete from courses where id = $1', [hc]);
+}
+
 // Courses -> time spent (20261023000000_course_time.sql)
 {
   const cc = (await one(`insert into courses (title, start_date, target_date) values ('Timed course', '2026-10-05', '2026-12-28') returning id`)).id;

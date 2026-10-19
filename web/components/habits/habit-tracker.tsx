@@ -6,6 +6,7 @@ import { ArrowRight, Flame, Pencil, Plus, Repeat, Trash2 } from "lucide-react";
 import { api, errorMessage, refresh } from "@/lib/api";
 import { colorOf } from "@/lib/colors";
 import { formatDate } from "@/lib/dates";
+import { minutesText } from "@/lib/habit-time";
 import type { Habit, HabitsResponse } from "@/lib/types";
 import { Progress } from "../ui/charts";
 import { useFeedback } from "../ui/feedback";
@@ -129,6 +130,7 @@ export function HabitTracker({ data, mutate, onEdit, onDelete, onNew, link, comp
                             {habit.goal_text && <p className="text-xs text-slate-500">{habit.goal_text}</p>}
                           </>
                         )}
+                        <TimeGoal habit={habit} />
                         <span className="-ml-2 mt-1 flex sm:hidden">{actions(habit)}</span>
                       </div>
                     </div>
@@ -178,5 +180,21 @@ export function HabitTracker({ data, mutate, onEdit, onDelete, onNew, link, comp
         </EmptyState>
       )}
     </section>
+  );
+}
+
+/** Today's time against the habit's daily goal (only for habits with a time goal): "1h 12m of 2h today". */
+function TimeGoal({ habit }: { habit: Habit }) {
+  if (!habit.target_minutes) return null;
+  const minutes = habit.today_minutes ?? 0;
+  const reached = minutes >= habit.target_minutes;
+  return (
+    <div className="mt-1" title={habit.sources?.length ? `Counts time from: ${habit.sources.map((s) => s.name).join(", ")}` : "Pick the projects and courses that count, in Edit habit"}>
+      <div className="flex items-center gap-1.5 text-[11px] font-medium tabular-nums text-slate-500">
+        <span className={reached ? "text-emerald-600" : undefined}>{minutesText(minutes)} of {minutesText(habit.target_minutes)} today</span>
+      </div>
+      <Progress value={Math.min(100, Math.round((minutes / habit.target_minutes) * 100))} fill={reached ? "bg-emerald-500" : "bg-blue-500"} className="mt-0.5 h-1 w-full max-w-36" />
+      {!habit.sources?.length && <p className="mt-0.5 text-[11px] text-amber-700">No project or course picked</p>}
+    </div>
   );
 }

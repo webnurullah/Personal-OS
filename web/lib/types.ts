@@ -103,6 +103,11 @@ export type Habit = {
   done: boolean[];
   streak: number;
   share: number;
+  /** Daily goal in minutes fed by the timers of `sources` (null: a normal tick-only habit). */
+  target_minutes?: number | null;
+  /** Minutes counted today from the timers of `sources`. */
+  today_minutes?: number;
+  sources?: { kind: "project" | "course"; id: string; name: string }[];
 };
 
 export type HabitsResponse = {
@@ -147,6 +152,9 @@ export type CourseSummary = {
   topics_left?: number;
   units_done?: number;
   units_left?: number;
+  /** Certificate courses linked to the course and how many are not completed yet. */
+  certificate_count?: number;
+  certificates_left?: number;
   days_left: number;
   /** Behind = something planned for an earlier week is not finished (see lib/study.ts). */
   state: CourseState;

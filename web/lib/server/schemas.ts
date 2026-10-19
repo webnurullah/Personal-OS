@@ -125,6 +125,9 @@ export const HabitCreate = z.object({
   icon: s.icon.optional(),
   color: s.color.optional(),
   position: z.number().int().min(0).optional(),
+  /** A daily goal in minutes fed by the timers of the projects and courses in `sources` (empty / null: a normal tick-only habit). */
+  target_minutes: z.number().int().min(1).max(1440).nullable().optional(),
+  sources: z.array(z.object({ kind: z.enum(["project", "course"]), id: s.id }).strict()).max(60).optional(),
 }).strict();
 export const HabitUpdate = HabitCreate.partial().extend({ archived: z.boolean().optional() }).strict();
 

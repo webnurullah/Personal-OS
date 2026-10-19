@@ -619,6 +619,35 @@ export type Database = {
           },
         ];
       };
+      habit_sources: {
+        Row: {
+          id: string;
+          user_id: string;
+          habit_id: string;
+          project_id: string | null;
+          course_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string;
+          habit_id: string;
+          project_id?: string | null;
+          course_id?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          habit_id?: string;
+          project_id?: string | null;
+          course_id?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+
+        ];
+      };
       habits: {
         Row: {
           id: string;
@@ -630,6 +659,8 @@ export type Database = {
           position: number;
           archived_at: string | null;
           created_at: string;
+          target_minutes: number | null;
+          auto_checked_on: string | null;
         };
         Insert: {
           id?: string;
@@ -641,6 +672,8 @@ export type Database = {
           position?: number;
           archived_at?: string | null;
           created_at?: string;
+          target_minutes?: number | null;
+          auto_checked_on?: string | null;
         };
         Update: {
           id?: string;
@@ -652,6 +685,8 @@ export type Database = {
           position?: number;
           archived_at?: string | null;
           created_at?: string;
+          target_minutes?: number | null;
+          auto_checked_on?: string | null;
         };
         Relationships: [
 

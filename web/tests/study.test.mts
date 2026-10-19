@@ -245,6 +245,8 @@ function fakeDb(tables: Record<string, Row[]>, failing: string[] = []) {
       const q: Record<string, unknown> = {
         select: (list = "*") => { columns = list === "*" ? null : list.split(",").map((c) => c.trim()); return q; },
         eq: (column: string, value: unknown) => { rows = rows.filter((r) => r[column] === value); return q; },
+        neq: (column: string, value: unknown) => { rows = rows.filter((r) => r[column] !== value); return q; },
+        not: (column: string, _op: string, value: unknown) => { rows = rows.filter((r) => (r[column] ?? null) !== value); return q; },
         gte: (column: string, value: string) => { rows = rows.filter((r) => String(r[column]) >= value); return q; },
         lt: (column: string, value: string) => { rows = rows.filter((r) => String(r[column]) < value); return q; },
         lte: (column: string, value: string) => { rows = rows.filter((r) => String(r[column]) <= value); return q; },

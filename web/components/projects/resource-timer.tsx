@@ -13,7 +13,7 @@ export const resourceTimePath = (id: string) => `/resources/${id}/time`;
 /** Starts the timer of a library item and reloads what shows the time. */
 export async function startResourceTimer(id: string) {
   const next = await api<ProjectTimeState>(resourceTimePath(id), { method: "POST", body: { action: "start" } });
-  void refresh("/resources", "/project-time", "/learning", "/courses", "/timer");
+  void refresh("/resources", "/project-time", "/learning", "/courses", "/timer", "/habits");
   return next;
 }
 
@@ -38,7 +38,7 @@ export function useResourceTimer(id: string, enabled = true) {
       const next = await api<ProjectTimeState>(resourceTimePath(id), { method: "POST", body: { action } });
       setSkew(new Date(next.now).getTime() - Date.now());
       await mutate(next, { revalidate: false });
-      void refresh("/project-time", "/learning", "/courses", "/timer");
+      void refresh("/project-time", "/learning", "/courses", "/timer", "/habits");
       toast(action === "start" ? "Timer started" : `Paused at ${clock(next.closed_seconds)}`);
     } catch (e) {
       toast(errorMessage(e), "error");

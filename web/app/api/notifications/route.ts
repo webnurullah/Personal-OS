@@ -33,7 +33,7 @@ export const GET = handle(async ({ db, profile: getProfile }) => {
     db.from("bills").select("*").is("paid_at", null).lte("due_date", addDays(today, 3)).order("due_date").then(must),
     db.from("events").select("*").lte("event_date", today).or(`repeat.neq.none,event_date.eq.${today}`).then(must),
     db.from("study_blocks").select("*").eq("week_start", mondayOf(today)).eq("weekday", weekdayIndex(today)).eq("done", false).then(must),
-    notify.habit_reminder ? loadHabits(db, today) : Promise.resolve(null),
+    notify.habit_reminder ? loadHabits(db, today, zone) : Promise.resolve(null),
     // Saved jobs (not applied yet) whose last date to apply is within 3 days.
     db.from("job_applications").select("id, title, company, deadline").eq("status", "saved").gte("deadline", today).lte("deadline", addDays(today, 3)).order("deadline").then(must),
     // Active projects with a due date (ongoing projects have none) that is within 3 days or already past.

@@ -13,7 +13,7 @@ import { COURSE_TEMPLATES, templateWeeks } from "@/lib/course-templates";
 import { hm, num, plural } from "@/lib/format";
 import { spent } from "@/lib/project-time";
 import { OUTLINE_LIMITS, parseOutline } from "@/lib/outline";
-import { COURSE_STATUSES, remainingText } from "@/lib/course";
+import { certificateText, COURSE_STATUSES, remainingText } from "@/lib/course";
 import { useProfile } from "@/lib/profile";
 import { forecastText } from "@/lib/study";
 import type { CourseStatus, CourseSummary, LearningWeek, StudyBlock } from "@/lib/types";
@@ -139,7 +139,7 @@ export function LearningView() {
                       </span>
                       <span className="min-w-0">
                         <span className="block truncate text-base font-semibold text-slate-900" title={course.title}>{course.title}</span>
-                        <span className="block truncate text-sm text-slate-500">{[(course.category ?? "").trim(), remainingText(course) || (course.unit_count === 0 ? "No units yet" : `${plural(course.unit_count, "unit")} · ${plural(course.topic_count, "topic")}`)].filter(Boolean).join(" · ")}</span>
+                        <span className="line-clamp-2 break-words text-sm text-slate-500">{[(course.category ?? "").trim(), remainingText(course) || (course.unit_count === 0 ? "No units yet" : `${plural(course.unit_count, "unit")} · ${plural(course.topic_count, "topic")}`), certificateText(course)].filter(Boolean).join(" · ")}</span>
                       </span>
                     </span>
                     <span className="mt-3 flex flex-wrap items-center gap-1.5">

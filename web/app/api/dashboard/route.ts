@@ -20,7 +20,7 @@ export const GET = handle(async ({ db, profile: getProfile }) => {
     fetchAll(() => db.from("events").select("*").lte("event_date", today).or(`repeat.neq.none,event_date.eq.${today}`)),
     db.from("tasks").select("*").is("done_at", null).lte("due_date", addDays(today, 6)).order("due_date").order("created_at").then(must),
     db.from("tasks").select("*").gte("done_at", startOfDayUtc(addDays(today, -13), zone)).then(must),
-    loadHabits(db, today),
+    loadHabits(db, today, zone),
     db.from("goals").select("*, goal_milestones(*)").neq("status", "completed").order("deadline", { nullsFirst: false }).then(must),
     db.from("budget_categories").select("*").order("position").then(must),
     fetchAll(() => db.from("transactions").select("type, amount, budget_category_id").gte("tx_date", monthStart).lte("tx_date", monthEnd)),

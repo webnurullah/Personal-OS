@@ -10,7 +10,7 @@ import { useFeedback } from "@/components/ui/feedback";
 
 /** A timer as the server lists it (see runningTimers in lib/server/project-time.ts). */
 type Timer = { key: string; kind: "project" | "course" | "resource"; id: string; name: string; module: "Project" | "Course" | "Certificate"; href: string; started_at: string; closed_seconds: number };
-type Running = { now: string; timers: Timer[] };
+type Running = { now: string; timers: Timer[]; /** Habits that reached their daily goal just now. */ ticked?: number };
 /** A timer that was running and is now paused: kept on screen so it can be started again in one tap, until it is hidden. */
 type Paused = Timer & { total: number };
 
@@ -59,6 +59,7 @@ export function RunningTimers() {
         });
       }
       last.current = list;
+      if (d.ticked) void refresh("/habits");
       // A hidden circle comes back when its timer runs again.
       setHidden((h) => (list.some((t) => h[t.key]) ? Object.fromEntries(Object.entries(h).filter(([k]) => !keys.has(k))) as Record<string, true> : h));
     },
@@ -84,7 +85,7 @@ export function RunningTimers() {
         setPaused((p) => without(p, t.key));
         setHidden((h) => without(h, t.key));
       }
-      void refresh("/timer", "/project-time", "/learning", "/courses", "/projects", "/resources");
+      void refresh("/timer", "/project-time", "/learning", "/courses", "/projects", "/resources", "/habits");
       await mutate();
     } catch (e) {
       toast(errorMessage(e), "error");

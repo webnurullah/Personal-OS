@@ -1,4 +1,5 @@
 import { handle } from "@/lib/server/api";
+import { autoCheckHabits } from "@/lib/server/habit-time";
 import { pauseTimer, startTimer, timeState } from "@/lib/server/project-time";
 import { parse, s, z } from "@/lib/server/validate";
 
@@ -14,5 +15,6 @@ export const POST = handle<{ id: string }>(async ({ db, params, body, today, pro
   const { action } = parse(z.object({ action: z.enum(["start", "pause"]) }).strict(), await body());
   if (action === "start") await startTimer(db, "resource", id);
   else await pauseTimer(db, "resource", id);
+  await autoCheckHabits(db, await today(), (await profile()).timezone);
   return timeState(db, "resource", id, (await profile()).timezone, await today());
 });
