@@ -29,7 +29,7 @@ const short = (s: number) => {
 };
 
 /**
- * Every running timer as a round circle above the AI circle, on every page. Tap a circle for its card: module, name, clock and Pause / Start.
+ * Every running timer as a round circle in the bottom row, to the left of the AI circle, on every page. Tap a circle for its card: module, name, clock and Pause / Start.
  * A timer you pause stays as a paused circle (× hides it) so it can be started again quickly.
  */
 export function RunningTimers() {
@@ -94,12 +94,12 @@ export function RunningTimers() {
   };
 
   return (
-    <div className="fixed bottom-[5.25rem] right-4 z-30 flex flex-col-reverse items-end gap-3 sm:bottom-[6.25rem] sm:right-5" aria-live="polite">
+    <div className="fixed bottom-4 right-[4.75rem] z-30 flex flex-row-reverse items-center gap-3 sm:bottom-5 sm:right-[5.25rem]" aria-live="polite">
       {circles.map(({ timer: t, isRunning, total }) => {
         const color = COLOR[t.module];
         const isOpen = open === t.key;
         return (
-          <div key={t.key} className="relative flex flex-row-reverse items-center gap-2.5">
+          <div key={t.key} className="relative">
             <button
               type="button"
               onClick={() => setOpen(isOpen ? null : t.key)}
@@ -115,7 +115,7 @@ export function RunningTimers() {
               {isRunning && <span className="absolute right-0.5 top-0.5 size-2.5 animate-pulse rounded-full border-2 border-white bg-emerald-500" aria-hidden />}
             </button>
             {isOpen && (
-              <div className="w-[min(17.5rem,calc(100vw-6.5rem))] rounded-2xl bg-white p-3.5 shadow-lg shadow-slate-900/20 ring-1 ring-slate-200">
+              <div className="fixed bottom-[5rem] right-4 w-[min(17.5rem,calc(100vw-2rem))] rounded-2xl bg-white p-3.5 shadow-lg shadow-slate-900/20 ring-1 ring-slate-200 sm:bottom-[5.75rem] sm:right-5">
                 <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider" style={{ color }}>
                   <span className="size-2 rounded-full" style={{ background: color }} aria-hidden />
                   {t.module}
