@@ -485,10 +485,10 @@ check('deleting the practice project keeps the item', (await one('select practic
   const tp2 = (await one(`insert into projects (name) values ('Other timed project') returning id`)).id;
   const first = await one(`insert into project_time (project_id) values ($1) returning id, ended_at`, [tp]);
   check('a timer starts with no end (it is running)', first.ended_at === null);
-  await expectError('only one timer can run at a time', () => qa(`insert into project_time (project_id) values ($1)`, [tp2]), 'duplicate key');
-  await qa(`update project_time set ended_at = started_at + interval '90 minutes' where id = $1`, [first.id]);
+  await expectError('a project cannot have two running timers', () => qa(`insert into project_time (project_id) values ($1)`, [tp]), 'duplicate key');
   const second = await one(`insert into project_time (project_id) values ($1) returning id`, [tp2]);
-  check('after stopping, another project can start', !!second.id);
+  check('two different projects can run at the same time', !!second.id);
+  await qa(`update project_time set ended_at = started_at + interval '90 minutes' where id = $1`, [first.id]);
   await expectError('a session cannot end before it started', () => qa(`update project_time set ended_at = started_at - interval '1 minute' where id = $1`, [second.id]), 'check constraint');
   await expectError('a session is never longer than 12 hours', () => qa(`update project_time set ended_at = started_at + interval '13 hours' where id = $1`, [second.id]), 'check constraint');
   await qa(`update project_time set ended_at = started_at + interval '12 hours' where id = $1`, [second.id]);
@@ -507,7 +507,7 @@ check('deleting the practice project keeps the item', (await one('select practic
   const cc = (await one(`insert into courses (title, start_date, target_date) values ('Timed course', '2026-10-05', '2026-12-28') returning id`)).id;
   const first = await one(`insert into course_time (course_id) values ($1) returning id, ended_at`, [cc]);
   check('a course timer starts with no end (it is running)', first.ended_at === null);
-  await expectError('only one course timer can run at a time', () => qa(`insert into course_time (course_id) values ($1)`, [cc]), 'duplicate key');
+  await expectError('a course cannot have two running timers', () => qa(`insert into course_time (course_id) values ($1)`, [cc]), 'duplicate key');
   await qa(`update course_time set ended_at = started_at + interval '45 minutes' where id = $1`, [first.id]);
   await expectError('a session cannot be longer than 12 hours', () => qa(`update course_time set ended_at = started_at + interval '13 hours' where id = $1`, [first.id]), 'check constraint');
   check("nobody else sees my course time", (await qb('select count(*)::int n from course_time'))[0].n === 0);
@@ -523,9 +523,10 @@ check('deleting the practice project keeps the item', (await one('select practic
   await qa(`insert into course_time (course_id, resource_id, ended_at) values ($1, $2, started_at)`, [rc, r1]).catch(() => {});
   const linked = await one(`insert into course_time (course_id, resource_id) values ($1, $2) returning id`, [rc, r1]);
   check('a linked item keeps time on its course', (await qa(`select id from course_time where course_id = $1 and resource_id = $2`, [rc, r1])).length >= 1);
-  await expectError('still one timer at a time with items', () => qa(`insert into course_time (resource_id) values ($1)`, [r2]), 'duplicate key');
-  await qa(`update course_time set ended_at = started_at + interval '10 minutes' where id = $1`, [linked.id]);
+  await expectError('an item cannot have two running timers', () => qa(`insert into course_time (course_id, resource_id) values ($1, $2)`, [rc, r1]), 'duplicate key');
   const loose = await one(`insert into course_time (resource_id) values ($1) returning id, course_id`, [r2]);
+  check('an item and its course can run together (the app avoids counting both)', (await qa(`insert into course_time (course_id) values ($1) returning id`, [rc])).length === 1);
+  await qa(`update course_time set ended_at = started_at + interval '10 minutes' where id = $1`, [linked.id]);
   check('an item with no course keeps its time on the item', loose.course_id === null);
   await qa(`update course_time set ended_at = started_at + interval '5 minutes' where id = $1`, [loose.id]);
   await expectError('a row needs a course or an item', () => qa(`insert into course_time (started_at) values (now())`), 'needs a course or a library item');
