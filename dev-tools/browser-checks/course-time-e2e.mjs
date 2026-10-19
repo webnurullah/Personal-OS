@@ -26,10 +26,10 @@ for (const width of [390, 320, 1280]) {
   const rows = { project: [{ project_id: "p1", started_at: new Date(Date.now() - 3600000).toISOString(), ended_at: null }], course: [] };
   const names = { p1: "CRM", c1: "Digital Marketing" };
   const stateFor = (kind, id) => {
-    const running = rows.project.find((r) => !r.ended_at) ?? rows.course.find((r) => !r.ended_at);
-    const runKind = rows.project.includes(running) ? "project" : "course";
+    // Several timers can run at once: a page only knows its own running timer.
+    const running = rows[kind].find((r) => !r.ended_at && r.project_id === id);
     const own = rows[kind].filter((r) => r.project_id === id && r.ended_at);
-    return projectState(running ? [...own, running] : own, id, running ? names[running.project_id] : "", REAL, "UTC", Date.now(), running ? runKind : "project");
+    return projectState(running ? [...own, running] : own, id, running ? names[running.project_id] : "", REAL, "UTC", Date.now(), kind);
   };
   const stopAll = () => {
     for (const k of ["project", "course"]) for (const r of rows[k]) if (!r.ended_at) r.ended_at = endFor(r.started_at, Date.now());
@@ -45,7 +45,6 @@ for (const width of [390, 320, 1280]) {
       const { action } = JSON.parse(req.postData() ?? "{}");
       const here = rows.course.find((r) => !r.ended_at);
       if (action === "start" && !here) {
-        stopAll();
         rows.course.push({ project_id: "c1", started_at: new Date().toISOString(), ended_at: null });
       } else if (action === "pause" && here) here.ended_at = endFor(here.started_at, Date.now());
     }
@@ -70,12 +69,12 @@ for (const width of [390, 320, 1280]) {
   check(`${width}px: the course page fits the screen`, !m.zoomedOut && m.mainClipped === 0 && m.offenders.length === 0, JSON.stringify(m));
   if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/course-time-${width}.png`, fullPage: true });
 
-  // ---- the timer: a project timer is running, so starting here pauses it
-  await page.getByText(/The timer is running on “CRM”/).waitFor();
-  check(`${width}px: it says the timer runs on another thing (CRM), and shows 0:00:00`, (await timer.innerText()).trim() === "0:00:00");
+  // ---- the timer: a project timer is running, and a course timer runs next to it
+  await page.getByRole("button", { name: "Start" }).waitFor();
+  check(`${width}px: no "running elsewhere" notice, and it shows 0:00:00`, (await page.getByText(/The timer is running on/).count()) === 0 && (await timer.innerText()).trim() === "0:00:00");
   await page.getByRole("button", { name: "Start" }).click();
   await page.getByRole("button", { name: "Pause" }).waitFor();
-  check(`${width}px: Start pauses the project timer and starts this course`, rows.project.every((r) => r.ended_at) && rows.course.filter((r) => !r.ended_at).length === 1);
+  check(`${width}px: Start starts this course and leaves the project timer running`, rows.project.every((r) => !r.ended_at) && rows.course.filter((r) => !r.ended_at).length === 1);
   await page.waitForFunction(() => /^0:00:0[1-9]$/.test(document.querySelector("[role=timer]")?.textContent?.trim() ?? ""), null, { timeout: 8000 }).catch(() => undefined);
   check(`${width}px: the clock counts up`, /^0:00:0[1-9]$/.test((await timer.innerText()).trim()), (await timer.innerText()).trim());
   await page.getByRole("button", { name: "Pause" }).click();

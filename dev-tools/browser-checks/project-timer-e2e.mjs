@@ -32,20 +32,18 @@ for (const width of [390, 320, 1280]) {
   const posts = [];
   const nameOf = (id) => projects.find((p) => p.id === id)?.name ?? "";
   const stateFor = (id) => {
-    const run = rows.find((r) => !r.ended_at);
-    return projectState(rows.filter((r) => r.project_id === id || !r.ended_at), id, run ? nameOf(run.project_id) : "", REAL, "UTC", Date.now());
+    // Several timers can run at once: this project's state only knows its own running timer.
+    const run = rows.find((r) => !r.ended_at && r.project_id === id);
+    return projectState(rows.filter((r) => r.project_id === id), id, run ? nameOf(run.project_id) : "", REAL, "UTC", Date.now(), "project");
   };
   const timeRoute = (id) => (method, url) => {
     if (method === "POST") {
       const action = JSON.parse(url.postData ?? "{}").action;
       posts.push(`${id}:${action}`);
-      const run = rows.find((r) => !r.ended_at);
+      const run = rows.find((r) => !r.ended_at && r.project_id === id);
       if (action === "start") {
-        if (!(run && run.project_id === id)) {
-          if (run) run.ended_at = endFor(run.started_at, Date.now());
-          rows.push({ project_id: id, started_at: new Date().toISOString(), ended_at: null });
-        }
-      } else if (run && run.project_id === id) run.ended_at = endFor(run.started_at, Date.now());
+        if (!run) rows.push({ project_id: id, started_at: new Date().toISOString(), ended_at: null });
+      } else if (run) run.ended_at = endFor(run.started_at, Date.now());
     }
     return stateFor(id);
   };
@@ -107,23 +105,25 @@ for (const width of [390, 320, 1280]) {
   await page.getByRole("button", { name: "Pause" }).waitFor();
   check(`${width}px: coming back, the timer is still running`, (await page.getByText(/^Running/).count()) === 1);
 
-  // Another project: starting there pauses this one.
+  // Another project: starting there leaves this one running (several timers at once).
   await page.goto(`${BASE}/projects/p2`);
-  await page.getByText(/The timer is running on/).waitFor();
-  check(`${width}px: on another project it says where the timer runs, and shows 0:00:00`, (await page.getByText(/The timer is running on “CRM”/).count()) === 1 && (await page.getByRole("timer", { name: "Time spent on this project" }).innerText()).trim() === "0:00:00", (await page.getByRole("timer", { name: "Time spent on this project" }).innerText()).trim() + " | " + (await page.getByText(/The timer is running/).count()));
+  await page.getByRole("button", { name: "Start" }).waitFor();
+  check(`${width}px: on another project there is no "running elsewhere" notice, and it shows 0:00:00`, (await page.getByText(/The timer is running on/).count()) === 0 && (await page.getByRole("timer", { name: "Time spent on this project" }).innerText()).trim() === "0:00:00");
   m = await measure(page, width);
   check(`${width}px: a very long project name does not break the layout`, !m.zoomedOut && m.mainClipped === 0 && m.offenders.length === 0, JSON.stringify(m));
   await page.getByRole("button", { name: "Start" }).click();
   await page.getByRole("button", { name: "Pause" }).waitFor();
-  check(`${width}px: starting on p2 paused p1 (one timer at a time)`, rows.filter((r) => !r.ended_at).length === 1 && rows.find((r) => !r.ended_at).project_id === "p2");
+  check(`${width}px: starting on p2 leaves p1 running`, rows.filter((r) => !r.ended_at).map((r) => r.project_id).sort().join() === "p1,p2");
   await page.waitForTimeout(1200);
   await page.getByRole("button", { name: "Pause" }).click();
   await page.getByRole("button", { name: "Continue" }).waitFor();
-  check(`${width}px: Pause stops it and the time is kept (the button now says Continue)`, rows.every((r) => r.ended_at) && /^0:00:0[1-9]$/.test((await page.getByRole("timer", { name: "Time spent on this project" }).innerText()).trim()));
+  check(`${width}px: Pause stops p2 and its time is kept (the button now says Continue)`, rows.filter((r) => !r.ended_at).map((r) => r.project_id).join() === "p1" && /^0:00:0[1-9]$/.test((await page.getByRole("timer", { name: "Time spent on this project" }).innerText()).trim()));
   await page.goto(`${BASE}/projects/p1`);
+  await page.getByRole("button", { name: "Pause" }).waitFor();
+  await page.getByRole("button", { name: "Pause" }).click();
   await page.getByRole("button", { name: "Continue" }).waitFor();
   const kept = (await page.getByRole("timer", { name: "Time spent on this project" }).innerText()).trim();
-  check(`${width}px: the first project kept what it had, plus the seconds it ran before it was paused`, /^2:00:\d\d$/.test(kept) && kept !== "2:00:00", kept);
+  check(`${width}px: the first project kept what it had, plus the seconds it ran`, /^2:00:\d\d$/.test(kept) && kept !== "2:00:00", kept);
   await page.goto(`${BASE}/habits`);
   await card.waitFor();
   check(`${width}px: with no timer running the notice is gone`, (await card.getByText(/Timer running on/).count()) === 0);

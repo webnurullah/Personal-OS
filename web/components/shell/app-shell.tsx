@@ -10,6 +10,7 @@ import { createClient } from "@/lib/supabase/client";
 import { PageSkeleton } from "../ui/states";
 import { FeedbackProvider } from "../ui/feedback";
 import { Assistant } from "./assistant";
+import { RunningTimers } from "./running-timers";
 import { CommandPalette } from "./command-palette";
 import { Sidebar } from "./sidebar";
 import { Topbar } from "./topbar";
@@ -95,6 +96,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <main className="relative mx-auto w-full max-w-[1720px] overflow-x-clip px-4 pb-24 pt-6 sm:px-6 sm:pb-6 xl:px-8">{children}</main>
           </div>
           <CommandPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
+          <RunningTimers />
           <Assistant />
         </ProfileProvider>
       </FeedbackProvider>

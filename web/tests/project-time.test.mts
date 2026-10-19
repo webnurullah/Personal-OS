@@ -2,7 +2,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { clock, dayOf, endFor, MAX_SESSION_SECONDS, projectState, sessionSeconds, spent, summariseTime, type TimeRow } from "../lib/project-time.ts";
-import { pauseTimer, startTimer, timeState, timeSummary } from "../lib/server/project-time.ts";
+import { pauseTimer, runningTimers, startTimer, timeState, timeSummary } from "../lib/server/project-time.ts";
 import { HttpError } from "../lib/server/http.ts";
 import type { Db } from "../lib/server/supabase.ts";
 
@@ -71,7 +71,7 @@ test("the state of one project: finished time and today's share, plus a running 
 // ---- start and pause, against a small stand-in database ----
 
 type Row = Record<string, unknown>;
-function fakeDb(tables: Record<string, Row[]>, opts: { uniqueRace?: boolean } = {}) {
+function fakeDb(tables: Record<string, Row[]>, opts: { uniqueRace?: boolean; onePerPerson?: boolean } = {}) {
   const log: string[] = [];
   const db = {
     from(name: string) {
@@ -98,7 +98,7 @@ function fakeDb(tables: Record<string, Row[]>, opts: { uniqueRace?: boolean } = 
           }
           if (action === "insert") {
             log.push(`insert ${name}`);
-            if (opts.uniqueRace) return Promise.resolve({ data: null, error: { code: "23505", message: "duplicate" } }).then(resolve, reject);
+            if (opts.uniqueRace || (opts.onePerPerson && tables[name].some((r) => !r.ended_at))) return Promise.resolve({ data: null, error: { code: "23505", message: "duplicate" } }).then(resolve, reject);
             tables[name].push({ ended_at: null, ...inserted! });
             return Promise.resolve({ data: null, error: null }).then(resolve, reject);
           }
@@ -123,9 +123,16 @@ test("Start begins a timer; starting again on the same project changes nothing",
   assert.equal(log.filter((l) => l.startsWith("insert")).length, 1);
 });
 
-test("starting another project pauses the first one (one timer at a time)", async () => {
+test("starting another project leaves the first one running (several timers at once)", async () => {
   const tables = { projects: [{ id: "a", name: "CRM", archived_at: null }, { id: "b", name: "Blog", archived_at: null }], project_time: [{ project_id: "a", started_at: "2026-10-18T08:00:00.000Z", ended_at: null }] as Row[] };
   const { db } = fakeDb(tables);
+  await startTimer(db, "project", "b", NOW);
+  assert.deepEqual(tables.project_time.map((r) => [r.project_id, r.ended_at]), [["a", null], ["b", null]]);
+});
+
+test("a database that still allows one running timer per person: the other one is paused, then the new one starts", async () => {
+  const tables = { projects: [{ id: "a", name: "CRM", archived_at: null }, { id: "b", name: "Blog", archived_at: null }], project_time: [{ project_id: "a", started_at: "2026-10-18T08:00:00.000Z", ended_at: null }] as Row[] };
+  const { db } = fakeDb(tables, { onePerPerson: true });
   await startTimer(db, "project", "b", NOW);
   assert.deepEqual(tables.project_time.map((r) => [r.project_id, r.ended_at]), [["a", "2026-10-18T10:00:00.000Z"], ["b", null]]);
 });
@@ -152,7 +159,7 @@ test("an archived project cannot be timed, and two taps at once leave one runnin
   await startTimer(race.db, "project", "a", NOW); // the database refused the second timer: that is fine
 });
 
-test("the state answers with the time already spent and where the timer runs", async () => {
+test("the state answers with the time already spent (a timer on another project is not this one)", async () => {
   const tables = {
     projects: [{ id: "a", name: "CRM", archived_at: null }, { id: "b", name: "Blog", archived_at: null }],
     project_time: [
@@ -162,10 +169,12 @@ test("the state answers with the time already spent and where the timer runs", a
   };
   const { db } = fakeDb(tables);
   const state = await timeState(db, "project", "a", "Asia/Dhaka", "2026-10-18", NOW);
-  assert.deepEqual([state.closed_seconds, state.today_closed_seconds, state.running?.project_id, state.running?.name], [3600, 3600, "b", "Blog"]);
+  assert.deepEqual([state.closed_seconds, state.today_closed_seconds, state.running], [3600, 3600, null]);
+  const mine = await timeState(db, "project", "b", "Asia/Dhaka", "2026-10-18", NOW);
+  assert.deepEqual([mine.running?.project_id, mine.running?.name, mine.running?.kind], ["b", "Blog", "project"]);
 });
 
-test("a course has its own timer, and starting it pauses a running project (one timer at a time across both)", async () => {
+test("a course has its own timer, and it runs next to a project timer", async () => {
   const tables = {
     projects: [{ id: "a", name: "CRM", archived_at: null }],
     courses: [{ id: "c", title: "Digital Marketing" }],
@@ -174,17 +183,37 @@ test("a course has its own timer, and starting it pauses a running project (one 
   };
   const { db } = fakeDb(tables);
   await startTimer(db, "course", "c", NOW);
-  assert.equal(tables.project_time[0].ended_at, "2026-10-18T10:00:00.000Z", "the project timer was paused");
+  assert.equal(tables.project_time[0].ended_at, null, "the project timer keeps running");
   assert.deepEqual(tables.course_time.map((r) => [r.course_id, r.ended_at]), [["c", null]]);
   await startTimer(db, "course", "c", NOW + 4000);
   assert.equal(tables.course_time.length, 1, "starting again on the same course changes nothing");
-  // And the other way round: a project start pauses the course.
-  await startTimer(db, "project", "a", NOW + 60_000);
+  await pauseTimer(db, "course", "c", NOW + 60_000);
   assert.equal(tables.course_time[0].ended_at, new Date(NOW + 60_000).toISOString());
-  assert.equal(tables.project_time.filter((r) => !r.ended_at).length, 1);
+  assert.equal(tables.project_time[0].ended_at, null, "pausing the course leaves the project running");
 });
 
-test("the state of a course says where the timer runs, even when it is on a project", async () => {
+test("a certificate course counts for its course: starting it pauses the course's own timer, and pausing the course pauses it too", async () => {
+  const tables = {
+    courses: [{ id: "c", title: "Digital Marketing" }],
+    learning_resources: [{ id: "r", title: "Foundations", course_id: "c" }, { id: "free", title: "Loose item", course_id: null }],
+    course_time: [{ course_id: "c", resource_id: null, started_at: "2026-10-18T08:00:00.000Z", ended_at: null }] as Row[],
+  };
+  const { db } = fakeDb(tables);
+  await startTimer(db, "resource", "r", NOW);
+  assert.equal(tables.course_time[0].ended_at, "2026-10-18T10:00:00.000Z", "the course's own timer was paused, so the time is not counted twice");
+  assert.deepEqual(tables.course_time.slice(1).map((r) => [r.course_id, r.resource_id, r.ended_at]), [["c", "r", null]]);
+  const course = await timeState(db, "course", "c", "Asia/Dhaka", "2026-10-18", NOW);
+  assert.deepEqual([course.running?.project_id, course.running?.kind], ["c", "course"], "the course page sees it as running");
+  await startTimer(db, "resource", "free", NOW + 1000);
+  assert.deepEqual(tables.course_time.slice(2).map((r) => [r.course_id, r.resource_id]), [[null, "free"]], "an item with no course keeps its time on the item");
+  await pauseTimer(db, "course", "c", NOW + 60_000);
+  assert.equal(tables.course_time[1].ended_at, new Date(NOW + 60_000).toISOString());
+  assert.equal(tables.course_time[2].ended_at, null, "the loose item keeps running");
+  const list = await runningTimers(db, NOW + 61_000);
+  assert.deepEqual(list.timers.map((x) => [x.kind, x.name, x.module, x.href]), [["resource", "Loose item", "Certificate", "/learning/library"]]);
+});
+
+test("the state of a course does not show a timer that runs on a project", async () => {
   const tables = {
     projects: [{ id: "a", name: "CRM", archived_at: null }],
     courses: [{ id: "c", title: "Digital Marketing" }],
@@ -193,7 +222,7 @@ test("the state of a course says where the timer runs, even when it is on a proj
   };
   const { db } = fakeDb(tables);
   const state = await timeState(db, "course", "c", "Asia/Dhaka", "2026-10-18", NOW);
-  assert.deepEqual([state.closed_seconds, state.running?.project_id, state.running?.kind, state.running?.name], [5400, "a", "project", "CRM"]);
+  assert.deepEqual([state.closed_seconds, state.running], [5400, null]);
 });
 
 test("the Habits summary lists projects and courses together, and says what the running timer is on", async () => {

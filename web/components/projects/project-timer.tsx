@@ -11,7 +11,7 @@ import { useFeedback } from "@/components/ui/feedback";
 /**
  * "Time spent" on a project page or a course page: a clock that counts up while you work on it. Press Start, and Pause when you stop; pressing Start
  * again carries on from the time already spent. The timer lives on the server, so it keeps running if you close the page.
- * Only one project can have a running timer: starting here stops the other one.
+ * Other timers keep running: several can count at the same time (each also shows as a circle on every page).
  */
 export function ProjectTimer({ kind = "project", projectId, archived = false }: { kind?: TimeKind; projectId: string; archived?: boolean }) {
   const { toast } = useFeedback();
@@ -24,7 +24,6 @@ export function ProjectTimer({ kind = "project", projectId, archived = false }: 
   const here = data?.running?.project_id === projectId && data.running.kind === kind;
   const second = useSecond(Boolean(data?.running));
   const sinceStart = data?.running ? Math.min(MAX_SESSION_SECONDS, Math.max(0, Math.floor((second + skew - new Date(data.running.started_at).getTime()) / 1000))) : 0;
-  const elsewhere = Boolean(data?.running && !here);
   const total = (data?.closed_seconds ?? 0) + (here ? sinceStart : 0);
   const today = (data?.today_closed_seconds ?? 0) + (here && data?.running?.started_today ? sinceStart : 0);
 
@@ -34,7 +33,7 @@ export function ProjectTimer({ kind = "project", projectId, archived = false }: 
       const next = await api<ProjectTimeState>(base, { method: "POST", body: { action } });
       setSkew(new Date(next.now).getTime() - Date.now());
       await mutate(next, { revalidate: false });
-      void refresh("/project-time");
+      void refresh("/project-time", "/timer");
       toast(action === "start" ? "Timer started" : `Paused at ${clock(next.closed_seconds)}`);
     } catch (e) {
       toast(errorMessage(e), "error");
@@ -54,7 +53,6 @@ export function ProjectTimer({ kind = "project", projectId, archived = false }: 
       <p className="mt-2 text-sm text-slate-500">
         {error && !data ? "The time could not be loaded." : here ? `Running · today ${spent(today)}` : `Paused · today ${spent(today)}`}
       </p>
-      {elsewhere && data?.running && <p className="mt-1 break-words text-xs text-amber-700">The timer is running on “{data.running.name}”. Starting here pauses that one.</p>}
       <div className="mt-3">
         {here ? (
           <button type="button" className="btn btn-secondary btn-sm" onClick={() => press("pause")} disabled={busy}>
