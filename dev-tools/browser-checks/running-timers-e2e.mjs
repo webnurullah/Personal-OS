@@ -47,7 +47,7 @@ for (const width of [390, 320, 1280]) {
   const box = await circle("Project CRM").boundingBox();
   const ai = page.getByRole("button", { name: /Open (Quick Add|POS Assistant)/ });
   const aiBox = (await ai.count()) ? await ai.boundingBox() : null;
-  check(`${width}px: the circles sit in the bottom row, left of the AI circle, inside the screen`, box && box.x + box.width <= width && (!aiBox || (box.x + box.width <= aiBox.x && Math.abs(box.y + box.height / 2 - (aiBox.y + aiBox.height / 2)) <= 6)), JSON.stringify({ box, aiBox }));
+  check(`${width}px: the first circle sits right above the AI circle (a small gap), inside the screen`, box && box.x + box.width <= width && (!aiBox || (box.y + box.height <= aiBox.y && aiBox.y - (box.y + box.height) <= 12)), JSON.stringify({ box, aiBox }));
 
   if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/circles-${width}.png` });
   await circle("Project CRM").click();
