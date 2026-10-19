@@ -49,6 +49,7 @@ for (const width of [390, 320, 1280]) {
   await page.getByRole("button", { name: /Edit Personal Project/ }).first().click();
   const minutes = page.locator("#habit-minutes");
   await minutes.waitFor();
+  check(`${width}px: only one goal field shows (the timer goal, not the words)`, (await page.locator("#habit-goal").count()) === 0);
   check(`${width}px: the form has the goal and the picked project`, (await minutes.inputValue()) === "120" && (await page.getByRole("checkbox", { name: /CRM/ }).isChecked()) && !(await page.getByRole("checkbox", { name: /Blog/ }).isChecked()));
   await page.getByRole("checkbox", { name: /Blog/ }).check();
   await page.getByRole("checkbox", { name: /Digital Marketing/ }).check();
@@ -58,12 +59,13 @@ for (const width of [390, 320, 1280]) {
   await page.waitForTimeout(500);
   const saved = calls.find((c) => c.method === "PATCH" && c.path === "/habits/h1");
   if (!saved) console.log("CALLS", JSON.stringify(calls), (await page.locator("[role=status], [role=alert]").allInnerTexts()).join("|"));
-  check(`${width}px: saving sends the goal and the picked projects and courses`, saved && saved.body.target_minutes === 30 && JSON.stringify(saved.body.sources.map((s) => `${s.kind}:${s.id}`).sort()) === JSON.stringify(["course:c1", "project:p1", "project:p2"]), JSON.stringify(saved?.body));
+  check(`${width}px: saving sends the goal and the picked projects and courses`, saved && saved.body.target_minutes === 30 && saved.body.goal_text === "30m daily" && JSON.stringify(saved.body.sources.map((s) => `${s.kind}:${s.id}`).sort()) === JSON.stringify(["course:c1", "project:p1", "project:p2"]), JSON.stringify(saved?.body));
 
   // Remove the time goal.
   await page.getByRole("button", { name: /Edit Personal Project/ }).first().click();
-  await page.getByRole("button", { name: "No time goal" }).click();
-  check(`${width}px: without a time goal the picks are hidden`, (await page.getByText("Counts time from").count()) === 0);
+  await page.getByRole("tab", { name: "I tick it myself" }).click();
+  check(`${width}px: one goal at a time: the words field replaces the time goal`, (await page.locator("#habit-goal").count()) === 1 && (await page.locator("#habit-minutes").count()) === 0);
+  check(`${width}px: ticking it yourself hides the picks`, (await page.getByText("Counts time from").count()) === 0);
   calls.length = 0;
   await page.getByRole("button", { name: "Save habit" }).click();
   await page.waitForTimeout(500);

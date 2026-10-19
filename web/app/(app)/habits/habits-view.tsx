@@ -11,7 +11,7 @@ import { useNewAction } from "@/lib/new-action";
 import type { Habit, HabitsResponse } from "@/lib/types";
 import { HABITS_KEY, HabitTracker } from "@/components/habits/habit-tracker";
 import { ProjectTimeCard } from "@/components/habits/project-time-card";
-import { ColorPicker, Field, IconPicker } from "@/components/ui/controls";
+import { ColorPicker, Field, IconPicker, Segmented } from "@/components/ui/controls";
 import { useFeedback } from "@/components/ui/feedback";
 import { HABIT_ICONS } from "@/components/ui/icon";
 import { Modal, ModalActions } from "@/components/ui/modal";
@@ -144,6 +144,8 @@ function HabitForm({ editing, onClose }: { editing: Habit | null; onClose: () =>
   const { toast } = useFeedback();
   const [busy, setBusy] = useState(false);
   // A time goal: the minutes a day, and the projects and courses whose timer counts for it.
+  // One goal, two ways: "I tick it" (a goal in words) or "Timer counts it" (minutes a day, ticked for you when the timers reach it).
+  const [mode, setMode] = useState<"tick" | "timer">(editing?.target_minutes ? "timer" : "tick");
   const [minutes, setMinutes] = useState(editing?.target_minutes ? String(editing.target_minutes) : "");
   const [picked, setPicked] = useState<Set<string>>(new Set((editing?.sources ?? []).map((s) => `${s.kind}:${s.id}`)));
   const { data: projects } = useSWR<{ items: { id: string; name: string; status: string }[] }>("/projects");
@@ -153,19 +155,20 @@ function HabitForm({ editing, onClose }: { editing: Habit | null; onClose: () =>
     ...(courses?.items ?? []).filter((c) => c.status !== "done" || picked.has(`course:${c.id}`)).map((c) => ({ key: `course:${c.id}`, kind: "course" as const, id: c.id, name: c.title })),
   ];
   const goal = Number(minutes);
-  const goalBad = minutes !== "" && (!Number.isInteger(goal) || goal < 1 || goal > 1440);
+  const timed = mode === "timer";
+  const goalBad = timed && (minutes === "" || !Number.isInteger(goal) || goal < 1 || goal > 1440);
 
   const submit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (goalBad) return toast("The daily goal is a whole number of minutes, from 1 to 1440.", "error");
+    if (goalBad) return toast("Give the daily goal as a whole number of minutes, from 1 to 1440.", "error");
     const form = new FormData(e.currentTarget);
     const body = {
       name: String(form.get("name")),
-      goal_text: String(form.get("goal_text")),
+      goal_text: timed ? `${minutesText(goal)} daily` : String(form.get("goal_text") ?? ""),
       icon: String(form.get("icon") || "circle-check"),
       color: String(form.get("color") || "emerald"),
-      target_minutes: minutes === "" ? null : goal,
-      sources: minutes === "" ? [] : options.filter((o) => picked.has(o.key)).map((o) => ({ kind: o.kind, id: o.id })),
+      target_minutes: timed ? goal : null,
+      sources: !timed ? [] : options.filter((o) => picked.has(o.key)).map((o) => ({ kind: o.kind, id: o.id })),
     };
     setBusy(true);
     try {
@@ -185,19 +188,32 @@ function HabitForm({ editing, onClose }: { editing: Habit | null; onClose: () =>
       <Field label="Habit" htmlFor="habit-name">
         <input id="habit-name" name="name" className="input" required maxLength={80} defaultValue={editing?.name} placeholder="e.g. Walk 5,000 steps" autoComplete="off" autoFocus />
       </Field>
-      <Field label="Goal" htmlFor="habit-goal">
-        <input id="habit-goal" name="goal_text" className="input" maxLength={80} defaultValue={editing?.goal_text} placeholder="e.g. 20 min · every day" autoComplete="off" />
+      <Field label="Goal">
+        <Segmented
+          label="How you track it"
+          value={mode}
+          onChange={setMode}
+          options={[
+            { value: "tick", label: "I tick it myself" },
+            { value: "timer", label: "Timer counts it" },
+          ]}
+        />
       </Field>
-      <Field label="Daily time goal (minutes)" htmlFor="habit-minutes" hint="Optional. When the timers of the projects and courses you pick below add up to this today, the day is ticked for you. You can still tick it yourself.">
-        <div className="flex flex-wrap items-center gap-2">
-          <input id="habit-minutes" type="number" inputMode="numeric" min={1} max={1440} step={1} className="input w-28" value={minutes} onChange={(e) => setMinutes(e.target.value)} placeholder="e.g. 120" />
-          {[30, 60, 120].map((m) => (
-            <button key={m} type="button" className={`btn btn-sm ${minutes === String(m) ? "btn-primary" : "btn-secondary"}`} onClick={() => setMinutes(String(m))}>{minutesText(m)}</button>
-          ))}
-          {minutes !== "" && <button type="button" className="btn btn-ghost btn-sm" onClick={() => setMinutes("")}>No time goal</button>}
-        </div>
-      </Field>
-      {minutes !== "" && (
+      {mode === "tick" ? (
+        <Field label="Goal in words" htmlFor="habit-goal">
+          <input id="habit-goal" name="goal_text" className="input" maxLength={80} defaultValue={editing?.goal_text} placeholder="e.g. 20 min · every day" autoComplete="off" />
+        </Field>
+      ) : (
+        <Field label="Daily time goal (minutes)" htmlFor="habit-minutes" hint="When the timers of the projects and courses you pick below add up to this today, the day is ticked for you. You can still tick it yourself.">
+          <div className="flex flex-wrap items-center gap-2">
+            <input id="habit-minutes" type="number" inputMode="numeric" min={1} max={1440} step={1} className="input w-28" value={minutes} onChange={(e) => setMinutes(e.target.value)} placeholder="e.g. 120" />
+            {[30, 60, 120].map((m) => (
+              <button key={m} type="button" className={`btn btn-sm ${minutes === String(m) ? "btn-primary" : "btn-secondary"}`} onClick={() => setMinutes(String(m))}>{minutesText(m)}</button>
+            ))}
+          </div>
+        </Field>
+      )}
+      {timed && (
         <fieldset className="space-y-2">
           <legend className="text-sm font-medium text-slate-700">Counts time from</legend>
           {options.length ? (
