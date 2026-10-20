@@ -44,7 +44,7 @@ for (const width of [390, 320, 1280]) {
   await search.fill("zzz nothing");
   check(`${width}px: no match says so, with a way to clear`, (await page.getByText("No job matches").count()) === 1 && (await page.getByRole("button", { name: "Clear the search" }).count()) === 1);
   await page.getByRole("button", { name: "Clear the search" }).click();
-  check(`${width}px: clearing brings everything back`, (await page.locator("article h3").count()) === 6);
+  check(`${width}px: clearing brings the whole list back (the jobs still to apply for)`, (await page.locator("article h3").count()) === 4);
 
   // board keeps working and respects the search
   await page.getByRole("tab", { name: "Board" }).click();

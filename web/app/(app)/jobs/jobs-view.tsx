@@ -73,7 +73,9 @@ export function JobsView() {
   // Starred jobs first, then saved ones (still to apply for), then the ones you applied for.
   // The search narrows the list, the board and the calendar (the numbers above always count all jobs).
   const shown = searchJobs(jobs, query);
-  const open = sortJobs(shown.filter((j) => isOpen(j, today)));
+  // The list on the left is the jobs still to apply for; the jobs you applied for and the closed ones wait on the right, closed first.
+  const open = sortJobs(shown.filter((j) => j.status === "saved" && isOpen(j, today)));
+  const applied = sortJobs(shown.filter((j) => ["applied", "interview"].includes(j.status) && isOpen(j, today)));
   const closed = sortJobs(shown.filter((j) => !isOpen(j, today)));
   const count = (status: JobStatus) => jobs.filter((j) => j.status === status).length;
   const closingSoon = closingWithin(jobs, today, 7).length;
@@ -238,15 +240,16 @@ export function JobsView() {
               <button type="button" className="btn btn-secondary" onClick={() => setQuery("")}>Clear the search</button>
             </EmptyState>
           ) : view === "list" ? (
-            <>
-              {open.map(card)}
-              {closed.length > 0 && (
-                <>
-                  <h2 className="pt-2 text-sm font-semibold text-slate-500">Closed or finished ({closed.length})</h2>
-                  <div className="space-y-4 opacity-75">{closed.map(card)}</div>
-                </>
-              )}
-            </>
+            open.length ? (
+              <>{open.map(card)}</>
+            ) : (
+              <EmptyState icon={BriefcaseBusiness} title="No job waiting to be applied for" text="Saved jobs you still have to apply for show here. The ones you applied for and the closed ones are on the right.">
+                <button type="button" className="btn btn-primary" onClick={() => setEditing("new")}>
+                  <Plus className="size-4" />
+                  Add Job
+                </button>
+              </EmptyState>
+            )
           ) : view === "calendar" ? (
             <JobCalendar jobs={shown} today={today} weekStart={profile.week_start ?? 1} onOpen={setEditing} />
           ) : (
@@ -255,6 +258,8 @@ export function JobsView() {
         </div>
 
         <aside className="space-y-5">
+          {view === "list" && closed.length > 0 && <JobSide title="Closed or finished" jobs={closed} today={today} dim onOpen={setEditing} onChange={update} />}
+          {view === "list" && applied.length > 0 && <JobSide title="Applied" jobs={applied} today={today} onOpen={setEditing} onChange={update} />}
           <SkillsCard skills={mySkills} onSave={saveSkills} />
           <section className="card p-5">
             <h2 className="card-title flex items-center gap-2.5">
@@ -332,6 +337,26 @@ function daysTone(deadline: string | null, today: string) {
   if (!deadline) return "bg-slate-100 text-slate-500";
   const days = daysBetween(today, deadline);
   return days < 0 ? "bg-slate-100 text-slate-500" : days <= 3 ? "bg-rose-50 text-rose-700" : "bg-amber-50 text-amber-700";
+}
+
+/** A short list of jobs in the side column: the title opens the job, and the status can be changed on the spot. */
+function JobSide({ title, jobs, today, dim = false, onOpen, onChange }: { title: string; jobs: JobApplication[]; today: string; dim?: boolean; onOpen: (job: JobApplication) => void; onChange: (job: JobApplication, changes: Partial<JobApplication>) => void }) {
+  return (
+    <section className="card p-5" aria-label={title}>
+      <h2 className="card-title">{title} <span className="ml-1 text-sm font-normal text-slate-500">({jobs.length})</span></h2>
+      <ul className={`mt-3 max-h-96 space-y-3 overflow-y-auto pr-1 ${dim ? "opacity-80" : ""}`}>
+        {jobs.map((job) => (
+          <li key={job.id} className="rounded-xl bg-slate-50 p-3">
+            <button type="button" className="block w-full text-left text-sm font-semibold leading-snug text-slate-900 hover:text-blue-700" onClick={() => onOpen(job)}>{job.title}</button>
+            <p className="mt-0.5 truncate text-xs text-slate-500">{[job.company, job.status === "saved" ? deadlineLabel(job.deadline, today) : job.applied_on ? `Applied ${formatDate(job.applied_on, "short")}` : ""].filter(Boolean).join(" · ")}</p>
+            <div className="mt-2">
+              <StatusSelect status={job.status} onChange={(status) => onChange(job, { status })} />
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
 }
 
 function StatusSelect({ status, onChange }: { status: JobStatus; onChange: (status: JobStatus) => void }) {

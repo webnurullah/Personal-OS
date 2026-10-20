@@ -45,9 +45,11 @@ for (const width of [390, 320, 1280]) {
 
   // ---- the order: starred first (saved before applied among them), then saved (nearest date first), then applied (latest first), then interview; closed ones last
   let now = await order();
-  check(`${width}px: starred first, then saved, then the ones applied for, closed ones last`, JSON.stringify(now) === JSON.stringify(["LONG", "Star applied", "Saved soon", "Saved late", "Applied one", "Interview one", "Rejected one"]), JSON.stringify(now));
+  check(`${width}px: the list holds the saved jobs to apply for (starred first, nearest last date next); the others are on the right`, JSON.stringify(now) === JSON.stringify(["LONG", "Saved soon", "Saved late"]), JSON.stringify(now));
   check(`${width}px: the stars show which jobs are favourites`, (await page.getByRole("button", { name: `Favourite: ${LONG}`, exact: true }).getAttribute("aria-pressed")) === "true" && (await page.getByRole("button", { name: "Favourite: Saved soon" }).getAttribute("aria-pressed")) === "false");
-  check(`${width}px: the finished ones are under their own heading`, (await page.getByRole("heading", { name: /Closed or finished \(1\)/ }).count()) === 1);
+  const sideTitles = await page.locator("aside section h2").allInnerTexts();
+  check(`${width}px: on the right, Closed comes first, then Applied, then My skills`, sideTitles.map((x) => x.replace(/\s*\(\d+\)/, "").trim()).slice(0, 3).join() === "Closed or finished,Applied,My skills", JSON.stringify(sideTitles));
+  check(`${width}px: the applied jobs and the closed one are listed on the right, not in the list`, (await page.getByRole("region", { name: "Applied" }).getByRole("button", { name: /^(Applied one|Star applied|Interview one)$/ }).count()) === 3 && (await page.getByRole("region", { name: "Closed or finished" }).getByRole("button", { name: "Rejected one" }).count()) === 1);
   let m = await measure(page, width);
   check(`${width}px: the list does not overflow (stars, a 100-letter title)`, !m.zoomedOut && m.mainClipped === 0 && m.offenders.length === 0, JSON.stringify(m));
   if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/job-favourite-${width}.png`, fullPage: true });
@@ -56,22 +58,15 @@ for (const width of [390, 320, 1280]) {
   await page.getByRole("button", { name: "Favourite: Saved late" }).click();
   await page.waitForTimeout(500);
   now = await order();
-  check(`${width}px: starring "Saved late" lists it first (above the unstarred saved jobs)`, JSON.stringify(now) === JSON.stringify(["Saved late", "LONG", "Star applied", "Saved soon", "Applied one", "Interview one", "Rejected one"]), JSON.stringify(now));
+  check(`${width}px: starring "Saved late" lists it first (above the unstarred saved jobs)`, JSON.stringify(now) === JSON.stringify(["Saved late", "LONG", "Saved soon"]), JSON.stringify(now));
   check(`${width}px: the star is saved on that job`, calls.length === 1 && calls[0].id === "j1" && JSON.stringify(calls[0].body) === JSON.stringify({ favourite: true }), JSON.stringify(calls));
   check(`${width}px: it says so, and that favourites are listed first`, (await page.getByText(/Added to your favourites/).count()) >= 1);
-
-  // ---- removing the star puts it back
-  await page.getByRole("button", { name: "Favourite: Star applied" }).click();
-  await page.waitForTimeout(500);
-  now = await order();
-  check(`${width}px: removing a star moves an applied job down below the saved ones`, JSON.stringify(now) === JSON.stringify(["Saved late", "LONG", "Saved soon", "Applied one", "Star applied", "Interview one", "Rejected one"]), JSON.stringify(now));
-  check(`${width}px: the star is cleared on that job`, JSON.stringify(calls[1]?.body) === JSON.stringify({ favourite: false }), JSON.stringify(calls));
 
   // ---- marking a job applied sends it below the saved ones (and the star keeps it on top)
   await page.locator("article", { hasText: "Saved soon" }).getByRole("combobox").selectOption("applied");
   await page.waitForTimeout(500);
   now = await order();
-  check(`${width}px: a saved job that is marked applied goes below the saved ones`, now.indexOf("Saved soon") > now.indexOf("LONG") && now.indexOf("Saved soon") > now.indexOf("Saved late") && now.indexOf("Saved soon") < now.indexOf("Interview one"), JSON.stringify(now));
+  check(`${width}px: a saved job that is marked applied leaves the list and appears under Applied on the right`, JSON.stringify(now) === JSON.stringify(["Saved late", "LONG"]) && (await page.getByRole("region", { name: "Applied" }).getByRole("button", { name: "Saved soon" }).count()) === 1, JSON.stringify(now));
 
   // ---- the Board: the same order inside each column, and a star on its cards
   await page.getByRole("tab", { name: "Board" }).click();

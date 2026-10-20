@@ -209,7 +209,7 @@ const job = (i, over = {}) => ({
   summary: `${H(i + 3, 2000)} ${SENT} ${SENT}`, requirements: [H(i), H(i + 1), H(i + 2), WORD], skills: ["React", "TypeScript", cut(WORD, 60), cut(BN, 60), cut(LINK, 60), "Communication", cut(EMO, 40)],
   notes: H(i, 500), image_url: i % 2 === 0 ? PIC : null, favourite: i === 1 || i === 4, created_at: iso("2026-10-01"), ...over,
 });
-const jobs = { today: TODAY, items: range(8).map((i) => job(i)) };
+const jobs = { today: TODAY, items: range(8).map((i) => job(i, i >= 6 ? { company: `Unlisted company number ${i}` } : {})) };
 // The company list: very long names and links, some without links, matching some of the jobs' companies.
 const companyRow = (i, over = {}) => ({ id: `co${i}`, name: i < 3 ? H(i, 200) : `${H(i, 180)} (${i})`, website: i % 3 === 2 ? "" : `https://www.${"verylongcompanydomain".repeat(4)}.com/${WORD}`, facebook: i % 2 ? `https://facebook.com/${WORD}` : "", linkedin: i % 2 ? "" : `https://www.linkedin.com/company/${WORD}`, note: i % 2 ? H(i + 1, 1000) : "", created_at: iso("2026-10-01"), ...over });
 const companies = { today: TODAY, items: range(7).map((i) => companyRow(i)) };
