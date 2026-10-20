@@ -10,12 +10,12 @@ const check = (name, ok, extra = "") => {
 const job = (id, title, over = {}) => ({ id, url: "", title, company: "Acme", location: "Dhaka", deadline: null, status: "saved", applied_on: null, summary: "", requirements: [], skills: [], notes: "", image_url: null, favourite: false, created_at: "2026-10-01T00:00:00Z", ...over });
 // TODAY is 2026-10-06.
 const jobs = [
-  job("j1", "SEO Lead", { deadline: "2026-10-08", skills: ["SEO"] }), // closes in 2 days
+  job("j1", "SEO Lead", { deadline: "2026-10-08", skills: ["SEO"], url: "https://www.linkedin.com/jobs/view/1" }), // closes in 2 days
   job("j2", "Social Media Manager", { deadline: "2026-10-11", company: "Beta Ltd" }), // 5 days
   job("j3", "Data Analyst", { deadline: "2026-10-30", skills: ["SQL"] }),
   job("j4", "Writer without a date"),
-  job("j5", "Applied role", { status: "applied", applied_on: "2026-10-04", deadline: "2026-10-07" }),
-  job("j6", "Rejected role", { status: "rejected", applied_on: "2026-09-20", deadline: "2026-09-25" }),
+  job("j5", "Applied role", { url: "https://bdjobs.com/a/5", status: "applied", applied_on: "2026-10-04", deadline: "2026-10-07" }),
+  job("j6", "Rejected role", { url: "https://bdjobs.com/a/6", status: "rejected", applied_on: "2026-09-20", deadline: "2026-09-25" }),
 ];
 const browser = await launch();
 
@@ -35,6 +35,13 @@ for (const width of [390, 320, 1280]) {
   const tabs = (await page.getByRole("tablist", { name: "View" }).getByRole("tab").allInnerTexts()).map((t) => t.trim());
   check(`${width}px: views are List, Board, Calendar (the Board stays)`, JSON.stringify(tabs) === JSON.stringify(["List", "Board", "Calendar"]), JSON.stringify(tabs));
 
+  // the quick link to the job post, in the list, on the right and on the Board
+  const link = (scope, title) => scope.getByRole("link", { name: `Open the job post: ${title}` });
+  const lk = await link(page.locator("article"), "SEO Lead");
+  check(`${width}px: a job in the list has a quick link to its post (new tab, safe)`, (await lk.count()) === 1 && (await lk.getAttribute("href")) === "https://www.linkedin.com/jobs/view/1" && (await lk.getAttribute("target")) === "_blank" && /noopener/.test((await lk.getAttribute("rel")) ?? ""));
+  check(`${width}px: a job with no web link has none`, (await link(page.locator("article"), "Writer without a date").count()) === 0);
+  check(`${width}px: the jobs on the right have it too (applied and closed)`, (await link(page.getByRole("region", { name: "Applied" }), "Applied role").count()) === 1 && (await link(page.getByRole("region", { name: "Closed or finished" }), "Rejected role").count()) === 1);
+
   // search
   const search = page.getByRole("searchbox", { name: "Search jobs" });
   await search.fill("seo");
@@ -49,6 +56,7 @@ for (const width of [390, 320, 1280]) {
   // board keeps working and respects the search
   await page.getByRole("tab", { name: "Board" }).click();
   check(`${width}px: the Board still shows all five columns`, (await page.locator("section[aria-label='Rejected']").count()) === 1 && (await page.locator("section[aria-label='Saved']").count()) === 1);
+  check(`${width}px: Board cards have the quick link`, (await link(page.locator("section[aria-label='Saved']"), "SEO Lead").count()) === 1);
   await search.fill("data");
   check(`${width}px: the search also narrows the Board`, (await page.locator("section[aria-label='Saved']").getByText("Data Analyst").count()) >= 1 && (await page.locator("section[aria-label]").getByText("SEO Lead").count()) === 0);
   await search.fill("");

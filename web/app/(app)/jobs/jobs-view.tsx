@@ -21,6 +21,7 @@ import { Modal, ModalActions } from "@/components/ui/modal";
 import { EmptyState, LoadError, PageHeader, PageSkeleton } from "@/components/ui/states";
 import { CompanyForm } from "./company-form";
 import { JobPictureField, JobPictureViewer } from "./job-picture";
+import { isHttpUrl } from "@/lib/projects";
 import { JobCalendar } from "./job-calendar";
 import { JobsTabs } from "./jobs-tabs";
 
@@ -339,6 +340,16 @@ function daysTone(deadline: string | null, today: string) {
   return days < 0 ? "bg-slate-100 text-slate-500" : days <= 3 ? "bg-rose-50 text-rose-700" : "bg-amber-50 text-amber-700";
 }
 
+/** The quick link to the job post itself (opens in a new tab). Nothing is shown when the job has no web link. */
+function PostLink({ job, className = "" }: { job: JobApplication; className?: string }) {
+  if (!isHttpUrl(job.url)) return null;
+  return (
+    <a href={job.url} target="_blank" rel="noopener noreferrer" className={`inline-flex shrink-0 items-center rounded-md p-0.5 text-slate-400 transition hover:text-blue-700 focus-visible:outline-2 focus-visible:outline-blue-500 ${className}`} aria-label={`Open the job post: ${job.title}`} title="Open the job post in a new tab">
+      <ExternalLink className="size-4" aria-hidden />
+    </a>
+  );
+}
+
 /** A short list of jobs in the side column: the title opens the job, and the status can be changed on the spot. */
 function JobSide({ title, jobs, today, dim = false, onOpen, onChange }: { title: string; jobs: JobApplication[]; today: string; dim?: boolean; onOpen: (job: JobApplication) => void; onChange: (job: JobApplication, changes: Partial<JobApplication>) => void }) {
   return (
@@ -347,7 +358,10 @@ function JobSide({ title, jobs, today, dim = false, onOpen, onChange }: { title:
       <ul className={`mt-3 max-h-96 space-y-3 overflow-y-auto pr-1 ${dim ? "opacity-80" : ""}`}>
         {jobs.map((job) => (
           <li key={job.id} className="rounded-xl bg-slate-50 p-3">
-            <button type="button" className="block w-full text-left text-sm font-semibold leading-snug text-slate-900 hover:text-blue-700" onClick={() => onOpen(job)}>{job.title}</button>
+            <div className="flex items-start justify-between gap-2">
+              <button type="button" className="min-w-0 text-left text-sm font-semibold leading-snug text-slate-900 hover:text-blue-700" onClick={() => onOpen(job)}>{job.title}</button>
+              <PostLink job={job} />
+            </div>
             <p className="mt-0.5 truncate text-xs text-slate-500">{[job.company, job.status === "saved" ? deadlineLabel(job.deadline, today) : job.applied_on ? `Applied ${formatDate(job.applied_on, "short")}` : ""].filter(Boolean).join(" · ")}</p>
             <div className="mt-2">
               <StatusSelect status={job.status} onChange={(status) => onChange(job, { status })} />
@@ -405,7 +419,7 @@ function JobCard({ job, today, mySkills, listed, onAddCompany, onChange, onEdit,
             </button>
           )}
           <div className="min-w-0">
-            <h3 className="text-base font-semibold text-slate-900">{job.title}</h3>
+            <h3 className="text-base font-semibold text-slate-900">{job.title}<PostLink job={job} className="ml-1.5 align-text-bottom" /></h3>
             <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-500">
               {job.company && <span>{job.company}</span>}
               {job.location && <span className="inline-flex items-center gap-1"><MapPin className="size-3.5" />{job.location}</span>}
@@ -555,6 +569,7 @@ function Board({ jobs, today, mySkills, listed, onAddCompany, onMove, onChange, 
                           <span className="block text-sm font-semibold text-slate-900">{job.title}</span>
                           {job.company && <span className="block truncate text-xs text-slate-500">{job.company}</span>}
                         </button>
+                        <PostLink job={job} className="mt-0.5" />
                         <FavouriteStar job={job} onChange={(changes) => onChange(job, changes)} className="-mr-1.5 -mt-1.5 shrink-0" />
                       </div>
                       <div className="mt-2 flex flex-wrap items-center gap-1.5">
