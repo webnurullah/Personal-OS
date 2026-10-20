@@ -4,14 +4,14 @@ import { toArchive } from "@/lib/archive";
 import { useEffect, useRef, useState, type DragEvent, type FormEvent } from "react";
 import Link from "next/link";
 import useSWR from "swr";
-import { Building2, BriefcaseBusiness, CalendarClock, Check, ChevronDown, Download, ExternalLink, GraduationCap, LayoutGrid, Link2, List as ListIcon, Loader2, MapPin, Pencil, Plus, Sparkles, Star, Trash2, X } from "lucide-react";
+import { Building2, BriefcaseBusiness, CalendarClock, CalendarDays, Check, ChevronDown, Download, ExternalLink, GraduationCap, LayoutGrid, Link2, List as ListIcon, Loader2, MapPin, Pencil, Plus, Search, Sparkles, Star, Trash2, X } from "lucide-react";
 import { api, errorMessage, refresh } from "@/lib/api";
 import { daysBetween, formatDate } from "@/lib/dates";
 import { hm } from "@/lib/format";
 import { companyKey } from "@/lib/companies";
 import { fixLink } from "@/lib/job-actions";
 import { prepareJobImage, PictureError } from "@/lib/job-image";
-import { compareJobs, deadlineLabel, isOpen, matchPercent, mergeSkills, skillKey, skillMatch, skillsToLearn, sortJobs } from "@/lib/jobs";
+import { closingWithin, compareJobs, deadlineLabel, isOpen, matchPercent, mergeSkills, skillKey, skillMatch, searchJobs, skillsToLearn, sortJobs } from "@/lib/jobs";
 import { useNewAction } from "@/lib/new-action";
 import type { Company, JobAnalysis, JobApplication, JobStatus, LearningResource, List, Profile } from "@/lib/types";
 import { Progress } from "@/components/ui/charts";
@@ -21,6 +21,7 @@ import { Modal, ModalActions } from "@/components/ui/modal";
 import { EmptyState, LoadError, PageHeader, PageSkeleton } from "@/components/ui/states";
 import { CompanyForm } from "./company-form";
 import { JobPictureField, JobPictureViewer } from "./job-picture";
+import { JobCalendar } from "./job-calendar";
 import { JobsTabs } from "./jobs-tabs";
 
 const STATUSES: { value: JobStatus; label: string; badge: string; column: string }[] = [
@@ -54,7 +55,8 @@ export function JobsView() {
   const [addingCompany, setAddingCompany] = useState<string | null>(null); // the company of the job whose "Add company" was pressed
   const { toast, confirm } = useFeedback();
   const [editing, setEditing] = useState<JobApplication | "new" | null>(null);
-  const [view, setView] = useState<"list" | "board">("list");
+  const [view, setView] = useState<"list" | "board" | "calendar">("list");
+  const [query, setQuery] = useState("");
   const [learning, setLearning] = useState<Set<string>>(new Set());
   const [librarying, setLibrarying] = useState<Set<string>>(new Set());
   const [coursing, setCoursing] = useState<Set<string>>(new Set()); // skills a course is being made for
@@ -69,10 +71,13 @@ export function JobsView() {
   const mySkills = profile.skills ?? [];
   const toLearn = skillsToLearn(jobs, mySkills, today);
   // Starred jobs first, then saved ones (still to apply for), then the ones you applied for.
-  const open = sortJobs(jobs.filter((j) => isOpen(j, today)));
-  const closed = sortJobs(jobs.filter((j) => !isOpen(j, today)));
+  // The search narrows the list, the board and the calendar (the numbers above always count all jobs).
+  const shown = searchJobs(jobs, query);
+  const open = sortJobs(shown.filter((j) => isOpen(j, today)));
+  const closed = sortJobs(shown.filter((j) => !isOpen(j, today)));
   const count = (status: JobStatus) => jobs.filter((j) => j.status === status).length;
-  const closingSoon = jobs.filter((j) => j.status === "saved" && j.deadline && j.deadline >= today && daysBetween(today, j.deadline) <= 7).length;
+  const closingSoon = closingWithin(jobs, today, 7).length;
+  const closingVerySoon = closingWithin(jobs, today, 3).length;
 
   const saveSkills = async (skills: string[]) => {
     await mutateProfile({ ...profile, skills }, { revalidate: false });
@@ -196,7 +201,7 @@ export function JobsView() {
           <Stat label="Applied" value={count("applied")} tone="text-blue-600" />
           <Stat label="Interviews" value={count("interview")} tone="text-violet-600" />
           <Stat label="Offers" value={count("offer")} tone="text-emerald-600" />
-          <Stat label="Rejected" value={count("rejected")} tone="text-rose-600" />
+          <Stat label="Closing in 3 days" value={closingVerySoon} tone={closingVerySoon ? "text-rose-600" : "text-slate-400"} />
           <Stat label="Closing in 7 days" value={closingSoon} tone={closingSoon ? "text-amber-600" : "text-slate-400"} />
         </div>
       )}
@@ -204,15 +209,22 @@ export function JobsView() {
       <div className="mt-6 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="min-w-0 space-y-4">
           {jobs.length > 0 && (
-            <Segmented
-              label="View"
-              value={view}
-              onChange={setView}
-              options={[
-                { value: "list", label: <span className="inline-flex items-center gap-1.5"><ListIcon className="size-4" />List</span> },
-                { value: "board", label: <span className="inline-flex items-center gap-1.5"><LayoutGrid className="size-4" />Board</span> },
-              ]}
-            />
+            <div className="flex flex-wrap items-center gap-3">
+              <Segmented
+                label="View"
+                value={view}
+                onChange={setView}
+                options={[
+                  { value: "list", label: <span className="inline-flex items-center gap-1.5"><ListIcon className="size-4" />List</span> },
+                  { value: "board", label: <span className="inline-flex items-center gap-1.5"><LayoutGrid className="size-4" />Board</span> },
+                  { value: "calendar", label: <span className="inline-flex items-center gap-1.5"><CalendarDays className="size-4" />Calendar</span> },
+                ]}
+              />
+              <div className="relative min-w-48 flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" aria-hidden />
+                <input type="search" className="input !pl-9" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search jobs, companies, skills…" aria-label="Search jobs" autoComplete="off" />
+              </div>
+            </div>
           )}
           {jobs.length === 0 ? (
             <EmptyState icon={BriefcaseBusiness} title="No jobs saved yet" text="Paste a job link: the last date to apply, the requirements and the skills are filled in for you to check.">
@@ -220,6 +232,10 @@ export function JobsView() {
                 <Plus className="size-4" />
                 Add your first job
               </button>
+            </EmptyState>
+          ) : shown.length === 0 ? (
+            <EmptyState icon={Search} title="No job matches" text={`Nothing found for “${query.trim()}”. Try a company, a skill or a part of the title.`}>
+              <button type="button" className="btn btn-secondary" onClick={() => setQuery("")}>Clear the search</button>
             </EmptyState>
           ) : view === "list" ? (
             <>
@@ -231,8 +247,10 @@ export function JobsView() {
                 </>
               )}
             </>
+          ) : view === "calendar" ? (
+            <JobCalendar jobs={shown} today={today} weekStart={profile.week_start ?? 1} onOpen={setEditing} />
           ) : (
-            <Board jobs={jobs} today={today} mySkills={mySkills} listed={listed} onAddCompany={setAddingCompany} onMove={(job, status) => update(job, { status })} onChange={update} onOpen={setEditing} />
+            <Board jobs={shown} today={today} mySkills={mySkills} listed={listed} onAddCompany={setAddingCompany} onMove={(job, status) => update(job, { status })} onChange={update} onOpen={setEditing} />
           )}
         </div>
 

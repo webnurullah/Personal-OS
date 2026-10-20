@@ -81,3 +81,21 @@ test("sorting does not change the list you give it, and an unknown status goes l
   assert.deepEqual(input, copy);
   assert.equal(compareJobs(listed("a", "saved"), listed("a", "saved")), 0);
 });
+
+test("searching jobs: every word must be found in the title, company, place, skills, requirements, summary or notes", async () => {
+  const { searchJobs, closingWithin } = await import("../lib/jobs.ts");
+  const j = (title: string, over = {}) => ({ title, company: "Acme", location: "Dhaka", skills: [] as string[], requirements: [] as string[], summary: "", notes: "", status: "saved", deadline: null as string | null, ...over });
+  const list = [j("SEO Lead", { skills: ["Google Ads"] }), j("Writer", { company: "Beta Ltd", notes: "call Rahim" }), j("Analyst", { requirements: ["SQL"] })];
+  assert.equal(searchJobs(list, "").length, 3);
+  assert.equal(searchJobs(list, "   ").length, 3);
+  assert.deepEqual(searchJobs(list, "seo").map((x) => x.title), ["SEO Lead"]);
+  assert.deepEqual(searchJobs(list, "google ADS").map((x) => x.title), ["SEO Lead"]);
+  assert.deepEqual(searchJobs(list, "beta rahim").map((x) => x.title), ["Writer"]);
+  assert.deepEqual(searchJobs(list, "sql dhaka").map((x) => x.title), ["Analyst"]);
+  assert.equal(searchJobs(list, "seo rahim").length, 0);
+
+  const today = "2026-10-06";
+  const jobs = [j("a", { deadline: "2026-10-06" }), j("b", { deadline: "2026-10-09" }), j("c", { deadline: "2026-10-10" }), j("d", { deadline: "2026-10-05" }), j("e", { deadline: "2026-10-07", status: "applied" }), j("f")];
+  assert.deepEqual(closingWithin(jobs, today, 3).map((x) => x.title), ["a", "b"]);
+  assert.deepEqual(closingWithin(jobs, today, 7).map((x) => x.title), ["a", "b", "c"]);
+});

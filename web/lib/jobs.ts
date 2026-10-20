@@ -96,3 +96,18 @@ export function compareJobs(a: Listed, b: Listed) {
 }
 
 export const sortJobs = <T extends Listed>(jobs: T[]) => [...jobs].sort(compareJobs);
+
+/** The jobs that match a search: every word typed must be found in the title, company, place, skills, requirements, summary or notes (capital letters do not count). */
+export function searchJobs<T extends { title: string; company: string; location: string; skills: string[]; requirements: string[]; summary: string; notes: string }>(jobs: T[], query: string) {
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  if (!words.length) return jobs;
+  return jobs.filter((j) => {
+    const text = [j.title, j.company, j.location, j.skills.join(" "), j.requirements.join(" "), j.summary, j.notes].join(" ").toLowerCase();
+    return words.every((w) => text.includes(w));
+  });
+}
+
+/** Saved jobs whose last day to apply is today or within the next `days` days. */
+export function closingWithin<T extends { status: string; deadline: string | null }>(jobs: T[], today: string, days: number) {
+  return jobs.filter((j) => j.status === "saved" && j.deadline && j.deadline >= today && daysBetween(today, j.deadline) <= days);
+}
