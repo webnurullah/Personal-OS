@@ -41,7 +41,8 @@ for (const width of [390, 320, 1280]) {
   await page.getByText("1h 12m of 2h today").first().waitFor();
   check(`${width}px: a habit with a time goal shows today's time against it`, (await page.getByText("1h 12m of 2h today").count()) >= 1);
   check(`${width}px: a reached goal shows in full, a habit without a time goal shows nothing extra`, (await page.getByText("1h of 1h today").count()) >= 1 && (await page.getByText(/5,000 steps/).count()) >= 1 && (await page.getByText(/of .* today/).count()) === (await page.getByText(/(1h 12m of 2h|1h of 1h|0m of 20m) today/).count()));
-  check(`${width}px: a goal with nothing picked says so`, (await page.getByText("No project or course picked").count()) >= 1);
+  check(`${width}px: a goal with nothing picked says so (on the same line)`, (await page.getByText(/none picked/i).count()) >= 1);
+  if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/habit-goal-${width}.png`, fullPage: true });
   const m = await measure(page, width);
   check(`${width}px: the Habits page fits the screen`, !m.zoomedOut && m.mainClipped === 0, JSON.stringify(m));
 

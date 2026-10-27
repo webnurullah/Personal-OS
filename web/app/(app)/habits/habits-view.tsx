@@ -156,26 +156,9 @@ function RangeBar({ today, preset, offset, custom, onPreset, onOffset, onCustom 
     if (!windowProblem(next, today)) onCustom(next);
   };
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <Segmented
-        label="Date range"
-        value={preset}
-        onChange={onPreset}
-        options={[
-          { value: "7d", label: "Last 7 days" },
-          { value: "week", label: "Week" },
-          { value: "month", label: "Month" },
-          { value: "custom", label: "Custom" },
-        ]}
-      />
-      {(preset === "week" || preset === "month") && (
-        <div className="flex gap-1">
-          <button type="button" className="btn btn-secondary btn-sm btn-icon" aria-label={`Earlier ${preset}`} onClick={() => onOffset(offset - 1)}><ChevronLeft className="size-4" /></button>
-          <button type="button" className="btn btn-secondary btn-sm btn-icon" aria-label={`Later ${preset}`} disabled={offset >= 0} onClick={() => onOffset(Math.min(0, offset + 1))}><ChevronRight className="size-4" /></button>
-        </div>
-      )}
+    <>
       {preset === "custom" && (
-        <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-2 text-sm text-slate-600">
+        <div className="order-last flex w-full flex-wrap items-center justify-center gap-x-3 gap-y-2 text-sm text-slate-600 sm:order-none sm:w-auto sm:flex-1">
           <label className="flex items-center gap-2" htmlFor="range-from">From
             <input id="range-from" type="date" className="input !h-9 !w-auto" value={from} max={today} onChange={(e) => change({ from: e.target.value, to })} />
           </label>
@@ -185,7 +168,26 @@ function RangeBar({ today, preset, offset, custom, onPreset, onOffset, onCustom 
           {problem ? <span className="text-rose-600" role="alert">{problem}</span> : <span className="text-slate-500">{windowDays({ from, to })} days</span>}
         </div>
       )}
-    </div>
+      <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+        <Segmented
+          label="Date range"
+          value={preset}
+          onChange={onPreset}
+          options={[
+            { value: "7d", label: "Last 7 days" },
+            { value: "week", label: "Week" },
+            { value: "month", label: "Month" },
+            { value: "custom", label: "Custom" },
+          ]}
+        />
+        {(preset === "week" || preset === "month") && (
+          <div className="flex gap-1">
+            <button type="button" className="btn btn-secondary btn-sm btn-icon" aria-label={`Earlier ${preset}`} onClick={() => onOffset(offset - 1)}><ChevronLeft className="size-4" /></button>
+            <button type="button" className="btn btn-secondary btn-sm btn-icon" aria-label={`Later ${preset}`} disabled={offset >= 0} onClick={() => onOffset(Math.min(0, offset + 1))}><ChevronRight className="size-4" /></button>
+          </div>
+        )}
+      </div>
+    </>
   );
 }
 

@@ -84,7 +84,7 @@ export function HabitTracker({ data, mutate, onEdit, onDelete, onNew, link, comp
 
   return (
     <section className={`card ${compact ? "p-4" : "p-5"} ${className}`} aria-labelledby="tracker-title">
-      <header className="flex flex-wrap items-center justify-between gap-2">
+      <header className={`flex flex-wrap items-center gap-x-3 gap-y-2 ${rangeBar ? "" : "justify-between"}`}>
         <h2 id="tracker-title" className="card-title">{title}</h2>
         {rangeBar}
         <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
@@ -107,7 +107,7 @@ export function HabitTracker({ data, mutate, onEdit, onDelete, onNew, link, comp
                   const isToday = i === days.length - 1 && day === data.today;
                   const monthMark = dense && (i === 0 || day.endsWith("-01"));
                   return (
-                    <th key={day} data-today={isToday ? "" : undefined} className={`text-center font-medium ${compact ? "pb-1.5" : "pb-3"}`}>
+                    <th key={day} data-today={isToday ? "" : undefined} className={`text-center font-medium ${compact ? "pb-1.5" : dense ? "pb-3" : "min-w-[3.25rem] pb-3"}`}>
                       {dense ? (
                         <span className={`block h-3.5 text-[10px] font-semibold ${isToday ? "text-blue-600" : "text-blue-500"}`}>{monthMark ? formatDate(day, "monthShort").split(" ")[0] : ""}</span>
                       ) : (
@@ -125,7 +125,7 @@ export function HabitTracker({ data, mutate, onEdit, onDelete, onNew, link, comp
             <tbody>
               {data.items.map((habit) => (
                 <tr key={habit.id} className="group border-t border-slate-100">
-                  <td className={`sticky left-0 z-10 bg-white pr-3 sm:static sm:w-auto sm:pr-4 ${compact ? "w-36 py-1.5" : "w-40 py-3"}`}>
+                  <td className={`sticky left-0 z-10 bg-white pr-3 sm:static sm:w-auto sm:pr-4 ${compact ? "w-36 py-1.5" : "w-40 py-3 sm:min-w-52"}`}>
                     <div className="flex items-center gap-3">
                       {!compact && (
                         <span className={`icon-tile max-sm:hidden ${colorOf(habit.color).tile}`}>
@@ -141,17 +141,27 @@ export function HabitTracker({ data, mutate, onEdit, onDelete, onNew, link, comp
                           </p>
                         ) : (
                           <>
-                            <p className="font-medium text-slate-800">{habit.name}</p>
-                            {habit.goal_text && <p className="text-xs text-slate-500">{habit.goal_text}</p>}
+                            {habit.target_minutes ? (
+                              <>
+                                {/* a time-goal habit is two lines: the name with its goal, then today's time against it */}
+                                <p className="font-medium text-slate-800">{habit.name}{habit.goal_text && <span className="ml-1.5 text-xs font-normal text-slate-500">· {habit.goal_text}</span>}</p>
+                                <TimeGoal habit={habit} inline />
+                              </>
+                            ) : (
+                              <>
+                                <p className="font-medium text-slate-800">{habit.name}</p>
+                                {habit.goal_text && <p className="text-xs text-slate-500">{habit.goal_text}</p>}
+                              </>
+                            )}
                           </>
                         )}
-                        <TimeGoal habit={habit} />
+                        {compact && <TimeGoal habit={habit} />}
                         <span className="-ml-2 mt-1 flex sm:hidden">{actions(habit)}</span>
                       </div>
                     </div>
                   </td>
                   {habit.done.map((done, i) => (
-                    <td key={days[i]} className="text-center">
+                    <td key={days[i]} className={`text-center ${compact || dense ? "" : "min-w-[3.25rem]"}`}>
                       <button
                         type="button"
                         className={`habit-dot ${compact || dense ? "habit-dot-md" : "habit-dot-lg"} ${days[i] === data.today ? "is-today" : ""}`}
@@ -167,8 +177,8 @@ export function HabitTracker({ data, mutate, onEdit, onDelete, onNew, link, comp
                       {habit.streak}
                     </span>
                   </td>
-                  <td className="pl-4">
-                    <div className={`flex items-center gap-2 ${compact ? "w-28" : "w-36"}`}>
+                  <td className={`pl-4 ${compact ? "w-[22%] min-w-28" : "w-[26%] min-w-40"}`}>
+                    <div className="flex w-full items-center gap-2">
                       <Progress value={habit.share} fill="bg-emerald-500" className="h-1.5 flex-1" />
                       <span className="w-9 text-right text-xs font-semibold text-slate-600">{habit.share}%</span>
                     </div>
@@ -201,17 +211,30 @@ export function HabitTracker({ data, mutate, onEdit, onDelete, onNew, link, comp
 }
 
 /** Today's time against the habit's daily goal (only for habits with a time goal): "1h 12m of 2h today". */
-function TimeGoal({ habit }: { habit: Habit }) {
+function TimeGoal({ habit, inline = false }: { habit: Habit; inline?: boolean }) {
   if (!habit.target_minutes) return null;
   const minutes = habit.today_minutes ?? 0;
   const reached = minutes >= habit.target_minutes;
-  return (
-    <div className="mt-1" title={habit.sources?.length ? `Counts time from: ${habit.sources.map((s) => s.name).join(", ")}` : "Pick the projects and courses that count, in Edit habit"}>
-      <div className="flex items-center gap-1.5 text-[11px] font-medium tabular-nums text-slate-500">
-        <span className={reached ? "text-emerald-600" : undefined}>{minutesText(minutes)} of {minutesText(habit.target_minutes)} today</span>
+  const percent = Math.min(100, Math.round((minutes / habit.target_minutes) * 100));
+  const title = habit.sources?.length ? `Counts time from: ${habit.sources.map((s) => s.name).join(", ")}` : "Pick the projects and courses that count, in Edit habit";
+  const text = <span className={reached ? "font-medium text-emerald-600" : undefined}>{minutesText(minutes)} of {minutesText(habit.target_minutes)} today</span>;
+  const bar = <Progress value={percent} fill={reached ? "bg-emerald-500" : "bg-blue-500"} className={inline ? "h-1 w-16 shrink-0" : "mt-0.5 h-1 w-full max-w-36"} />;
+  const missing = !habit.sources?.length && <span className="text-amber-700">· none picked</span>;
+  if (inline) {
+    // one line under the name: the time against the goal, a small bar after it
+    return (
+      <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs tabular-nums text-slate-500" title={title}>
+        {text}
+        {bar}
+        {missing}
       </div>
-      <Progress value={Math.min(100, Math.round((minutes / habit.target_minutes) * 100))} fill={reached ? "bg-emerald-500" : "bg-blue-500"} className="mt-0.5 h-1 w-full max-w-36" />
-      {!habit.sources?.length && <p className="mt-0.5 text-[11px] text-amber-700">No project or course picked</p>}
+    );
+  }
+  return (
+    <div className="mt-1" title={title}>
+      <div className="flex items-center gap-1.5 text-[11px] font-medium tabular-nums text-slate-500">{text}</div>
+      {bar}
+      {missing && <p className="mt-0.5 text-[11px]">{missing}</p>}
     </div>
   );
 }

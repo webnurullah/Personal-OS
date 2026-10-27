@@ -54,6 +54,7 @@ for (const width of [390, 320, 1280]) {
   const range = page.getByRole("tablist", { name: "Date range" });
 
   check(`${width}px: the default is Last 7 days with 7 day columns`, (await title.innerText()) === "Last 7 days" && (await columns()) === 7 && requests.every((r) => r === "?days=7"), JSON.stringify(requests));
+  if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/habit-range-default-${width}.png`, fullPage: true });
   check(`${width}px: the range buttons are Last 7 days, Week, Month, Custom`, JSON.stringify((await range.getByRole("tab").allInnerTexts()).map((x) => x.trim())) === JSON.stringify(["Last 7 days", "Week", "Month", "Custom"]));
 
   await range.getByRole("tab", { name: "Month" }).click();
@@ -94,6 +95,7 @@ for (const width of [390, 320, 1280]) {
   await to.fill("2026-09-10");
   await page.waitForFunction(() => document.querySelector("#tracker-title")?.textContent === "Sep 1 – Sep 10");
   check(`${width}px: valid dates show that range (10 columns, "10 days")`, (await columns()) === 10 && requests.at(-1) === "?from=2026-09-01&to=2026-09-10" && (await page.getByText("10 days", { exact: true }).count()) === 1, requests.at(-1));
+  if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/habit-range-custom-${width}.png`, fullPage: true });
   m = await measure(page, width);
   check(`${width}px: the custom range bar fits the screen`, !m.zoomedOut && m.mainClipped === 0, JSON.stringify(m));
   await range.getByRole("tab", { name: "Last 7 days" }).click();
