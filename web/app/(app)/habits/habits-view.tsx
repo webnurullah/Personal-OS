@@ -3,10 +3,12 @@
 import { toArchive } from "@/lib/archive";
 import { useState, type FormEvent, type ReactNode } from "react";
 import useSWR from "swr";
-import { ChartPie, CircleCheck, Flame, Lightbulb, Plus, Sparkles, TriangleAlert, Trophy } from "lucide-react";
+import { ChartPie, ChevronLeft, ChevronRight, CircleCheck, Flame, Lightbulb, Plus, Sparkles, TriangleAlert, Trophy } from "lucide-react";
 import { api, errorMessage, refresh } from "@/lib/api";
 import { formatDate } from "@/lib/dates";
 import { minutesText } from "@/lib/habit-time";
+import { presetWindow, windowDays, windowKey, windowProblem, windowTitle, type RangePreset } from "@/lib/habit-range";
+import { useProfile } from "@/lib/profile";
 import { useNewAction } from "@/lib/new-action";
 import type { Habit, HabitsResponse } from "@/lib/types";
 import { HABITS_KEY, HabitTracker } from "@/components/habits/habit-tracker";
@@ -18,15 +20,30 @@ import { Modal, ModalActions } from "@/components/ui/modal";
 import { LoadError, PageHeader, PageSkeleton } from "@/components/ui/states";
 
 export function HabitsView() {
-  const { data, error, mutate } = useSWR<HabitsResponse>(HABITS_KEY);
+  const { profile } = useProfile();
   const { toast, confirm } = useFeedback();
   const [editing, setEditing] = useState<Habit | "new" | null>(null);
   useNewAction(() => setEditing("new"));
+
+  // The date range of the tracker. The last 7 days (the default) is the answer the Dashboard shares; other ranges ask for exact dates.
+  const [preset, setPreset] = useState<RangePreset>("7d");
+  const [offset, setOffset] = useState(0);
+  const [custom, setCustom] = useState<{ from: string; to: string } | null>(null);
+  const base = useSWR<HabitsResponse>(HABITS_KEY);
+  const today = base.data?.today;
+  const picked = today ? (preset === "custom" ? custom ?? presetWindow("7d", today) : presetWindow(preset, today, offset, profile?.week_start ?? 1)) : null;
+  const usable = Boolean(today && picked && preset !== "7d" && !(preset === "custom" && windowProblem(picked, today)));
+  const ranged = useSWR<HabitsResponse>(usable && picked ? windowKey(preset, picked) : null);
+  const active = preset === "7d" || !usable ? base : ranged;
+  const data = preset === "7d" || !usable ? base.data : ranged.data ?? base.data;
+  const { error, mutate } = active;
 
   if (error && !data) return <LoadError error={error} retry={() => mutate()} />;
   if (!data) return <PageSkeleton />;
 
   const { summary, days } = data;
+  const shown = data.range ?? { from: days[0], to: days[days.length - 1] };
+  const title = windowTitle(preset, shown);
 
   const remove = async (habit: Habit) => {
     if (!(await confirm({ title: "Delete this habit?", message: toArchive(`“${habit.name}” and all its history`) }))) return;
@@ -59,11 +76,21 @@ export function HabitsView() {
           value={`${summary.best.days} ${summary.best.days === 1 ? "day" : "days"}`}
           sub={summary.best.name}
         />
-        <Summary icon={<ChartPie className="size-5" />} tile="bg-blue-50 text-blue-600" label="Last 7 days" value={`${summary.share}%`} />
+        <Summary icon={<ChartPie className="size-5" />} tile="bg-blue-50 text-blue-600" label={title} value={`${summary.share}%`} />
         <Summary icon={<Sparkles className="size-5" />} tile="bg-violet-50 text-violet-600" label="Perfect days" value={`${summary.perfect_days} of ${days.length}`} />
       </div>
 
-      <HabitTracker className="mt-6" data={data} mutate={mutate} onEdit={setEditing} onDelete={remove} onNew={() => setEditing("new")} />
+      <HabitTracker
+        className="mt-6"
+        data={data}
+        mutate={mutate}
+        title={title}
+        shareLabel={preset === "7d" ? "This week" : "In range"}
+        rangeBar={today && <RangeBar today={today} preset={preset} offset={offset} custom={picked ?? { from: today, to: today }} onPreset={(p) => { setPreset(p); setOffset(0); if (p === "custom" && !custom) setCustom(presetWindow("7d", today, 0)); }} onOffset={setOffset} onCustom={setCustom} />}
+        onEdit={setEditing}
+        onDelete={remove}
+        onNew={() => setEditing("new")}
+      />
 
       <ProjectTimeCard className="mt-5" />
 
@@ -112,6 +139,53 @@ export function HabitsView() {
         <HabitForm editing={editing && editing !== "new" ? editing : null} onClose={() => setEditing(null)} />
       </Modal>
     </>
+  );
+}
+
+/** The date range buttons of the tracker: last 7 days, a week, a month (with arrows to earlier ones), or two dates picked by hand. */
+function RangeBar({ today, preset, offset, custom, onPreset, onOffset, onCustom }: {
+  today: string; preset: RangePreset; offset: number; custom: { from: string; to: string };
+  onPreset: (preset: RangePreset) => void; onOffset: (offset: number) => void; onCustom: (range: { from: string; to: string }) => void;
+}) {
+  const [from, setFrom] = useState(custom.from);
+  const [to, setTo] = useState(custom.to);
+  const problem = preset === "custom" ? windowProblem({ from, to }, today) : "";
+  const change = (next: { from: string; to: string }) => {
+    setFrom(next.from);
+    setTo(next.to);
+    if (!windowProblem(next, today)) onCustom(next);
+  };
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <Segmented
+        label="Date range"
+        value={preset}
+        onChange={onPreset}
+        options={[
+          { value: "7d", label: "Last 7 days" },
+          { value: "week", label: "Week" },
+          { value: "month", label: "Month" },
+          { value: "custom", label: "Custom" },
+        ]}
+      />
+      {(preset === "week" || preset === "month") && (
+        <div className="flex gap-1">
+          <button type="button" className="btn btn-secondary btn-sm btn-icon" aria-label={`Earlier ${preset}`} onClick={() => onOffset(offset - 1)}><ChevronLeft className="size-4" /></button>
+          <button type="button" className="btn btn-secondary btn-sm btn-icon" aria-label={`Later ${preset}`} disabled={offset >= 0} onClick={() => onOffset(Math.min(0, offset + 1))}><ChevronRight className="size-4" /></button>
+        </div>
+      )}
+      {preset === "custom" && (
+        <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-2 text-sm text-slate-600">
+          <label className="flex items-center gap-2" htmlFor="range-from">From
+            <input id="range-from" type="date" className="input !h-9 !w-auto" value={from} max={today} onChange={(e) => change({ from: e.target.value, to })} />
+          </label>
+          <label className="flex items-center gap-2" htmlFor="range-to">To
+            <input id="range-to" type="date" className="input !h-9 !w-auto" value={to} max={today} onChange={(e) => change({ from, to: e.target.value })} />
+          </label>
+          {problem ? <span className="text-rose-600" role="alert">{problem}</span> : <span className="text-slate-500">{windowDays({ from, to })} days</span>}
+        </div>
+      )}
+    </div>
   );
 }
 

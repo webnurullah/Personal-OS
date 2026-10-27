@@ -1,15 +1,17 @@
 import { addDays, mondayOf } from "./dates.ts";
+import { windowList, type HabitWindow } from "../habit-range.ts";
 import { currentStreak } from "./streaks.ts";
 
 /**
  * Everything the habits screens show, worked out from the active habits and their done days.
- * `days` is how many recent days to show per habit.
+ * `days` is how many recent days to show per habit, or `range` is the exact dates to show (then `days` is ignored).
  */
-export function habitBoard<H extends { id: string; name: string }>(habits: H[], logs: { habit_id: string; log_date: string }[], today: string, days: number, heatmapWeeks = 20) {
+export function habitBoard<H extends { id: string; name: string }>(habits: H[], logs: { habit_id: string; log_date: string }[], today: string, days: number, heatmapWeeks = 20, range?: HabitWindow) {
   const doneBy = new Map<string, Set<string>>(habits.map((h) => [h.id, new Set()]));
   for (const log of logs) doneBy.get(log.habit_id)?.add(log.log_date);
 
-  const window = Array.from({ length: days }, (_, i) => addDays(today, i - (days - 1)));
+  const window = range ? windowList(range) : Array.from({ length: days }, (_, i) => addDays(today, i - (days - 1)));
+  days = window.length;
   const items = habits.map((habit) => {
     const set = doneBy.get(habit.id) ?? new Set<string>();
     const done = window.map((day) => set.has(day));
@@ -34,11 +36,12 @@ export function habitBoard<H extends { id: string; name: string }>(habits: H[], 
 
   return {
     days: window,
+    range: { from: window[0], to: window[window.length - 1], days: window.length },
     items,
     heatmap,
     summary: {
       total,
-      done_today: items.filter((h) => h.done[days - 1]).length,
+      done_today: habits.filter((h) => doneBy.get(h.id)?.has(today)).length,
       best,
       share: total ? Math.round((doneTotal / (total * days)) * 100) : 0,
       perfect_days: total ? window.filter((_, i) => items.every((h) => h.done[i])).length : 0,

@@ -23,8 +23,14 @@ type Mutate = (data: HabitsResponse, options: { revalidate: boolean }) => Promis
  * share of this week. Used on the Habits page (with edit and delete) and at the top of the Dashboard (tick only).
  * On a phone the table is wider than the screen: it starts with today's column in view, and the habit names stay put on the left.
  */
-export function HabitTracker({ data, mutate, onEdit, onDelete, onNew, link, compact = false, className = "" }: {
+export function HabitTracker({ data, mutate, onEdit, onDelete, onNew, link, compact = false, className = "", title = "Last 7 days", rangeBar, shareLabel = "This week" }: {
   data: HabitsResponse;
+  /** The title of the card (the date range shown). */
+  title?: string;
+  /** The date range buttons (the Habits page): shown in the header in place of the "Tap a day" line, which then moves under the table. */
+  rangeBar?: ReactNode;
+  /** The heading of the last column ("This week", or "In range" for a chosen range). */
+  shareLabel?: string;
   mutate: Mutate;
   onEdit?: (habit: Habit) => void;
   onDelete?: (habit: Habit) => void;
@@ -39,6 +45,8 @@ export function HabitTracker({ data, mutate, onEdit, onDelete, onNew, link, comp
   const { toast } = useFeedback();
   const scroller = useRef<HTMLDivElement>(null);
   const { days } = data;
+  // A long range (more than two weeks): smaller dots and a month marker over the day numbers.
+  const dense = !compact && days.length > 14;
   const habitCount = data.items.length;
   useEffect(() => {
     const box = scroller.current;
@@ -77,9 +85,10 @@ export function HabitTracker({ data, mutate, onEdit, onDelete, onNew, link, comp
   return (
     <section className={`card ${compact ? "p-4" : "p-5"} ${className}`} aria-labelledby="tracker-title">
       <header className="flex flex-wrap items-center justify-between gap-2">
-        <h2 id="tracker-title" className="card-title">Last 7 days</h2>
+        <h2 id="tracker-title" className="card-title">{title}</h2>
+        {rangeBar}
         <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
-          {!compact && "Tap a day to tick or untick it. Streaks update straight away."}
+          {!compact && !rangeBar && "Tap a day to tick or untick it. Streaks update straight away."}
           {link && (
             <Link href={link.href} className="link-more">
               {link.label} <ArrowRight className="size-3.5" />
@@ -88,22 +97,28 @@ export function HabitTracker({ data, mutate, onEdit, onDelete, onNew, link, comp
         </p>
       </header>
       {data.items.length ? (
+        <>
         <div ref={scroller} className={`relative overflow-x-auto ${compact ? "mt-2" : "mt-4"}`}>
-          <table className={`w-full text-sm ${compact ? "min-w-[600px]" : "min-w-[760px]"}`}>
+          <table className="w-full text-sm" style={{ minWidth: compact ? 600 : dense ? 300 + days.length * 30 : 760 }}>
             <thead>
               <tr className="text-xs text-slate-500">
                 <th className={`sticky left-0 z-10 bg-white text-left font-medium ${compact ? "pb-1.5" : "pb-3"}`}>Habit</th>
                 {days.map((day, i) => {
-                  const isToday = i === days.length - 1;
+                  const isToday = i === days.length - 1 && day === data.today;
+                  const monthMark = dense && (i === 0 || day.endsWith("-01"));
                   return (
                     <th key={day} data-today={isToday ? "" : undefined} className={`text-center font-medium ${compact ? "pb-1.5" : "pb-3"}`}>
-                      <span className={`block ${compact ? "text-[11px]" : ""} ${isToday ? "text-blue-600" : ""}`}>{isToday ? "Today" : formatDate(day, "weekday")}</span>
-                      <span className={`mt-0.5 inline-grid place-items-center rounded-full ${compact ? "size-5 text-[10px]" : "size-6 text-[11px]"} ${isToday ? "bg-blue-600 text-white" : "text-slate-400"}`}>{Number(day.slice(8))}</span>
+                      {dense ? (
+                        <span className={`block h-3.5 text-[10px] font-semibold ${isToday ? "text-blue-600" : "text-blue-500"}`}>{monthMark ? formatDate(day, "monthShort").split(" ")[0] : ""}</span>
+                      ) : (
+                        <span className={`block ${compact ? "text-[11px]" : ""} ${isToday ? "text-blue-600" : ""}`}>{isToday ? "Today" : formatDate(day, "weekday")}</span>
+                      )}
+                      <span className={`mt-0.5 inline-grid place-items-center rounded-full ${compact ? "size-5 text-[10px]" : dense ? "size-5 text-[10px]" : "size-6 text-[11px]"} ${isToday ? "bg-blue-600 text-white" : "text-slate-400"}`}>{Number(day.slice(8))}</span>
                     </th>
                   );
                 })}
                 <th className={`text-center font-medium ${compact ? "pb-1.5" : "pb-3"}`}>Streak</th>
-                <th className={`pl-4 text-left font-medium ${compact ? "pb-1.5" : "pb-3"}`}>This week</th>
+                <th className={`pl-4 text-left font-medium ${compact ? "pb-1.5" : "pb-3"}`}>{shareLabel}</th>
                 <th className={compact ? "pb-1.5" : "pb-3"} />
               </tr>
             </thead>
@@ -139,9 +154,9 @@ export function HabitTracker({ data, mutate, onEdit, onDelete, onNew, link, comp
                     <td key={days[i]} className="text-center">
                       <button
                         type="button"
-                        className={`habit-dot ${compact ? "habit-dot-md" : "habit-dot-lg"} ${i === days.length - 1 ? "is-today" : ""}`}
+                        className={`habit-dot ${compact || dense ? "habit-dot-md" : "habit-dot-lg"} ${days[i] === data.today ? "is-today" : ""}`}
                         aria-pressed={done}
-                        aria-label={`${habit.name} · ${i === days.length - 1 ? "Today" : formatDate(days[i], "long")}`}
+                        aria-label={`${habit.name} · ${days[i] === data.today ? "Today" : formatDate(days[i], "long")}`}
                         onClick={() => toggle(habit, i)}
                       />
                     </td>
@@ -166,6 +181,8 @@ export function HabitTracker({ data, mutate, onEdit, onDelete, onNew, link, comp
             </tbody>
           </table>
         </div>
+        {!compact && rangeBar && <p className="mt-3 text-xs text-slate-500">Tap a day to tick or untick it. Streaks update straight away.</p>}
+        </>
       ) : (
         <EmptyState icon={Repeat} title="No habits yet" text="Start with one small habit. You can always add more.">
           {onNew ? (

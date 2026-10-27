@@ -113,6 +113,8 @@ export type Habit = {
 export type HabitsResponse = {
   today: string;
   days: string[];
+  /** The dates shown (older saved answers have none). */
+  range?: { from: string; to: string; days: number };
   items: Habit[];
   heatmap: { date: string; share: number | null }[];
   summary: {

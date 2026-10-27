@@ -126,6 +126,8 @@ for (const width of [390, 320, 1280]) {
   check(`${width}px: the first project kept what it had, plus the seconds it ran`, /^2:00:\d\d$/.test(kept) && kept !== "2:00:00", kept);
   await page.goto(`${BASE}/habits`);
   await card.waitFor();
+  // (the saved answer from before may show for a moment: wait for the fresh one)
+  await card.getByText(/Timer running on/).waitFor({ state: "detached", timeout: 5000 }).catch(() => undefined);
   check(`${width}px: with no timer running the notice is gone`, (await card.getByText(/Timer running on/).count()) === 0);
   check(`${width}px: no page errors`, errors.length === 0, errors.join("; "));
   await ctx.close();
