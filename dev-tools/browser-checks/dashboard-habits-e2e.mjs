@@ -111,7 +111,7 @@ for (const width of [390, 320, 1280]) {
   await page.goto(`${BASE}/habits`);
   const card = page.locator("section", { has: page.getByRole("heading", { name: "Last 7 days", exact: true }) });
   await card.locator("table").waitFor();
-  check("the Habits page keeps the line that tells how to tick a day, and its larger rows", (await page.getByText("Tap a day to tick or untick it. Streaks update straight away.").count()) === 1 && Math.round((await card.locator("button.habit-dot").first().boundingBox()).width) === 36);
+  check("the Habits page has no \"Tap a day…\" line any more, and keeps its larger rows", (await page.getByText("Tap a day to tick or untick it. Streaks update straight away.").count()) === 0 && Math.round((await card.locator("button.habit-dot").first().boundingBox()).width) === 36);
   check("the Habits page has the same tracker, with Edit and Delete for each habit and no View All", (await card.getByRole("button", { name: /^Edit / }).count()) >= 5 && (await card.getByRole("button", { name: /^Delete / }).count()) >= 5 && (await card.getByRole("link", { name: /View All/ }).count()) === 0);
   await card.getByRole("button", { name: "NWC Work · Today" }).evaluate((el) => el.click());
   const ticked = (await card.getByRole("button", { name: "NWC Work · Today" }).getAttribute("aria-pressed")) === "true"; // at once (the stand-in answers later with its unchanged list)

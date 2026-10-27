@@ -27,7 +27,7 @@ export function HabitTracker({ data, mutate, onEdit, onDelete, onNew, link, comp
   data: HabitsResponse;
   /** The title of the card (the date range shown). */
   title?: string;
-  /** The date range buttons (the Habits page): shown in the header in place of the "Tap a day" line, which then moves under the table. */
+  /** The date range buttons (the Habits page), shown in the header. */
   rangeBar?: ReactNode;
   /** The heading of the last column ("This week", or "In range" for a chosen range). */
   shareLabel?: string;
@@ -38,7 +38,7 @@ export function HabitTracker({ data, mutate, onEdit, onDelete, onNew, link, comp
   onNew?: () => void;
   /** An extra link in the header, such as "View All". */
   link?: { href: string; label: string };
-  /** A smaller card (the Dashboard): tighter rows and smaller dots, and without the line that tells how to tick a day. */
+  /** A smaller card (the Dashboard): tighter rows and smaller dots. */
   compact?: boolean;
   className?: string;
 }) {
@@ -88,7 +88,6 @@ export function HabitTracker({ data, mutate, onEdit, onDelete, onNew, link, comp
         <h2 id="tracker-title" className="card-title">{title}</h2>
         {rangeBar}
         <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
-          {!compact && !rangeBar && "Tap a day to tick or untick it. Streaks update straight away."}
           {link && (
             <Link href={link.href} className="link-more">
               {link.label} <ArrowRight className="size-3.5" />
@@ -191,7 +190,6 @@ export function HabitTracker({ data, mutate, onEdit, onDelete, onNew, link, comp
             </tbody>
           </table>
         </div>
-        {!compact && rangeBar && <p className="mt-3 text-xs text-slate-500">Tap a day to tick or untick it. Streaks update straight away.</p>}
         </>
       ) : (
         <EmptyState icon={Repeat} title="No habits yet" text="Start with one small habit. You can always add more.">
