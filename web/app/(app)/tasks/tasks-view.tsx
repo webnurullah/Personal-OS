@@ -20,6 +20,18 @@ import { Modal, ModalActions } from "@/components/ui/modal";
 import { EmptyState, LoadError, PageHeader, PageSkeleton } from "@/components/ui/states";
 
 type Filter = "all" | "today" | "upcoming" | "overdue" | "done";
+/** Groups the person can fold away. "Completed" starts folded; the choice is kept on this device. */
+const FOLDABLE = ["someday", "done"];
+const FOLDED_KEY = "tasks-folded";
+function foldedGroups(): string[] {
+  try {
+    const raw = typeof window === "undefined" ? null : window.localStorage.getItem(FOLDED_KEY);
+    const list: unknown = raw ? JSON.parse(raw) : ["done"];
+    return Array.isArray(list) ? list.filter((k): k is string => typeof k === "string" && FOLDABLE.includes(k)) : ["done"];
+  } catch {
+    return ["done"];
+  }
+}
 const PRIORITY: Record<Priority, { label: string; color: string }> = {
   high: { label: "High", color: "text-rose-500" },
   medium: { label: "Medium", color: "text-amber-500" },
@@ -34,7 +46,7 @@ export function TasksView() {
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
   const [categoryId, setCategoryId] = useState("");
-  const [showDone, setShowDone] = useState(false);
+  const [folded, setFolded] = useState(foldedGroups);
   const [editing, setEditing] = useState<Task | "new" | null>(null);
   useNewAction(() => setEditing("new"));
 
@@ -67,6 +79,17 @@ export function TasksView() {
     { key: "someday", title: "No date", tone: "text-slate-500", items: visible.filter((t) => !t.done_at && !t.due_date) },
     { key: "done", title: "Completed", tone: "text-emerald-600", items: visible.filter((t) => t.done_at && !isOnDay(t, today)) },
   ];
+
+  const toggleFold = (key: string) => {
+    const next = folded.includes(key) ? folded.filter((k) => k !== key) : [...folded, key];
+    setFolded(next);
+    try {
+      window.localStorage.setItem(FOLDED_KEY, JSON.stringify(next));
+    } catch {
+      // The choice just is not remembered.
+    }
+  };
+  const searching = query.trim() !== "";
 
   // Instant tick: update the list on screen first, then save.
   const toggle = async (task: Task) => {
@@ -146,13 +169,14 @@ export function TasksView() {
           <div className="mt-4 space-y-5">
             {groups.map((group) => {
               if (!group.items.length) return null;
-              const collapsible = group.key === "done" && filter === "all";
-              const hidden = collapsible && !showDone;
+              // Folded groups open by themselves while searching, so a match is never hidden.
+              const collapsible = FOLDABLE.includes(group.key) && (group.key === "someday" || filter === "all");
+              const hidden = collapsible && folded.includes(group.key) && !searching;
               return (
                 <div key={group.key}>
                   <h3 className={`flex items-center gap-2 px-3 text-xs font-semibold uppercase tracking-wide ${group.tone}`}>
                     {collapsible ? (
-                      <button type="button" className="flex items-center gap-2 uppercase" onClick={() => setShowDone((s) => !s)} aria-expanded={!hidden}>
+                      <button type="button" className="flex items-center gap-2 uppercase" onClick={() => toggleFold(group.key)} aria-expanded={!hidden}>
                         {group.title} <span className="rounded-full bg-slate-100 px-1.5 text-[11px] text-slate-500">{group.items.length}</span>
                         <ChevronDown className={`size-3.5 transition ${hidden ? "" : "rotate-180"}`} />
                       </button>

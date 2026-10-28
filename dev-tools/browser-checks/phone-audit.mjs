@@ -569,10 +569,15 @@ unit("tasks", "/tasks", heading, () => ({ "/tasks": { today: TODAY, items: tasks
     await page.locator("section[aria-label='Task list'] select").selectOption({ index: 2 }).catch(() => undefined);
     await snap("long search text + category chosen");
   }),
-  scene("done group opened", async (page, snap) => {
-    const done = page.locator("section[aria-label='Task list'] h3 button[aria-expanded]");
-    if (await done.count()) await press(done.first());
-    await snap("Completed group expanded");
+  scene("groups folded and opened", async (page, snap) => {
+    // The scene before leaves a long search and a category chosen: start from the whole list.
+    await page.locator("section[aria-label='Task list'] input[type=search]").fill("");
+    await page.locator("section[aria-label='Task list'] select").selectOption({ index: 0 });
+    const groups = page.locator("section[aria-label='Task list'] h3 button[aria-expanded]");
+    await press(groups.filter({ hasText: "No date" }));
+    await snap("No date group folded");
+    await press(groups.filter({ hasText: "Completed" }));
+    await snap("Completed group expanded, No date folded");
   }),
   filledDialog("New task dialog", (p) => button(p, "New Task")),
   scene("Edit task dialog", async (page, snap) => {
