@@ -5,7 +5,7 @@ type Kind = { label: string; href: string; /** What goes with it, singular and p
 
 export const ARCHIVE_KINDS: Record<string, Kind> = {
   task: { label: "Task", href: "/tasks" },
-  note: { label: "Note", href: "/notes" },
+  note: { label: "Note", href: "/notes", related: ["file", "files"] },
   event: { label: "Event", href: "/calendar" },
   goal: { label: "Goal", href: "/goals", related: ["milestone", "milestones"] },
   milestone: { label: "Milestone", href: "/goals" },

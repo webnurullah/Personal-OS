@@ -17,7 +17,7 @@ export function Modal({
   onClose: () => void;
   title: string;
   description?: string;
-  size?: "sm" | "md" | "lg";
+  size?: "sm" | "md" | "lg" | "xl";
   /** false while something is being saved: Esc, the X and a click outside then do nothing. */
   dismissible?: boolean;
   children: ReactNode;
@@ -32,7 +32,7 @@ export function Modal({
     if (!open && dialog.open) dialog.close();
   }, [open]);
 
-  const width = size === "sm" ? "max-w-sm" : size === "lg" ? "max-w-2xl" : "max-w-lg";
+  const width = size === "sm" ? "max-w-sm" : size === "xl" ? "max-w-4xl" : size === "lg" ? "max-w-2xl" : "max-w-lg";
 
   return (
     <dialog
@@ -61,8 +61,8 @@ export function Modal({
         <div className="p-6">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
-              <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
-              {description && <p className="text-sm text-slate-500">{description}</p>}
+              <h2 className="break-words text-lg font-semibold text-slate-900">{title}</h2>
+              {description && <p className="break-words text-sm text-slate-500">{description}</p>}
             </div>
             <button type="button" className="btn btn-ghost btn-sm btn-icon -mr-2 -mt-1" onClick={onClose} aria-label="Close" disabled={!dismissible}>
               <X className="size-5" />

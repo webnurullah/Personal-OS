@@ -1,6 +1,7 @@
 import { forgetProfile, handle, ok } from "@/lib/server/api";
 import { forgetGoogle } from "@/lib/server/google";
 import { must } from "@/lib/server/http";
+import { removeAllNoteFiles } from "@/lib/server/note-files";
 import { removeAllJobImages } from "@/lib/server/job-image";
 import { parse, z } from "@/lib/server/validate";
 
@@ -11,6 +12,8 @@ export const POST = handle(async ({ db, body, user }) => {
   must(await db.from("job_applications").delete().not("id", "is", null));
   // Their pictures (a leftover file is harmless, so a failure is only logged).
   await removeAllJobImages(db, user.id);
+  // The pictures and PDFs kept in notes (their rows go with the notes, below).
+  await removeAllNoteFiles(db, user.id);
   // The company list.
   must(await db.from("companies").delete().not("id", "is", null));
   // The Learning library (certificates, playlists …); deleting courses only unlinks it, so it is removed here.

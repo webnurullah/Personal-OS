@@ -284,6 +284,10 @@ export type HealthLog = {
 export type HealthResponse = { today: string; goals: { steps: number; sleep_minutes: number; water: number }; logs: HealthLog[] };
 
 export type Note = { id: string; title: string; body: string; tag: string; color: ColorName; pinned: boolean; created_at: string; updated_at: string };
+/** A picture or PDF kept with a note. `url` is a signed address for a picture (null for a PDF, which is opened on demand). */
+export type NoteFile = { id: string; note_id: string; kind: "image" | "pdf"; name: string; size_bytes: number; created_at: string; url: string | null };
+/** A note as the notes list gives it. `files` is missing in a copy of the list that the browser saved before files existed. */
+export type NoteWithFiles = Note & { files?: NoteFile[] };
 export type Reminder = { id: string; text: string; due_date: string | null; done: boolean; created_at: string };
 
 export type Dashboard = {

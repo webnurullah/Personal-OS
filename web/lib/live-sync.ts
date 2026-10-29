@@ -20,6 +20,7 @@ export const TABLE_PREFIXES: Record<string, string[]> = {
   goals: ["/goals", "/tasks"],
   goal_milestones: ["/goals", "/tasks"],
   notes: ["/notes"],
+  note_files: ["/notes"],
   bills: ["/finance"],
   transactions: ["/finance"],
   budget_categories: ["/finance"],

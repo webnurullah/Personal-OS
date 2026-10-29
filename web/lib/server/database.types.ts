@@ -934,6 +934,47 @@ export type Database = {
 
         ];
       };
+      note_files: {
+        Row: {
+          id: string;
+          user_id: string;
+          note_id: string;
+          kind: string;
+          name: string;
+          path: string;
+          size_bytes: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string;
+          note_id: string;
+          kind: string;
+          name: string;
+          path: string;
+          size_bytes: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          note_id?: string;
+          kind?: string;
+          name?: string;
+          path?: string;
+          size_bytes?: number;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'note_files_note_id_fkey';
+            columns: ['note_id'];
+            isOneToOne: false;
+            referencedRelation: 'notes';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       notes: {
         Row: {
           id: string;

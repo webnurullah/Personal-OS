@@ -171,6 +171,59 @@ check('you can remove your own job picture', (await qa(`delete from storage.obje
 check('a job can forget its picture', (await qa('update job_applications set image_path = null where id = $1 returning image_path', [jimg.id]))[0].image_path === null);
 await db.exec(`delete from job_applications where id = '${jimg.id}'`);
 
+// Note files (20261029000000_note_files.sql): pictures and PDFs kept with a note, in a private bucket
+{
+const nbucket = (await db.query(`select public, file_size_limit::int as max, allowed_mime_types from storage.buckets where id = 'note-files'`)).rows[0];
+check('note-files bucket is PRIVATE, capped at 4 MB, pictures and PDFs only', nbucket?.public === false && nbucket.max === 4194304 && nbucket.allowed_mime_types.join() === 'image/jpeg,image/png,image/webp,application/pdf', JSON.stringify(nbucket));
+const nf = (uid, n, ext = 'pdf') => `${uid}/${String(n).padStart(8, '0')}-bbbb-4ccc-8ddd-eeeeeeeeeeee.${ext}`;
+const nrow = async (id, over = {}) => qa(`insert into note_files (note_id, kind, name, path, size_bytes) values ($1, $2, $3, $4, $5) returning id, user_id`, [id, over.kind ?? 'pdf', over.name ?? 'Invoice.pdf', over.path ?? nf(A, 1), over.size ?? 1000]);
+const note = (await qa(`insert into notes (title) values ('With files') returning id`))[0].id;
+const noteB = (await qb(`insert into notes (title) values ('B note') returning id`))[0].id;
+const f1 = (await nrow(note))[0];
+check('a note can keep a file; the owner is filled in', f1.user_id === A);
+check('the file row lists with its note', (await qa('select count(*)::int n from note_files where note_id = $1', [note]))[0].n === 1);
+for (const [name, over] of [
+  ['an unknown kind', { kind: 'video', path: nf(A, 2) }],
+  ['an empty name', { name: '', path: nf(A, 3) }],
+  ['a name over 200 characters', { name: 'x'.repeat(201), path: nf(A, 4) }],
+  ['a zero size', { size: 0, path: nf(A, 5) }],
+  ['a size over 4 MB', { size: 4194305, path: nf(A, 6) }],
+  ['a path with a wrong extension', { path: nf(A, 7, 'gif') }],
+  ['a path that climbs up', { path: `${A}/../x.pdf` }],
+  ['a path inside someone else\'s folder', { path: nf(B, 8) }],
+]) {
+  await expectError(`a file row rejects ${name}`, () => nrow(note, over), 'check constraint');
+}
+await expectError('two rows cannot share one stored file', () => nrow(note, { path: nf(A, 1) }), 'duplicate key');
+await expectError("someone else's note cannot be given a file by B for A", () => qb(`insert into note_files (user_id, note_id, kind, name, path, size_bytes) values ($1, $2, 'pdf', 'x.pdf', $3, 10)`, [A, note, nf(A, 9)]), 'row-level security');
+check("B cannot see A's files", (await qb('select id from note_files')).length === 0);
+check("B cannot delete A's file", (await qb('delete from note_files where id = $1 returning id', [f1.id])).length === 0);
+await expectError('a file cannot be edited (only added and removed)', () => qa(`update note_files set name = 'x.pdf' where id = $1`, [f1.id]), 'permission denied');
+await expectError('a signed-out visitor cannot read files', () => qanon('select * from note_files'), 'permission denied');
+
+check('you can add a file to your own folder in the bucket', (await qa(`insert into storage.objects (bucket_id, name, owner_id) values ('note-files', $1, $2) returning name`, [nf(A, 1), A])).length === 1);
+await expectError("you cannot add a file to someone else's folder", () => qb(`insert into storage.objects (bucket_id, name, owner_id) values ('note-files', $1, $2)`, [nf(A, 1), B]), 'row-level security');
+await expectError('a signed-out visitor cannot add a file', () => qanon(`insert into storage.objects (bucket_id, name) values ('note-files', $1)`, [nf(A, 1)]), 'row-level security');
+check("you cannot look up someone else's files (so no signed address either)", (await qb(`select name from storage.objects where bucket_id = 'note-files'`)).length === 0);
+check('you can look up your own files', (await qa(`select name from storage.objects where bucket_id = 'note-files'`)).length === 1);
+check("you cannot remove someone else's file", (await qb(`delete from storage.objects where name = $1 and bucket_id = 'note-files' returning id`, [nf(A, 1)])).length === 0);
+
+// A deleted note goes to the Archive with its files and comes back with them; a file never shows for another person.
+await qa(`insert into note_files (note_id, kind, name, path, size_bytes) values ($1, 'image', 'Photo.jpg', $2, 500)`, [note, nf(A, 10, 'jpg')]);
+const entryId = (await qa('select archive_delete($1, $2) as id', ['note', note]))[0].id;
+const arch = (await qa('select related, data from archive_items where id = $1', [entryId]))[0];
+check('a deleted note takes its 2 files with it into the Archive', arch.related === 2 && arch.data.children.note_files.length === 2 && (await qa('select count(*)::int n from note_files where note_id = $1', [note]))[0].n === 0);
+check('the stored files stay in the bucket while the note waits in the Archive', (await qa(`select count(*)::int n from storage.objects where bucket_id = 'note-files'`))[0].n === 1);
+const back = (await qa('select archive_restore($1) as r', [entryId]))[0].r;
+const files = await qa('select name, kind, path from note_files where note_id = $1 order by name', [note]);
+check('restoring the note brings the files back with their paths', back.id === note && files.length === 2 && files[0].name === 'Invoice.pdf' && files[1].path === nf(A, 10, 'jpg'), JSON.stringify(files));
+// Deleting for good is done by the app (it removes the stored files too); here the rows are simply gone.
+await db.exec(`delete from notes where id = '${note}'`);
+check('deleting a note without the Archive removes its file rows', (await qa('select count(*)::int n from note_files where note_id = $1', [note]))[0].n === 0);
+check('(clean up)', (await qa(`delete from storage.objects where bucket_id = 'note-files' and name = $1 returning id`, [nf(A, 1)])).length === 1);
+await db.exec(`delete from notes where id = '${noteB}'`);
+}
+
 // Job favourite star (20261017000000_job_favourite.sql)
 {
   const jf = (await qa(`insert into job_applications (url, title) values ('', 'Starred job') returning id, favourite`))[0];

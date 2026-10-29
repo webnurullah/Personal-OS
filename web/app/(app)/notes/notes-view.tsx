@@ -1,18 +1,21 @@
 "use client";
 
 import { toArchive } from "@/lib/archive";
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import useSWR from "swr";
 import { BellRing, NotebookPen, Pin, Plus, Search, Trash2 } from "lucide-react";
 import { api, errorMessage, refresh } from "@/lib/api";
 import { colorOf, PICKER_COLORS } from "@/lib/colors";
 import { daysBetween, formatDate, relativeDay } from "@/lib/dates";
 import { plural } from "@/lib/format";
+import { NOTE_FILES_PER_NOTE } from "@/lib/note-files";
+import { PictureError, prepareNoteFile } from "@/lib/note-upload";
 import { useNewAction } from "@/lib/new-action";
 import { useProfile } from "@/lib/profile";
-import type { List, Note, Reminder } from "@/lib/types";
+import type { List, NoteFile, NoteWithFiles, Reminder } from "@/lib/types";
 import { ColorPicker, Field } from "@/components/ui/controls";
 import { useFeedback } from "@/components/ui/feedback";
+import { CardFiles, FilesField, FileViewer, type Staged } from "@/components/notes/note-files";
 import { Modal, ModalActions } from "@/components/ui/modal";
 import { EmptyState, LoadError, PageHeader, PageSkeleton } from "@/components/ui/states";
 
@@ -65,13 +68,15 @@ function NoteBody({ text }: { text: string }) {
 }
 
 export function NotesView() {
-  const notes = useSWR<List<Note>>("/notes");
+  const notes = useSWR<List<NoteWithFiles>>("/notes");
   const reminders = useSWR<List<Reminder>>("/reminders");
   const { profile } = useProfile();
   const { toast, confirm } = useFeedback();
   const [query, setQuery] = useState("");
   const [tag, setTag] = useState("");
-  const [editing, setEditing] = useState<Note | "new" | null>(null);
+  const [editing, setEditing] = useState<NoteWithFiles | "new" | null>(null);
+  const [viewing, setViewing] = useState<NoteFile | null>(null);
+  const [saving, setSaving] = useState(false);
   useNewAction(() => setEditing("new"));
 
   if (notes.error && !notes.data) return <LoadError error={notes.error} retry={() => notes.mutate()} />;
@@ -81,11 +86,11 @@ export function NotesView() {
   const all = notes.data.items;
   const tags = [...new Set(all.map((n) => n.tag).filter(Boolean))].sort((a, b) => a.localeCompare(b));
   const q = query.trim().toLowerCase();
-  const shown = all.filter((n) => (!tag || n.tag === tag) && (!q || `${n.title} ${n.body} ${n.tag}`.toLowerCase().includes(q)));
+  const shown = all.filter((n) => (!tag || n.tag === tag) && (!q || `${n.title} ${n.body} ${n.tag} ${(n.files ?? []).map((f) => f.name).join(" ")}`.toLowerCase().includes(q)));
   const pinned = shown.filter((n) => n.pinned);
   const others = shown.filter((n) => !n.pinned);
 
-  const togglePin = async (note: Note) => {
+  const togglePin = async (note: NoteWithFiles) => {
     await notes.mutate((current) => current && { ...current, items: current.items.map((n) => (n.id === note.id ? { ...n, pinned: !n.pinned } : n)) }, { revalidate: false });
     try {
       await api(`/notes/${note.id}`, { method: "PATCH", body: { pinned: !note.pinned } });
@@ -95,7 +100,7 @@ export function NotesView() {
     await refresh("/notes");
   };
 
-  const remove = async (note: Note) => {
+  const remove = async (note: NoteWithFiles) => {
     if (!(await confirm({ title: "Delete this note?", message: toArchive(`“${note.title}”`) }))) return;
     // Gone at once; it comes back if the delete fails.
     setEditing(null);
@@ -109,7 +114,7 @@ export function NotesView() {
     await refresh("/notes");
   };
 
-  const card = (note: Note) => {
+  const card = (note: NoteWithFiles) => {
     const palette = colorOf(note.color);
     return (
       <article
@@ -139,6 +144,7 @@ export function NotesView() {
           </div>
         </div>
         {note.body && <NoteBody text={note.body} />}
+        <CardFiles files={note.files ?? []} onOpen={setViewing} />
         <div className="mt-4 flex items-center justify-between gap-2 text-xs text-slate-500">
           {note.tag ? <span className={`badge ${note.color === "white" ? "bg-slate-100" : "bg-white/70"} text-slate-600`}>{note.tag}</span> : <span />}
           <span title={`Edited ${new Date(note.updated_at).toLocaleString()}`}>{relativeDay(dayOf(note.updated_at, profile?.timezone), today)}</span>
@@ -213,16 +219,97 @@ export function NotesView() {
         </aside>
       </div>
 
-      <Modal open={editing !== null} onClose={() => setEditing(null)} title={editing === "new" ? "New note" : "Edit note"} size="lg">
-        {editing !== null && <NoteForm note={editing === "new" ? undefined : editing} tags={tags} defaultTag={tag} onDelete={remove} onClose={() => setEditing(null)} />}
+      <Modal open={editing !== null} onClose={() => setEditing(null)} title={editing === "new" ? "New note" : "Edit note"} size="lg" dismissible={!saving}>
+        {editing !== null && (
+          <NoteForm
+            note={editing === "new" ? undefined : editing}
+            files={editing === "new" ? [] : (all.find((n) => n.id === editing.id) ?? editing).files ?? []}
+            tags={tags}
+            defaultTag={tag}
+            onDelete={remove}
+            onView={setViewing}
+            onSaving={setSaving}
+            onClose={() => setEditing(null)}
+          />
+        )}
       </Modal>
+      <FileViewer file={viewing} onClose={() => setViewing(null)} />
     </>
   );
 }
 
-function NoteForm({ note, tags, defaultTag, onDelete, onClose }: { note?: Note; tags: string[]; defaultTag: string; onDelete: (note: Note) => void; onClose: () => void }) {
-  const { toast } = useFeedback();
+function NoteForm({ note, files, tags, defaultTag, onDelete, onView, onSaving, onClose }: { note?: NoteWithFiles; files: NoteFile[]; tags: string[]; defaultTag: string; onDelete: (note: NoteWithFiles) => void; onView: (file: NoteFile) => void; onSaving: (saving: boolean) => void; onClose: () => void }) {
+  const { toast, confirm } = useFeedback();
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState("");
+
+  // Pictures and PDFs chosen here are prepared at once (a picture is made smaller) and sent after the note is saved.
+  const [staged, setStaged] = useState<Staged[]>([]);
+  const [preparing, setPreparing] = useState(false);
+  const [fileError, setFileError] = useState("");
+  const counter = useRef(0);
+  const open = useRef(true);
+  const stagedNow = useRef(staged);
+  useEffect(() => {
+    stagedNow.current = staged;
+  });
+  useEffect(() => {
+    open.current = true;
+    return () => {
+      open.current = false;
+      for (const file of stagedNow.current) if (file.preview) URL.revokeObjectURL(file.preview);
+    };
+  }, []);
+
+  const choose = async (chosen: File[]) => {
+    setPreparing(true);
+    setFileError("");
+    let room = NOTE_FILES_PER_NOTE - files.length - staged.length;
+    const added: Staged[] = [];
+    const problems: string[] = [];
+    let leftOut = 0;
+    for (const file of chosen) {
+      if (room <= 0) {
+        leftOut++;
+        continue;
+      }
+      try {
+        const prepared = await prepareNoteFile(file);
+        added.push({ key: `new-${++counter.current}`, ...prepared, preview: prepared.kind === "image" ? URL.createObjectURL(prepared.blob) : null });
+        room--;
+      } catch (error) {
+        const why = error instanceof PictureError ? error.message : "It cannot be opened here. Try a JPG, PNG or PDF file.";
+        problems.push(why.includes(file.name) ? why : `“${file.name}”: ${why}`);
+      }
+    }
+    if (!open.current) {
+      for (const file of added) if (file.preview) URL.revokeObjectURL(file.preview);
+      return;
+    }
+    if (leftOut) problems.push(`A note keeps up to ${NOTE_FILES_PER_NOTE} files, so ${leftOut === 1 ? "one file was" : `${leftOut} files were`} left out.`);
+    setStaged((current) => [...current, ...added]);
+    setFileError(problems.join(" "));
+    setPreparing(false);
+  };
+
+  const unstage = (key: string) => {
+    setStaged((current) => {
+      const gone = current.find((f) => f.key === key);
+      if (gone?.preview) URL.revokeObjectURL(gone.preview);
+      return current.filter((f) => f.key !== key);
+    });
+  };
+
+  const removeSaved = async (file: NoteFile) => {
+    if (!(await confirm({ title: "Remove this file?", message: `“${file.name}” will be deleted for good. This cannot be undone.`, action: "Remove file" }))) return;
+    try {
+      await api(`/notes/${file.note_id}/files/${file.id}`, { method: "DELETE" });
+      toast("File removed");
+    } catch (error) {
+      toast(errorMessage(error), "error");
+    }
+    await refresh("/notes");
+  };
 
   const submit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -235,15 +322,35 @@ function NoteForm({ note, tags, defaultTag, onDelete, onClose }: { note?: Note; 
       pinned: form.get("pinned") === "on",
     };
     setBusy(true);
+    onSaving(true);
     try {
-      await api(note ? `/notes/${note.id}` : "/notes", { method: note ? "PATCH" : "POST", body });
+      const saved = await api<{ id: string }>(note ? `/notes/${note.id}` : "/notes", { method: note ? "PATCH" : "POST", body });
+      // The files go up once the note exists. If only some fail, the note is still saved.
+      const failed: string[] = [];
+      let firstProblem = "";
+      for (const [i, file] of staged.entries()) {
+        setProgress(`Adding file ${i + 1} of ${staged.length}…`);
+        try {
+          await api(`/notes/${saved.id}/files?name=${encodeURIComponent(file.name)}`, { method: "POST", file: file.blob });
+        } catch (error) {
+          failed.push(file.name);
+          firstProblem ||= errorMessage(error);
+        }
+      }
       await refresh("/notes");
-      toast(note ? "Note saved" : "Note added");
+      if (failed.length) {
+        const what = failed.length === 1 ? `“${failed[0]}” was` : `${failed.length} files were`;
+        toast(`The note is saved, but ${what} not added: ${firstProblem} Open the note to add ${failed.length === 1 ? "it" : "them"} again.`, "error");
+      } else {
+        toast(note ? "Note saved" : "Note added");
+      }
       onClose();
     } catch (error) {
       toast(errorMessage(error), "error");
     } finally {
       setBusy(false);
+      setProgress("");
+      onSaving(false);
     }
   };
 
@@ -255,6 +362,7 @@ function NoteForm({ note, tags, defaultTag, onDelete, onClose }: { note?: Note; 
       <Field label="Note" htmlFor="note-body" hint="Start lines with “- ” for a bulleted list or “1. ” for a numbered list.">
         <textarea id="note-body" name="body" rows={8} maxLength={10000} className="input h-auto min-h-40 py-2.5 leading-relaxed" defaultValue={note?.body} />
       </Field>
+      <FilesField saved={files} staged={staged} preparing={preparing} error={fileError} onChoose={choose} onUnstage={unstage} onRemoveSaved={removeSaved} onView={onView} />
       <div className="grid gap-4 sm:grid-cols-[12rem_1fr]">
         <Field label="Tag" htmlFor="note-tag">
           <input id="note-tag" name="tag" className="input" maxLength={30} list="note-tags" defaultValue={note?.tag ?? defaultTag} placeholder="e.g. Work" autoComplete="off" />
@@ -272,13 +380,16 @@ function NoteForm({ note, tags, defaultTag, onDelete, onClose }: { note?: Note; 
         <input type="checkbox" name="pinned" className="checkbox" defaultChecked={note?.pinned ?? false} />
         Pin to the top
       </label>
+      {progress && <p role="status" className="text-sm text-slate-500">{progress}</p>}
       <ModalActions
         onCancel={onClose}
         submitLabel={note ? "Save note" : "Add note"}
         busy={busy}
+        disabled={preparing}
+        cancelDisabled={busy}
         left={
           note && (
-            <button type="button" className="btn btn-ghost text-rose-600" onClick={() => onDelete(note)}>
+            <button type="button" className="btn btn-ghost text-rose-600" onClick={() => onDelete(note)} disabled={busy}>
               <Trash2 className="size-4" /> Delete
             </button>
           )

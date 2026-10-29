@@ -153,7 +153,10 @@ const note = (i) => ({
   id: `n${i}`, title: H(i, 200), body: [H(i + 1), `- ${H(i + 2, 120)}`, `- ${WORD}`, `1. ${LINK}`, H(i + 4)].join("\n"), tag: i % 3 ? cut(H(i + 4), 30) : "",
   color: ["white", ...COLORS][i % 11], pinned: i < 3, created_at: iso("2026-10-01"), updated_at: iso(D(-(i % 6))),
 });
-const notes = { today: TODAY, items: range(18).map(note) };
+// Pictures and PDFs kept with notes: hostile names (very long, no spaces, Bangla, emoji) and sizes, up to the limit of 10 per note.
+const TINY_PICTURE = "data:image/gif;base64,R0lGODlhAQABAIAAAAUEBAAAACwAAAAAAQABAAACAkQBADs=";
+const noteFile = (n, k, over = {}) => ({ id: `nf${n}-${k}`, note_id: `n${n}`, kind: k % 3 === 0 ? "pdf" : "image", name: [WORD + ".pdf", `${LINK}.jpg`, `${BN}.pdf`, H(k, 120) + ".pdf"][k % 4], size_bytes: [4194304, 850 * 1024, 999, 123456][k % 4], created_at: iso("2026-10-02"), url: k % 3 === 0 ? null : TINY_PICTURE, ...over });
+const notes = { today: TODAY, items: range(18).map((i) => ({ ...note(i), files: i === 0 ? range(10).map((k) => noteFile(i, k)) : i === 1 ? [noteFile(i, 3), noteFile(i, 0)] : i === 2 ? [noteFile(i, 1), noteFile(i, 2)] : [] })) };
 const reminders = { today: TODAY, items: range(10).map((i) => ({ id: `r${i}`, text: H(i, 200), due_date: i % 3 ? D(i - 4) : null, done: i % 4 === 0, created_at: iso("2026-10-01") })) };
 
 const budgetCats = range(8).map((i) => ({
@@ -646,6 +649,14 @@ unit("notes", "/notes", heading, () => ({ "/notes": notes, "/reminders": reminde
   scene("Edit note dialog", async (page, snap) => {
     await openDialog(page, page.locator("main article h3 button").first());
     await snap("edit prefilled");
+  }),
+  scene("Edit note with 10 files", async (page, snap) => {
+    await openDialog(page, page.locator("main article h3 button").first());
+    await snap("edit with 10 hostile files (button says no room)");
+  }),
+  scene("Picture of a note opened", async (page, snap) => {
+    await press(page.locator("main article button[aria-label^='View picture']").first());
+    await snap("picture viewer");
   }),
   scene("Edit reminder dialog", async (page, snap) => {
     await openDialog(page, page.locator("button[aria-label='Edit reminder']").first());
