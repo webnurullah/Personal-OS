@@ -3,7 +3,7 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
 import useSWR from "swr";
-import { ArrowRight, BriefcaseBusiness, CalendarDays, ChartNoAxesColumn, Clock, FileText, Footprints, FolderKanban, GraduationCap, HeartPulse, Leaf, Moon, Pin, Plus, SquareCheck, Sun, Target, TrendingUp, Wallet } from "lucide-react";
+import { ArrowRight, BriefcaseBusiness, CalendarDays, ChartNoAxesColumn, Clock, ExternalLink, FileText, Footprints, FolderKanban, GraduationCap, HeartPulse, Leaf, Moon, Pin, Plus, SquareCheck, Sun, Target, TrendingUp, Wallet } from "lucide-react";
 import { api, errorMessage, refresh } from "@/lib/api";
 import { colorOf } from "@/lib/colors";
 import { timeLeft } from "@/lib/course";
@@ -95,6 +95,11 @@ export function ScheduleWidget({ data }: Props) {
                   <p className="text-sm font-semibold text-slate-800">
                     {e.title}
                     {current && <span className="badge ml-1 bg-blue-600 px-1.5 py-0 text-[10px] text-white">Now</span>}
+                    {e.link && (
+                      <a href={e.link} target="_blank" rel="noopener noreferrer" className="ml-1.5 inline-flex align-middle text-blue-600 hover:text-blue-700" aria-label={`Open the link of ${e.title}`} title={e.link}>
+                        <ExternalLink className="size-3.5" aria-hidden />
+                      </a>
+                    )}
                   </p>
                   {e.note && <p className="truncate text-xs text-slate-500">{e.note}</p>}
                 </div>

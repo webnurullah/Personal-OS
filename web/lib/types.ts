@@ -62,6 +62,8 @@ export type CalendarEvent = {
   repeat_until: string | null;
   category_id: string | null;
   note: string;
+  /** A link for the event (empty = none). Missing in a copy of the list that the browser saved before links existed. */
+  link?: string;
   /** The day this occurrence happens (repeating events appear once per day). */
   date: string;
 };

@@ -403,6 +403,7 @@ export type Database = {
           repeat_until: string | null;
           category_id: string | null;
           note: string;
+          link: string;
           created_at: string;
           updated_at: string;
         };
@@ -418,6 +419,7 @@ export type Database = {
           repeat_until?: string | null;
           category_id?: string | null;
           note?: string;
+          link?: string;
           created_at?: string;
           updated_at?: string;
         };
@@ -433,6 +435,7 @@ export type Database = {
           repeat_until?: string | null;
           category_id?: string | null;
           note?: string;
+          link?: string;
           created_at?: string;
           updated_at?: string;
         };

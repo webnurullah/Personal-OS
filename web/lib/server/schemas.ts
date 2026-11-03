@@ -73,7 +73,9 @@ export const EventFields = z.object({
   repeat: z.enum(["none", "daily", "weekly"]).optional(),
   repeat_until: s.date.nullable().optional(),
   category_id: s.id.nullable().optional(),
-  note: s.optionalText(300).optional(),
+  note: s.optionalText(1000).optional(),
+  /** A link for the event (a meeting room, a registration page …); empty = none. */
+  link: z.union([z.url({ protocol: /^https?$/, message: "Use a full link starting with https://" }).max(500), z.literal("")]).optional(),
 }).strict();
 
 /** All-day events have no times; timed events must end after they start. */

@@ -25,3 +25,24 @@ export function taskDateLabel(t: Dated, today: string) {
   if (t.due_date <= today && today <= t.end_date) return `Ends ${lower(relativeDay(t.end_date, today))}`;
   return `${formatDate(t.due_date, "short")} – ${formatDate(t.end_date, "short")}`;
 }
+
+type EventDay = { id: string; date: string; all_day: boolean; start_time: string | null };
+
+/** How many days ahead the task list looks for events. */
+export const EVENT_DAYS_AHEAD = 60;
+
+const byDayThenTime = (a: EventDay, b: EventDay) => a.date.localeCompare(b.date) || (a.all_day === b.all_day ? (a.start_time ?? "").localeCompare(b.start_time ?? "") : a.all_day ? -1 : 1);
+
+/**
+ * Calendar events for the task list. `occurrences` holds one entry per day an event happens (repeating events once per day).
+ * Today: everything happening today. Upcoming: each event once, on its next day after today (a daily event is not listed sixty times).
+ */
+export function eventsForTaskList<T extends EventDay>(occurrences: T[], today: string): { today: T[]; upcoming: T[] } {
+  const next = new Map<string, T>();
+  for (const e of occurrences) {
+    if (e.date <= today) continue;
+    const have = next.get(e.id);
+    if (!have || byDayThenTime(e, have) < 0) next.set(e.id, e);
+  }
+  return { today: occurrences.filter((e) => e.date === today).sort(byDayThenTime), upcoming: [...next.values()].sort(byDayThenTime) };
+}

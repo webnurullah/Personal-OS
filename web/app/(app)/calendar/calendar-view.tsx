@@ -4,11 +4,12 @@ import { toArchive } from "@/lib/archive";
 import { useState, type FormEvent } from "react";
 import useSWR from "swr";
 import Link from "next/link";
-import { BriefcaseBusiness, CalendarDays, ChevronLeft, CircleAlert, FolderKanban, ChevronRight, GraduationCap, Plus, Repeat, Trash2 } from "lucide-react";
+import { BriefcaseBusiness, CalendarDays, ChevronLeft, CircleAlert, ExternalLink, FolderKanban, ChevronRight, GraduationCap, Plus, Repeat, Trash2 } from "lucide-react";
 import { api, errorMessage, refresh } from "@/lib/api";
 import { colorOf } from "@/lib/colors";
 import { addDays, addMonths, daysBetween, formatDate, monthGrid, relativeDay, weekdayNames } from "@/lib/dates";
 import { hm, minutesOf, shortTime } from "@/lib/format";
+import { fixLink } from "@/lib/library";
 import { useCategories, useNowMinutes } from "@/lib/hooks";
 import { useNewAction } from "@/lib/new-action";
 import { useProfile } from "@/lib/profile";
@@ -290,8 +291,8 @@ export function CalendarView() {
             {agenda.length ? (
               <ol className="mt-4 space-y-1">
                 {agenda.map((e) => (
-                  <li key={`${e.id}-agenda`}>
-                    <button type="button" onClick={() => setEditing(e)} className="grid w-full grid-cols-[4.25rem_auto_1fr] items-start gap-3 rounded-xl px-2 py-2 text-left transition hover:bg-slate-50">
+                  <li key={`${e.id}-agenda`} className="relative">
+                    <button type="button" onClick={() => setEditing(e)} className={`grid w-full grid-cols-[4.25rem_auto_1fr] items-start gap-3 rounded-xl px-2 py-2 text-left transition hover:bg-slate-50 ${e.link ? "pr-11" : ""}`}>
                       <span className="pt-0.5 text-xs font-medium text-slate-500">{e.all_day ? "All day" : time(e.start_time!)}</span>
                       <span className={`mt-0.5 h-9 w-1 rounded-full ${color(e).dot}`} />
                       <span className="min-w-0">
@@ -305,6 +306,11 @@ export function CalendarView() {
                         </span>
                       </span>
                     </button>
+                    {e.link && (
+                      <a href={e.link} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-sm btn-icon absolute right-1 top-1 text-blue-600" aria-label={`Open the link of ${e.title}`} title={e.link}>
+                        <ExternalLink className="size-4" aria-hidden />
+                      </a>
+                    )}
                   </li>
                 ))}
               </ol>
@@ -402,6 +408,8 @@ function EventForm({ editing, defaultDate, onClose }: { editing: CalendarEvent |
   const submit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
+    const link = fixLink(String(form.get("link") ?? ""));
+    if (link && !/^https?:\/\/\S+$/i.test(link)) return toast("The event link should start with https://", "error");
     const body = {
       title: String(form.get("title")),
       event_date: String(form.get("event_date")),
@@ -412,6 +420,7 @@ function EventForm({ editing, defaultDate, onClose }: { editing: CalendarEvent |
       repeat_until: repeat === "none" ? null : String(form.get("repeat_until")) || null,
       category_id: String(form.get("category_id")) || null,
       note: String(form.get("note")),
+      link,
     };
     setBusy(true);
     try {
@@ -472,19 +481,20 @@ function EventForm({ editing, defaultDate, onClose }: { editing: CalendarEvent |
             <input id="event-until" name="repeat_until" type="date" className="input" disabled={repeat === "none"} defaultValue={editing?.repeat_until ?? ""} />
           </Field>
         </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Category" htmlFor="event-category">
-            <select id="event-category" name="category_id" className="select select-lg" defaultValue={editing?.category_id ?? categories.find((c) => c.name === "Personal")?.id ?? ""}>
-              <option value="">No category</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Place or note" htmlFor="event-note">
-            <input id="event-note" name="note" className="input" maxLength={300} defaultValue={editing?.note} placeholder="Optional" autoComplete="off" />
-          </Field>
-        </div>
+        <Field label="Category" htmlFor="event-category">
+          <select id="event-category" name="category_id" className="select select-lg" defaultValue={editing?.category_id ?? categories.find((c) => c.name === "Personal")?.id ?? ""}>
+            <option value="">No category</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Event Link (optional)" htmlFor="event-link">
+          <input id="event-link" name="link" type="text" inputMode="url" className="input" maxLength={500} defaultValue={editing?.link ?? ""} placeholder="https://meet.google.com/…" autoComplete="off" autoCapitalize="none" spellCheck={false} />
+        </Field>
+        <Field label="Place or note" htmlFor="event-note">
+          <textarea id="event-note" name="note" rows={4} className="input h-auto min-h-24 w-full py-2.5 leading-relaxed" maxLength={1000} defaultValue={editing?.note} placeholder="Optional" />
+        </Field>
         <ModalActions
           onCancel={onClose}
           submitLabel={editing ? "Save event" : "Add event"}

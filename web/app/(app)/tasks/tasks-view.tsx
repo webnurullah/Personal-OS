@@ -4,15 +4,16 @@ import { toArchive } from "@/lib/archive";
 import { useState, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
 import useSWR from "swr";
-import { CalendarClock, CalendarDays, ChevronDown, CircleAlert, CircleCheck, Flag, Lightbulb, Plus, Search, SearchX, Sun, Trash2 } from "lucide-react";
+import { CalendarClock, CalendarDays, ChevronDown, CircleAlert, CircleCheck, ExternalLink, Flag, Lightbulb, Plus, Repeat, Search, SearchX, Sun, Trash2 } from "lucide-react";
 import { api, errorMessage, refresh } from "@/lib/api";
 import { colorOf } from "@/lib/colors";
-import { addDays } from "@/lib/dates";
+import { addDays, relativeDay } from "@/lib/dates";
 import { pct, plural } from "@/lib/format";
 import { useCategories, useProjects } from "@/lib/hooks";
 import { useNewAction } from "@/lib/new-action";
-import { isOnDay, isOverdue, isUpcoming, taskDateLabel } from "@/lib/tasks";
-import type { List, Priority, Task } from "@/lib/types";
+import { useProfile } from "@/lib/profile";
+import { EVENT_DAYS_AHEAD, eventsForTaskList, isOnDay, isOverdue, isUpcoming, taskDateLabel } from "@/lib/tasks";
+import type { CalendarEvent, List, Priority, Task } from "@/lib/types";
 import { Donut } from "@/components/ui/charts";
 import { Field, Segmented } from "@/components/ui/controls";
 import { useFeedback } from "@/components/ui/feedback";
@@ -20,6 +21,8 @@ import { Modal, ModalActions } from "@/components/ui/modal";
 import { EmptyState, LoadError, PageHeader, PageSkeleton } from "@/components/ui/states";
 
 type Filter = "all" | "today" | "upcoming" | "overdue" | "done";
+/** A line of the list: a task, or an event from the Calendar (`day` orders the Upcoming group). */
+type Row = { key: string; day?: string } & ({ task: Task; event?: undefined } | { event: CalendarEvent; task?: undefined });
 /** Groups the person can fold away. "Completed" starts folded; the choice is kept on this device. */
 const FOLDABLE = ["someday", "done"];
 const FOLDED_KEY = "tasks-folded";
@@ -40,6 +43,10 @@ const PRIORITY: Record<Priority, { label: string; color: string }> = {
 
 export function TasksView() {
   const { data, error, mutate } = useSWR<List<Task>>("/tasks");
+  // The events you added in the Calendar are listed here too (today, and each one's next day); a failed or slow answer just means none are shown.
+  const eventsKey = data?.today ? `/events?from=${data.today}&to=${addDays(data.today, EVENT_DAYS_AHEAD)}&own=1` : null;
+  const { data: eventData } = useSWR<{ items: CalendarEvent[] }>(eventsKey);
+  const { time } = useProfile();
   const { categories, byId } = useCategories();
   const { byId: projectsById } = useProjects();
   const { toast, confirm } = useFeedback();
@@ -72,12 +79,25 @@ export function TasksView() {
     }
   };
   const visible = tasks.filter(matches);
-  const groups: { key: string; title: string; tone: string; items: Task[] }[] = [
-    { key: "overdue", title: "Overdue", tone: "text-rose-500", items: visible.filter((t) => isOverdue(t, today)) },
-    { key: "today", title: "Today", tone: "text-slate-500", items: visible.filter((t) => isOnDay(t, today)) },
-    { key: "upcoming", title: "Upcoming", tone: "text-slate-500", items: visible.filter((t) => isUpcoming(t, today)) },
-    { key: "someday", title: "No date", tone: "text-slate-500", items: visible.filter((t) => !t.done_at && !t.due_date) },
-    { key: "done", title: "Completed", tone: "text-emerald-600", items: visible.filter((t) => t.done_at && !isOnDay(t, today)) },
+
+  // Events follow the same search and category choice; they are never overdue or completed.
+  const q0 = query.trim().toLowerCase();
+  const eventMatches = (e: CalendarEvent) => (!q0 || `${e.title} ${e.note}`.toLowerCase().includes(q0)) && (!categoryId || e.category_id === categoryId);
+  const listed = eventsForTaskList((eventData?.items ?? []).filter(eventMatches), today);
+  const todayEvents = filter === "all" || filter === "today" ? listed.today : [];
+  const upcomingEvents = filter === "all" || filter === "upcoming" ? listed.upcoming : [];
+  const taskRows = (items: Task[]): Row[] => items.map((task) => ({ key: task.id, task }));
+  // Upcoming: tasks and events together, by day (a task before an event on the same day).
+  const upcomingRows: Row[] = [
+    ...visible.filter((t) => isUpcoming(t, today)).map((task): Row => ({ key: task.id, task, day: task.due_date! })),
+    ...upcomingEvents.map((event): Row => ({ key: `event-${event.id}`, event, day: event.date })),
+  ].sort((a, b) => (a.day ?? "").localeCompare(b.day ?? ""));
+  const groups: { key: string; title: string; tone: string; rows: Row[] }[] = [
+    { key: "overdue", title: "Overdue", tone: "text-rose-500", rows: taskRows(visible.filter((t) => isOverdue(t, today))) },
+    { key: "today", title: "Today", tone: "text-slate-500", rows: [...taskRows(visible.filter((t) => isOnDay(t, today))), ...todayEvents.map((event): Row => ({ key: `event-${event.id}-${event.date}`, event }))] },
+    { key: "upcoming", title: "Upcoming", tone: "text-slate-500", rows: upcomingRows },
+    { key: "someday", title: "No date", tone: "text-slate-500", rows: taskRows(visible.filter((t) => !t.done_at && !t.due_date)) },
+    { key: "done", title: "Completed", tone: "text-emerald-600", rows: taskRows(visible.filter((t) => t.done_at && !isOnDay(t, today))) },
   ];
 
   const toggleFold = (key: string) => {
@@ -168,7 +188,7 @@ export function TasksView() {
 
           <div className="mt-4 space-y-5">
             {groups.map((group) => {
-              if (!group.items.length) return null;
+              if (!group.rows.length) return null;
               // Folded groups open by themselves while searching, so a match is never hidden.
               const collapsible = FOLDABLE.includes(group.key) && (group.key === "someday" || filter === "all");
               const hidden = collapsible && folded.includes(group.key) && !searching;
@@ -177,23 +197,25 @@ export function TasksView() {
                   <h3 className={`flex items-center gap-2 px-3 text-xs font-semibold uppercase tracking-wide ${group.tone}`}>
                     {collapsible ? (
                       <button type="button" className="flex items-center gap-2 uppercase" onClick={() => toggleFold(group.key)} aria-expanded={!hidden}>
-                        {group.title} <span className="rounded-full bg-slate-100 px-1.5 text-[11px] text-slate-500">{group.items.length}</span>
+                        {group.title} <span className="rounded-full bg-slate-100 px-1.5 text-[11px] text-slate-500">{group.rows.length}</span>
                         <ChevronDown className={`size-3.5 transition ${hidden ? "" : "rotate-180"}`} />
                       </button>
                     ) : (
                       <>
-                        {group.title} <span className="rounded-full bg-slate-100 px-1.5 text-[11px] text-slate-500">{group.items.length}</span>
+                        {group.title} <span className="rounded-full bg-slate-100 px-1.5 text-[11px] text-slate-500">{group.rows.length}</span>
                       </>
                     )}
                   </h3>
                   {!hidden && (
                     <ul className="mt-1.5">
-                      {group.items.map((task) => {
+                      {group.rows.map((row) => {
+                        if (row.event) return <EventRow key={row.key} event={row.event} today={today} category={row.event.category_id ? byId.get(row.event.category_id) : undefined} time={time} />;
+                        const task = row.task;
                         const category = task.category_id ? byId.get(task.category_id) : undefined;
                         const project = task.project_id ? projectsById.get(task.project_id) : undefined;
                         const overdue = isOverdue(task, today);
                         return (
-                          <li key={task.id} className="group flex items-center gap-3 rounded-xl px-3 py-2.5 transition hover:bg-slate-50">
+                          <li key={row.key} className="group flex items-center gap-3 rounded-xl px-3 py-2.5 transition hover:bg-slate-50">
                             <label className="-m-2 shrink-0 p-2">
                               <input type="checkbox" className="checkbox" checked={Boolean(task.done_at)} onChange={() => toggle(task)} aria-label={`Done: ${task.title}`} />
                             </label>
@@ -236,8 +258,8 @@ export function TasksView() {
             })}
           </div>
 
-          {!visible.length && (
-            <EmptyState icon={SearchX} title={tasks.length ? "No tasks here" : "No tasks yet"} text={tasks.length ? "Try another filter, or add a new task." : "Add your first task and tick it off when it is done."}>
+          {!groups.some((g) => g.rows.length) && (
+            <EmptyState icon={SearchX} title={tasks.length || eventData?.items.length ? "No tasks here" : "No tasks yet"} text={tasks.length || eventData?.items.length ? "Try another filter, or add a new task." : "Add your first task and tick it off when it is done."}>
               <button type="button" className="btn btn-primary btn-sm" onClick={() => setEditing("new")}>
                 <Plus className="size-4" /> New task
               </button>
@@ -288,6 +310,41 @@ export function TasksView() {
 
       <TaskModal task={editing} today={today} onClose={() => setEditing(null)} />
     </>
+  );
+}
+
+/** An event from the Calendar in the list: no tick box (an event is not done), it opens that day in the Calendar. */
+function EventRow({ event, today, category, time }: { event: CalendarEvent; today: string; category?: { name: string; color: string }; time: (hhmm: string) => string }) {
+  const when = event.all_day || !event.start_time || !event.end_time ? "All day" : `${time(event.start_time)} – ${time(event.end_time)}`;
+  return (
+    <li className="flex items-center gap-3 rounded-xl px-3 py-2.5 transition hover:bg-slate-50">
+      <span className="shrink-0 text-blue-600" aria-hidden>
+        <CalendarClock className="size-5" />
+      </span>
+      <Link href={`/calendar?date=${event.date}`} className="min-w-0 flex-1 text-left" aria-label={`Event: ${event.title}, ${relativeDay(event.date, today)}, ${when}. Open in the Calendar`}>
+        <span className="block truncate text-sm font-medium text-slate-800">{event.title}</span>
+        <span className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+          <span className="badge shrink-0 bg-blue-50 text-blue-700">Event</span>
+          <span className="flex shrink-0 items-center gap-1 whitespace-nowrap">
+            <CalendarDays className="size-3.5 shrink-0" />
+            {relativeDay(event.date, today)} · {when}
+          </span>
+          {event.repeat !== "none" && (
+            <span className="flex shrink-0 items-center gap-1">
+              <Repeat className="size-3.5 shrink-0" aria-hidden />
+              {event.repeat === "weekly" ? "Every week" : "Every day"}
+            </span>
+          )}
+          {category && <span className={`badge max-w-full truncate sm:hidden ${colorOf(category.color).badge}`}>{category.name}</span>}
+        </span>
+      </Link>
+      {category && <span className={`badge hidden max-w-40 truncate sm:inline-flex ${colorOf(category.color).badge}`}>{category.name}</span>}
+      {event.link && (
+        <a href={event.link} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-sm btn-icon text-blue-600" aria-label={`Open the link of ${event.title}`} title={event.link}>
+          <ExternalLink className="size-4" aria-hidden />
+        </a>
+      )}
+    </li>
   );
 }
 

@@ -224,6 +224,23 @@ check('(clean up)', (await qa(`delete from storage.objects where bucket_id = 'no
 await db.exec(`delete from notes where id = '${noteB}'`);
 }
 
+// Event link (20261103000000_event_link.sql)
+{
+  const ev = (await qa(`insert into events (title, event_date, all_day) values ('With link', '2026-11-08', true) returning id, link`))[0];
+  check('an event starts with no link', ev.link === '');
+  check('an event can keep a link', (await qa(`update events set link = 'https://meet.google.com/abc-defg-hij' where id = $1 returning link`, [ev.id]))[0].link === 'https://meet.google.com/abc-defg-hij');
+  await expectError('a link over 500 characters is refused', () => qa(`update events set link = $1 where id = $2`, ['https://a.com/' + 'x'.repeat(500), ev.id]), 'events_link_check');
+  await expectError('a link cannot be empty-as-null', () => qa(`update events set link = null where id = $1`, [ev.id]), 'not-null');
+  const entry = (await qa('select archive_delete($1, $2) as id', ['event', ev.id]))[0].id;
+  await qa('select archive_restore($1)', [entry]);
+  check('the link travels with the event into the Archive and back', (await qa('select link from events where id = $1', [ev.id]))[0].link === 'https://meet.google.com/abc-defg-hij');
+  const entry2 = (await qa('select archive_delete($1, $2) as id', ['event', ev.id]))[0].id;
+  await db.exec(`update archive_items set data = jsonb_set(data, '{row}', (data -> 'row') - 'link') where id = '${entry2}'`);
+  await qa('select archive_restore($1)', [entry2]);
+  check('an Archive copy made before links existed comes back with an empty link', (await qa('select link from events where id = $1', [ev.id]))[0].link === '');
+  await db.exec(`delete from events where id = '${ev.id}'`);
+}
+
 // Job favourite star (20261017000000_job_favourite.sql)
 {
   const jf = (await qa(`insert into job_applications (url, title) values ('', 'Starred job') returning id, favourite`))[0];

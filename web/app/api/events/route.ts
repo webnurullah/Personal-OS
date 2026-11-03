@@ -16,8 +16,13 @@ export const GET = handle(async ({ db, query, today, user, profile }) => {
   const span = daysBetween(from, to);
   if (span < 0 || span > 93) throw new HttpError(400, "Ask for at most three months at a time.");
 
+  // The task list only wants your own events (?own=1): none of the extras below, so it stays quick.
+  const only = query.own === "1";
+
   // Your Google Calendar events: asked at the same time as the rest, and never able to break the page (it only says what went wrong).
-  const googleAsked = profile()
+  const googleAsked = only
+    ? Promise.resolve({ status: "ok" as GoogleStatus, events: [] as GoogleEvent[] })
+    : profile()
     .then((p) => googleEvents(db, user.id, p.timezone, from, to))
     .catch((): { status: GoogleStatus; events: GoogleEvent[] } => ({ status: "error", events: [] }));
   const events = await fetchAll(() =>
@@ -26,25 +31,30 @@ export const GET = handle(async ({ db, query, today, user, profile }) => {
       .or(`repeat.neq.none,event_date.gte.${from}`) // skip old one-off events
       .order("event_date"),
   );
-  // Last dates to apply for jobs you have not applied to yet (shown on the calendar).
-  const deadlines = must(
-    await db.from("job_applications").select("id, title, company, deadline").eq("status", "saved").gte("deadline", from).lte("deadline", to).order("deadline"),
-  ).map((j) => ({ id: j.id, title: j.title, company: j.company, date: j.deadline! }));
-  // Due dates of active projects that have one (ongoing projects have none), shown on the calendar.
-  const project_dates = must(
-    await db.from("projects").select("id, name, color, due_date").eq("status", "active").is("archived_at", null).gte("due_date", from).lte("due_date", to).order("due_date"),
-  ).map((p) => ({ id: `project-${p.id}`, project_id: p.id, title: p.name, kind: "deadline" as const, date: p.due_date!, color: p.color }));
-  // Study sessions you planned (not done yet) on days in the range, shown on the calendar.
-  const study = must(
-    await db.from("study_blocks").select("id, week_start, weekday, hours, activity").eq("done", false).gte("week_start", mondayOf(from)).lte("week_start", to).order("week_start").order("weekday").order("created_at"),
-  )
-    .map((b) => ({ id: b.id, date: addDays(b.week_start, b.weekday), hours: Number(b.hours), activity: b.activity }))
-    .filter((b) => b.date >= from && b.date <= to);
+  const extras = only
+    ? { deadlines: [], project_dates: [], study: [] }
+    : await (async () => {
+      // Last dates to apply for jobs you have not applied to yet (shown on the calendar).
+      const deadlines = must(
+        await db.from("job_applications").select("id, title, company, deadline").eq("status", "saved").gte("deadline", from).lte("deadline", to).order("deadline"),
+      ).map((j) => ({ id: j.id, title: j.title, company: j.company, date: j.deadline! }));
+      // Due dates of active projects that have one (ongoing projects have none), shown on the calendar.
+      const project_dates = must(
+        await db.from("projects").select("id, name, color, due_date").eq("status", "active").is("archived_at", null).gte("due_date", from).lte("due_date", to).order("due_date"),
+      ).map((p) => ({ id: `project-${p.id}`, project_id: p.id, title: p.name, kind: "deadline" as const, date: p.due_date!, color: p.color }));
+      // Study sessions you planned (not done yet) on days in the range, shown on the calendar.
+      const study = must(
+        await db.from("study_blocks").select("id, week_start, weekday, hours, activity").eq("done", false).gte("week_start", mondayOf(from)).lte("week_start", to).order("week_start").order("weekday").order("created_at"),
+      )
+        .map((b) => ({ id: b.id, date: addDays(b.week_start, b.weekday), hours: Number(b.hours), activity: b.activity }))
+        .filter((b) => b.date >= from && b.date <= to);
+      return { deadlines, project_dates, study };
+    })();
   const items = events
     .flatMap((event) => occurrences(event, from, to).map((date) => ({ ...event, date })))
     .sort((a, b) => a.date.localeCompare(b.date) || byTime(a, b));
   const google = await googleAsked;
-  return { today: await today(), from, to, items, deadlines, project_dates, study, google: google.events, google_status: google.status };
+  return { today: await today(), from, to, items, ...extras, google: google.events, google_status: google.status };
 });
 
 export const POST = handle(async ({ db, body }) => {

@@ -183,7 +183,7 @@ const events = (from, to) => {
       const allDay = n % 3 === 0;
       items.push({
         id: `e${n}`, title: H(n, 200), event_date: day, all_day: allDay, start_time: allDay ? null : `${String(8 + k).padStart(2, "0")}:00:00`, end_time: allDay ? null : `${String(9 + k).padStart(2, "0")}:30:00`,
-        repeat: n % 7 === 0 ? "weekly" : "none", repeat_until: null, category_id: categories[n % 8].id, note: H(n + 1, 300), date: day,
+        repeat: n % 7 === 0 ? "weekly" : "none", repeat_until: null, category_id: categories[n % 8].id, note: n % 2 ? H(n + 1, 300) : [H(n + 1, 120), WORD, H(n + 2, 120)].join("\n"), link: n % 3 === 1 ? LINK : "", date: day,
       });
     }
   }
@@ -561,7 +561,7 @@ unit("dashboard", "/", heading, () => ({ "/dashboard": dashboard, "/notes": note
   }),
 ]);
 
-unit("tasks", "/tasks", heading, () => ({ "/tasks": { today: TODAY, items: tasks } }), [
+unit("tasks", "/tasks", heading, () => ({ "/tasks": { today: TODAY, items: tasks }, "/events": eventsResponse }), [
   scene("filters", async (page, snap) => {
     for (const name of ["Today", "Upcoming", "Overdue", "Completed", "All"]) {
       await press(tab(page.locator("section[aria-label='Task list']"), name));
