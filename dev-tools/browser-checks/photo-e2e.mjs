@@ -1,4 +1,5 @@
 import { chromium } from "/opt/node22/lib/node_modules/playwright/index.mjs";
+import { launch } from "/home/user/Personal-OS/dev-tools/browser-checks/audit-lib.mjs";
 const base = "http://localhost:3124", MOCK = "http://localhost:4012", S = process.argv[2], T = "2026-10-06";
 const UID = "11111111-1111-4111-8111-111111111111";
 const b64 = (o) => Buffer.from(JSON.stringify(o)).toString("base64url");
@@ -6,7 +7,7 @@ const TOKEN = `${b64({ alg: "HS256", typ: "JWT" })}.${b64({ sub: UID, email: "me
 const now = Math.floor(Date.now() / 1000);
 const session = { access_token: TOKEN, refresh_token: "r", token_type: "bearer", expires_in: 99999999, expires_at: now + 99999999, user: { id: UID, aud: "authenticated", email: "me@example.com", app_metadata: {}, user_metadata: {}, created_at: "2026-01-01" } };
 const cookie = { name: "sb-localhost-auth-token", value: "base64-" + Buffer.from(JSON.stringify(session)).toString("base64url"), url: base };
-const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium-1194/chrome-linux/chrome" });
+const browser = await launch();
 const out = [];
 const check = (name, cond, extra = "") => { const l = `${cond ? "PASS" : "FAIL"}  ${name}${extra ? "  → " + extra : ""}`; out.push(l); console.log(l); };
 const state = async () => (await fetch(MOCK + "/__state")).json();

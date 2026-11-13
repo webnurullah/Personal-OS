@@ -17,6 +17,7 @@ import { Field } from "@/components/ui/controls";
 import { useFeedback } from "@/components/ui/feedback";
 import { Modal } from "@/components/ui/modal";
 import { EmptyState, LoadError, PageSkeleton } from "@/components/ui/states";
+import { ProjectFiles } from "@/components/projects/project-files";
 import { ProjectTimer } from "@/components/projects/project-timer";
 import { ProjectForm } from "../project-form";
 import { forgetProject, KindIcon, refreshProjects, TimeBadge, useProjectActions } from "../shared";
@@ -296,6 +297,8 @@ export function ProjectView({ id }: { id: string }) {
               </p>
             )}
           </section>
+
+          <ProjectFiles projectId={project.id} files={data.files ?? []} readOnly={archived} />
 
           <section className="card p-5">
             <h2 className="card-title">Brief & notes</h2>

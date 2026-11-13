@@ -2,6 +2,7 @@ import { forgetProfile, handle, ok } from "@/lib/server/api";
 import { forgetGoogle } from "@/lib/server/google";
 import { must } from "@/lib/server/http";
 import { removeAllNoteFiles } from "@/lib/server/note-files";
+import { removeAllProjectFiles } from "@/lib/server/project-files";
 import { removeAllJobImages } from "@/lib/server/job-image";
 import { parse, z } from "@/lib/server/validate";
 
@@ -18,8 +19,9 @@ export const POST = handle(async ({ db, body, user }) => {
   must(await db.from("companies").delete().not("id", "is", null));
   // The Learning library (certificates, playlists …); deleting courses only unlinks it, so it is removed here.
   must(await db.from("learning_resources").delete().not("id", "is", null));
-  // Projects too (their tasks go with them).
+  // Projects too (their tasks and file rows go with them), and the files they kept.
   must(await db.from("projects").delete().not("id", "is", null));
+  await removeAllProjectFiles(db, user.id);
   // The link to Google Calendar (the calendars themselves stay in Google).
   must(await db.from("google_connections").delete().eq("user_id", user.id));
   forgetGoogle(user.id);

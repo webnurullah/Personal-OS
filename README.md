@@ -59,6 +59,7 @@ Frontend and backend are **one Vercel project**. Every push to GitHub `main` put
    30. `20261028000000_realtime.sql` (real-time sync: the app's tables join the `supabase_realtime` publication so a change on one device shows on the others without a reload; `google_connections` is never published)
    31. `20261029000000_note_files.sql` (Notes: pictures and PDFs kept with a note: the `note_files` table and a private Storage bucket `note-files` (up to 4 MB a file, 10 files a note); a deleted note takes its files into the Archive and brings them back on restore)
    32. `20261103000000_event_link.sql` (Calendar: an optional link on an event, shown as a link icon on the event; the event note is now a longer text area)
+   33. `20261113000000_project_files.sql` (Projects: files kept with a project (any file; a picture or PDF can be previewed, every file downloaded): the `project_files` table and a private Storage bucket `project-files` (up to 4 MB a file, 20 files a project))
 
    Already set up? Only run the files you have not run yet. Each new file is listed here when it is added.
 3. **Authentication → URL Configuration**

@@ -37,7 +37,8 @@ for (const width of [390, 320, 1280]) {
   page.on("pageerror", (e) => errors.push(String(e)));
   await page.goto(`${BASE}/calendar`);
   await page.getByRole("heading", { name: "Calendar", level: 1 }).waitFor({ timeout: 30000 });
-  const agenda = page.locator("ol", { has: page.getByText("Plain event") });
+  // The day's list (not "Coming up", which also holds today's later events depending on the time of day).
+  const agenda = page.locator("ol.space-y-1", { has: page.getByText("Plain event") });
   await agenda.getByText("Grameenphone CV training").waitFor();
 
   // ---- the agenda: the link is an icon next to the event; the row itself still opens the editor

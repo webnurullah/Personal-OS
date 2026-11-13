@@ -1,18 +1,20 @@
 import { handle, ok } from "@/lib/server/api";
 import { HttpError, must } from "@/lib/server/http";
 import { progress, timeframe } from "@/lib/projects";
+import { filesOfProject, projectFilePaths, removeProjectFiles } from "@/lib/server/project-files";
 import { withDays } from "@/lib/server/projects";
 import { checkProjectDates, ProjectFields } from "@/lib/server/schemas";
 import { nonEmpty, parse, s } from "@/lib/server/validate";
 
 // One project with its tasks: every open task, and the newest 100 finished ones (the count of all finished ones is exact).
-export const GET = handle<{ id: string }>(async ({ db, params, today, profile }) => {
+export const GET = handle<{ id: string }>(async ({ db, user, params, today, profile }) => {
   const id = parse(s.id, params.id);
-  const [project, open, done, doneCount] = await Promise.all([
+  const [project, open, done, doneCount, files] = await Promise.all([
     db.from("projects").select("*").eq("id", id).single().then(must),
     db.from("tasks").select("*").eq("project_id", id).is("done_at", null).order("due_date", { ascending: true, nullsFirst: false }).order("created_at").then(must),
     db.from("tasks").select("*").eq("project_id", id).not("done_at", "is", null).order("done_at", { ascending: false }).limit(100).then(must),
     db.from("tasks").select("id", { count: "exact", head: true }).eq("project_id", id).not("done_at", "is", null),
+    filesOfProject(db, user.id, id),
   ]);
   if (doneCount.error) must({ data: null, error: doneCount.error });
   const finished = doneCount.count ?? done.length;
@@ -22,6 +24,7 @@ export const GET = handle<{ id: string }>(async ({ db, params, today, profile })
     today: t,
     project: { ...dated, timeframe: timeframe(dated, t), tasks_total: open.length + finished, tasks_done: finished, tasks_open: open.length, percent: progress(finished, open.length + finished) },
     tasks: [...open, ...done],
+    files,
   };
 });
 
@@ -33,12 +36,15 @@ export const PATCH = handle<{ id: string }>(async ({ db, params, body }) => {
   return must(await db.from("projects").update(changes).eq("id", id).select().single());
 });
 
-// Deletes the project for good, and its tasks too. Only an archived project can be deleted:
+// Deletes the project for good, and its tasks and files too. Only an archived project can be deleted:
 // removing a project always goes through the Archive first.
-export const DELETE = handle<{ id: string }>(async ({ db, params }) => {
+export const DELETE = handle<{ id: string }>(async ({ db, user, params }) => {
   const id = parse(s.id, params.id);
   const found = must(await db.from("projects").select("archived_at").eq("id", id).single());
   if (!found.archived_at) throw new HttpError(400, "Archive the project first, then delete it from the Archive.");
+  // Its files go with it: the paths are read first (the rows go with the project), the stored files are removed last.
+  const paths = await projectFilePaths(db, id);
   must(await db.from("projects").delete().eq("id", id).select("id").single());
+  await removeProjectFiles(db, user.id, paths);
   return ok;
 });

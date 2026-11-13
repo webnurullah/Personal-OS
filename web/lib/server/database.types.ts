@@ -1084,6 +1084,47 @@ export type Database = {
 
         ];
       };
+      project_files: {
+        Row: {
+          id: string;
+          user_id: string;
+          project_id: string;
+          kind: string;
+          name: string;
+          path: string;
+          size_bytes: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string;
+          project_id: string;
+          kind: string;
+          name: string;
+          path: string;
+          size_bytes: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          project_id?: string;
+          kind?: string;
+          name?: string;
+          path?: string;
+          size_bytes?: number;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'project_files_project_id_fkey';
+            columns: ['project_id'];
+            isOneToOne: false;
+            referencedRelation: 'projects';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       project_time: {
         Row: {
           id: string;

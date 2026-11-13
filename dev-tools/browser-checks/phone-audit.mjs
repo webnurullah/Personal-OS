@@ -112,6 +112,8 @@ const projectDetail = (i, over = {}) => ({
   today: TODAY,
   project: { ...makeProject(i), notes: [SENT, WORD, BN, LINK].join("\n"), ...over },
   tasks: [...range(14).map((k) => task(k + 100, { project_id: `p${i}`, due_date: k % 2 ? D(k) : null })), ...range(8).map((k) => task(k + 200, { project_id: `p${i}`, done_at: iso(D(-1), "09:00:00") }))],
+  // Files kept with the project: hostile names (very long, no spaces, Bangla, emoji), every kind, up to the limit of 20.
+  files: range(20).map((k) => ({ id: `pf${i}-${k}`, project_id: `p${i}`, kind: ["image", "pdf", "file"][k % 3], name: [`${WORD}.docx`, `${LINK}.zip`, `${BN}.pdf`, `${H(k, 120)}.xlsx`][k % 4], size_bytes: [4194304, 850 * 1024, 999, 123456][k % 4], created_at: iso("2026-10-02"), url: k % 3 === 0 ? "data:image/gif;base64,R0lGODlhAQABAIAAAAUEBAAAACwAAAAAAQABAAACAkQBADs=" : null })),
 });
 
 const habitIcons = ["dumbbell", "book-open", "brain", "glass-water", "salad", "moon", "footprints", "notebook-pen"];
@@ -860,6 +862,15 @@ unit("project", "/projects/p1", (p) => p.locator("main h1").first().waitFor({ ti
     await page.locator("input[aria-label='New task']").fill(WORD);
     await page.locator("textarea#project-notes").fill(H(0, 10000).repeat(20));
     await snap("long task + notes typed");
+  }),
+  scene("Files box with 20 hostile files", async (page, snap) => {
+    await page.locator("section[aria-label='Project files']").scrollIntoViewIfNeeded();
+    await snap("20 files, long names, Full button");
+  }),
+  confirmScene("Delete file question", (p) => p.locator("section[aria-label='Project files'] button[aria-label^='Delete ']").first()),
+  scene("Picture of a project opened", async (page, snap) => {
+    await press(page.locator("section[aria-label='Project files'] button[aria-label^='Preview ']").first());
+    await snap("picture viewer");
   }),
   scene("Edit project dialog", async (page, snap) => {
     await openDialog(page, button(page, "Edit", true));

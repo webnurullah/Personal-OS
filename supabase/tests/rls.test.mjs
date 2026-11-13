@@ -241,6 +241,52 @@ await db.exec(`delete from notes where id = '${noteB}'`);
   await db.exec(`delete from events where id = '${ev.id}'`);
 }
 
+// Project files (20261113000000_project_files.sql): any file kept with a project, in a private bucket
+{
+const pbucket = (await db.query(`select public, file_size_limit::int as max, allowed_mime_types from storage.buckets where id = 'project-files'`)).rows[0];
+check('project-files bucket is PRIVATE, capped at 4 MB, any file type', pbucket?.public === false && pbucket.max === 4194304 && pbucket.allowed_mime_types === null, JSON.stringify(pbucket));
+const pf = (uid, n, ext = '.pdf') => `${uid}/${String(n).padStart(8, '0')}-bbbb-4ccc-8ddd-eeeeeeeeeeee${ext}`;
+const proj = (await qa(`insert into projects (name) values ('Files project') returning id`))[0].id;
+const projB = (await qb(`insert into projects (name) values ('B project') returning id`))[0].id;
+const prow = async (id, over = {}) => qa(`insert into project_files (project_id, kind, name, path, size_bytes) values ($1, $2, $3, $4, $5) returning id, user_id`, [id, over.kind ?? 'pdf', over.name ?? 'Brief.pdf', over.path ?? pf(A, 1), over.size ?? 1000]);
+const p1 = (await prow(proj))[0];
+check('a project can keep a file; the owner is filled in', p1.user_id === A);
+check('a file of any kind is allowed ("file"), with no ending in its stored name too', (await prow(proj, { kind: 'file', name: 'Contract.docx', path: pf(A, 2, '.docx') })).length === 1 && (await prow(proj, { kind: 'file', name: 'LICENSE', path: pf(A, 3, '') })).length === 1);
+for (const [name, over] of [
+  ['an unknown kind', { kind: 'video', path: pf(A, 4) }],
+  ['an empty name', { name: '', path: pf(A, 5) }],
+  ['a name over 200 characters', { name: 'x'.repeat(201), path: pf(A, 6) }],
+  ['a zero size', { size: 0, path: pf(A, 7) }],
+  ['a size over 4 MB', { size: 4194305, path: pf(A, 8) }],
+  ['an ending with a space or a symbol', { path: pf(A, 9, '.p df') }],
+  ['an ending of more than 10 characters', { path: pf(A, 10, '.abcdefghijk') }],
+  ['an upper-case ending', { path: pf(A, 11, '.PDF') }],
+  ['a path that climbs up', { path: `${A}/../x.pdf` }],
+  ["a path inside someone else's folder", { path: pf(B, 12) }],
+]) {
+  await expectError(`a project file row rejects ${name}`, () => prow(proj, over), 'check constraint');
+}
+await expectError('two rows cannot share one stored file', () => prow(proj, { path: pf(A, 1) }), 'duplicate key');
+await expectError("B cannot give A's project a file for A", () => qb(`insert into project_files (user_id, project_id, kind, name, path, size_bytes) values ($1, $2, 'pdf', 'x.pdf', $3, 10)`, [A, proj, pf(A, 13)]), 'row-level security');
+check("B cannot see A's project files", (await qb('select id from project_files')).length === 0);
+check("B cannot delete A's project file", (await qb('delete from project_files where id = $1 returning id', [p1.id])).length === 0);
+await expectError('a project file cannot be edited (only added and removed)', () => qa(`update project_files set name = 'x.pdf' where id = $1`, [p1.id]), 'permission denied');
+await expectError('a signed-out visitor cannot read project files', () => qanon('select * from project_files'), 'permission denied');
+
+check('you can add a file to your own folder in the bucket', (await qa(`insert into storage.objects (bucket_id, name, owner_id) values ('project-files', $1, $2) returning name`, [pf(A, 1), A])).length === 1);
+await expectError("you cannot add a project file to someone else's folder", () => qb(`insert into storage.objects (bucket_id, name, owner_id) values ('project-files', $1, $2)`, [pf(A, 1), B]), 'row-level security');
+await expectError('a signed-out visitor cannot add a project file', () => qanon(`insert into storage.objects (bucket_id, name) values ('project-files', $1)`, [pf(A, 1)]), 'row-level security');
+check("you cannot look up someone else's project files (so no signed address either)", (await qb(`select name from storage.objects where bucket_id = 'project-files'`)).length === 0);
+check('you can look up your own project files', (await qa(`select name from storage.objects where bucket_id = 'project-files'`)).length === 1);
+check("you cannot remove someone else's project file", (await qb(`delete from storage.objects where name = $1 and bucket_id = 'project-files' returning id`, [pf(A, 1)])).length === 0);
+
+// Deleting a project deletes its file rows (the app removes the stored files too).
+await db.exec(`delete from projects where id = '${proj}'`);
+check('deleting a project removes its file rows', (await qa('select count(*)::int n from project_files where project_id = $1', [proj]))[0].n === 0);
+check('(clean up)', (await qa(`delete from storage.objects where bucket_id = 'project-files' and name = $1 returning id`, [pf(A, 1)])).length === 1);
+await db.exec(`delete from projects where id = '${projB}'`);
+}
+
 // Job favourite star (20261017000000_job_favourite.sql)
 {
   const jf = (await qa(`insert into job_applications (url, title) values ('', 'Starred job') returning id, favourite`))[0];

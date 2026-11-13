@@ -6,6 +6,7 @@ export const TABLE_PREFIXES: Record<string, string[]> = {
   tasks: ["/tasks", "/events", "/goals", "/courses", "/learning", "/search"],
   events: ["/events"],
   projects: ["/projects", "/project-time"],
+  project_files: ["/projects"],
   project_time: ["/timer", "/project-time", "/projects", "/courses", "/learning", "/habits"],
   course_time: ["/timer", "/project-time", "/courses", "/learning", "/resources", "/habits"],
   courses: ["/courses", "/learning", "/resources"],

@@ -1,8 +1,9 @@
 import { chromium } from "/opt/node22/lib/node_modules/playwright/index.mjs";
+import { launch } from "/home/user/Personal-OS/dev-tools/browser-checks/audit-lib.mjs";
 import { summarise, timeframe, progress } from "/home/user/Personal-OS/web/lib/projects.ts";
 const base = "http://localhost:3123", S = process.argv[2];
 const T = "2026-10-06";
-const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium-1194/chrome-linux/chrome" });
+const browser = await launch();
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
 const now = Math.floor(Date.now() / 1000);
 const session = { access_token: "x.y.z", refresh_token: "r", token_type: "bearer", expires_in: 99999999, expires_at: now + 99999999, user: { id: "u1", aud: "authenticated", email: "me@example.com", app_metadata: {}, user_metadata: {}, created_at: "2026-01-01" } };

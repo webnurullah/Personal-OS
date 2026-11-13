@@ -424,7 +424,10 @@ export type Project = {
   tasks_open: number;
   percent: number;
 };
-export type ProjectDetail = { today: string; project: Project & { links: ProjectLink[]; notes: string }; tasks: Task[] };
+/** A file kept with a project. A picture or PDF can be previewed; any other file is only downloaded. `url` is a signed address for a picture. */
+export type ProjectFile = { id: string; project_id: string; kind: "image" | "pdf" | "file"; name: string; size_bytes: number; created_at: string; url: string | null };
+/** `files` is missing in a copy of the project that the browser saved before files existed. */
+export type ProjectDetail = { today: string; project: Project & { links: ProjectLink[]; notes: string }; tasks: Task[]; files?: ProjectFile[] };
 /** The short list for pickers (GET /projects?lite=1). */
 /** One thing waiting in the Archive: a deleted item (source "item") or an archived project (source "project"). */
 export type ArchiveEntry = {

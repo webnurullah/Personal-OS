@@ -1,6 +1,7 @@
 import { chromium } from "/opt/node22/lib/node_modules/playwright/index.mjs";
+import { launch } from "/home/user/Personal-OS/dev-tools/browser-checks/audit-lib.mjs";
 const base = "http://localhost:3123", T = "2026-10-06";
-const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium-1194/chrome-linux/chrome" });
+const browser = await launch();
 const now = Math.floor(Date.now() / 1000);
 const session = { access_token: "x.y.z", refresh_token: "r", token_type: "bearer", expires_in: 99999999, expires_at: now + 99999999, user: { id: "u1", aud: "authenticated", email: "me@example.com", app_metadata: {}, user_metadata: {}, created_at: "2026-01-01" } };
 const profile = { id: "u1", email: "me@example.com", today: T, full_name: "Nurullah", currency: "BDT", time_format: "12h", timezone: "Asia/Dhaka", week_start: 1, hide_amounts: false, skills: [], notify: {}, avatar_url: null };

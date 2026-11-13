@@ -3,11 +3,13 @@
 //   import { chromium, session, newPhone, apiMock, measure } from "/tmp/claude-0/-home-user-Personal-OS/2c2f8a59-52e5-53a4-9940-d366d1b5c600/scratchpad/audit/audit-lib.mjs";
 export { chromium } from "/opt/node22/lib/node_modules/playwright/index.mjs";
 import { chromium } from "/opt/node22/lib/node_modules/playwright/index.mjs";
+import { existsSync } from "node:fs";
 
 export const BASE = "http://localhost:3123";
 export const TODAY = "2026-10-06";
 export const CHROME = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
-export const launch = () => chromium.launch({ executablePath: CHROME });
+// The browser that came with the machine (its folder name changes with the Playwright version): when the path above is not there, Playwright finds its own.
+export const launch = () => chromium.launch(existsSync(CHROME) ? { executablePath: CHROME } : {});
 
 const now = Math.floor(Date.now() / 1000);
 // A fake signed-in browser session. The app only needs this cookie; the API is answered by apiMock() below.
